@@ -134,7 +134,7 @@ if $USE_LOCAL && [ -f "$INSTALL_DIR/package.json" ]; then
   ok "Panel files copied"
 else
   info "Cloning from repository..."
-  REPO_URL="${REPO_URL:-https://github.com/your-org/mcpanel.git}"
+  REPO_URL="${REPO_URL:-https://github.com/Skitaru/mcpanel.git}"
   if [ -d /tmp/mcpanel-repo ]; then rm -rf /tmp/mcpanel-repo; fi
   git clone --depth 1 "$REPO_URL" /tmp/mcpanel-repo 2>/dev/null || \
     fail "Failed to clone repository. Set REPO_URL or use --local."
