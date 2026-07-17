@@ -9,7 +9,7 @@ A lightweight, modern web panel for managing Minecraft servers via Docker.
 ## ⚡ One-Line Install (Debian 12/13)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/mcpanel/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash
 ```
 
 > Requires **Debian 11/12/13** or **Ubuntu 22.04/24.04** · Root access · Ports 3000 + 3001 open
@@ -24,7 +24,7 @@ The installer handles everything:
 ### Custom options
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/mcpanel/main/install.sh | sudo bash -s -- --port 3000 --fe-port 3001 --api-key YOUR_KEY
+curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash -s -- --port 3000 --fe-port 3001 --api-key YOUR_KEY
 ```
 
 ---
