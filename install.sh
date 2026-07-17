@@ -73,7 +73,7 @@ case "${ID:-}" in debian|ubuntu) ;; *) fail "Debian or Ubuntu required." ;; esac
 if [ -d "$PANEL_DIR" ] && [ -f "$PANEL_DIR/servers.json" ]; then
   clear
   echo; echo -e "  ${Y}⚠${N}  MCPanel is already installed."; echo
-  printf "  Reinstall? Data stays. [y/N]: "; read -r ans
+  printf "  Reinstall? Data stays. [y/N]: "; read -r ans < /dev/tty
   case "$ans" in [yY]) ;; *) echo -e "  ${D}Cancelled.${N}"; exit 0 ;; esac
   systemctl stop mcpanel-backend mcpanel-frontend 2>/dev/null || true
 fi
@@ -112,10 +112,20 @@ if $USE_LOCAL && [ -f "$INSTALL_DIR/package.json" ]; then
   cp -r "$INSTALL_DIR/frontend/." "$PANEL_DIR/frontend/"
   ok "Files copied"
 else
-  rm -rf /tmp/mcpanel-repo
-  run "Clone repo" git clone --depth 1 "$REPO_URL" /tmp/mcpanel-repo
-  cp -r /tmp/mcpanel-repo/src /tmp/mcpanel-repo/package.json /tmp/mcpanel-repo/tsconfig.json "$PANEL_DIR/"
-  cp -r /tmp/mcpanel-repo/frontend/. "$PANEL_DIR/frontend/"
+  info "Cloning from repository..."
+  REPO_URL="${REPO_URL:-https://github.com/Skitaru/mcpanel.git}"
+  if [ -d /tmp/mcpanel-repo ]; then rm -rf /tmp/mcpanel-repo; fi
+  git clone --depth 1 "$REPO_URL" /tmp/mcpanel-repo 2>/dev/null || \
+    fail "Failed to clone repository. Set REPO_URL or use --local."
+  cp -r /tmp/mcpanel-repo/src "$PANEL_DIR/"
+  cp /tmp/mcpanel-repo/package.json "$PANEL_DIR/"
+  cp /tmp/mcpanel-repo/tsconfig.json "$PANEL_DIR/"
+  cp -r /tmp/mcpanel-repo/frontend/src "$PANEL_DIR/frontend/"
+  cp /tmp/mcpanel-repo/frontend/package.json "$PANEL_DIR/frontend/"
+  cp /tmp/mcpanel-repo/frontend/tsconfig.json "$PANEL_DIR/frontend/"
+  cp /tmp/mcpanel-repo/frontend/next.config.ts "$PANEL_DIR/frontend/"
+  cp /tmp/mcpanel-repo/frontend/postcss.config.mjs "$PANEL_DIR/frontend/"
+  cp -r /tmp/mcpanel-repo/frontend/public "$PANEL_DIR/frontend/" 2>/dev/null || true
   rm -rf /tmp/mcpanel-repo
   ok "Files deployed"
 fi
