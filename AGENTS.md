@@ -75,8 +75,9 @@
 - **`ERR_CONNECTION_REFUSED` on login:** `install.sh` was baking `NEXT_PUBLIC_API_URL=http://127.0.0.1:3000` into the frontend build. Remote browsers resolved `127.0.0.1` to their own machine. Removed the env var from the build command — frontend now uses relative URLs + Next.js rewrites.
 - **`401 Unauthorized` after login:** `authMiddleware` validated JWT but didn't set `_authOk`. The API-key fallback middleware then rejected the request. Added `(req as any)._authOk = true` in `auth.ts`.
 - **Frontend systemd service** now has `EnvironmentFile=/opt/mcpanel/.env` so `BACKEND_URL` is available.
-- **`resolveJavaImage` default:** Non-standard version strings (e.g. "26.2") were falling to Java 8. Changed default to Java 21 in `docker.ts` (commit `33c977c`).
-- **`startContainer` 500 on already-running:** Docker returns 304 when container is already started, dockerode treated it as error. Now caught and treated as no-op (commit `33c977c`).
+- **`resolveJavaImage`:** Short-form versions ("26.2" → 1.26.2) now normalised. Added Java 25 for MC 1.26+. Commits `33c977c`, `296ea56`.
+- **`startContainer` 500 on already-running:** Docker returns 304 when container is already started, now caught and treated as no-op. Commit `33c977c`.
+- **WebSocket → Polling:** Next.js production rewrites don't proxy WebSocket upgrades. Changed Socket.IO to polling-only transport. Commit `e0724bb`.
 
 **Added:**
 - **Logout button** in dashboard header (page.tsx) — clears token, reloads to login screen. (Logout also exists in sidebar footer.)
@@ -85,6 +86,21 @@
 **Git:** Frontend was incorrectly tracked as a gitlink/submodule without a remote. Converted to regular tracked directory in commit `7fddf80`.
 
 **Cleanup:** Removed 10 orphaned data directories + 7 stale backup tarballs from `/opt/mcpanel/data/`.
+
+---
+
+### 2026-07-18 (Session 2) — Socket.IO 401 + server icon binary serving
+
+**Bug: Socket.IO 401 Unauthorized**
+- **Root cause:** The global API-key fallback middleware (`index.ts` line 40) rejected `/socket.io` polling requests. The JWT `authMiddleware` only runs on `/api/*` routes, but the API-key fallback ran on ALL routes. Socket.IO polling doesn't carry a Bearer token, so it hit the `401` code path.
+- **Fix:** Added `req.path.startsWith("/socket.io")` to the skip-conditions in the API-key fallback middleware. Commit `6488380`.
+
+**Bug: Server icon 404 + not rendering**
+- **Root cause 1:** `SettingsTab.tsx` used `/api/servers/:id/file?path=/server-icon.png` as an `<img src>` URL. But the backend's GET `/file` endpoint reads files as UTF-8 and returns JSON — browsers can't render JSON as images.
+- **Root cause 2:** Even if the endpoint returned binary data, `<img src>` requests don't go through the fetch interceptor, so they wouldn't carry the JWT Bearer token — resulting in 401.
+- **Fix (backend):** Added `?raw=true` query param to GET `/file`. When set, the endpoint returns raw binary with a proper `Content-Type` header (mapped from file extension via `MIME_MAP`).
+- **Fix (frontend):** `SettingsTab` now fetches the icon via `fetch()` (which goes through the auth interceptor → adds Bearer token), creates a `blob:` URL from the response, and uses that as the `<img src>`. Old blob URLs are revoked to prevent memory leaks.
+- **MIME types:** Added extensive `MIME_MAP` (png, jpg, gif, svg, ico, webp, json, html, css, js, xml, txt, log, yml, yaml, toml, properties, cfg, conf).
 
 ---
 
@@ -140,4 +156,4 @@ deepseek/                      # Local clone root
 
 ---
 
-> **Last updated:** 2026-07-18 · Session: bug fixes + UI polish
+> **Last updated:** 2026-07-18 · Session: Socket.IO 401 fix + binary file serving
