@@ -4,25 +4,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
-  Terminal, FolderOpen, ScrollText,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Settings, Upload, LogOut,
+  Terminal, FolderOpen, ScrollText, Settings2,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Settings, Upload, LogOut, Users,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import EditServerDialog from "@/components/EditServerDialog";
+import SettingsTab from "@/components/SettingsTab";
 import ServerSidebar from "@/components/ServerSidebar";
 import { DetailSkeleton } from "@/components/Skeleton";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-type Tab = "console" | "files" | "logs";
+type Tab = "console" | "files" | "logs" | "settings";
 
 const TABS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "logs", label: "Logs", icon: ScrollText },
+  { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
 function statusColor(s: ServerStatus["status"]) {
@@ -50,6 +52,8 @@ export default function ServerDetailPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
+  const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
 
   const fetchServer = useCallback(async () => {
     try {
@@ -67,6 +71,25 @@ export default function ServerDetailPage() {
 
   useEffect(() => { fetchServer(); }, [fetchServer]);
   useEffect(() => { const i = setInterval(fetchServer, 3000); return () => clearInterval(i); }, [fetchServer]);
+
+  // Player list poll
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/servers/${serverId}/players`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.unreachable) {
+            setPlayerCount({ online: data.online, max: data.max });
+            setPlayerList(data.players ?? []);
+          }
+        }
+      } catch {}
+    };
+    poll();
+    const i = setInterval(poll, 15000);
+    return () => clearInterval(i);
+  }, [serverId]);
 
   const handleAction = useCallback(async (action: "start" | "stop" | "restart") => {
     setActing(true);
@@ -164,7 +187,26 @@ export default function ServerDetailPage() {
                     <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">{typeLabel(server.serverType)}</span>
                     <span>{server.ram >= 1024 ? `${(server.ram / 1024).toFixed(1)} GB` : `${server.ram} MB`}</span>
                     <span>Port {server.port}</span>
+                    {playerCount.online > 0 && (
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <Users className="h-3 w-3" />
+                        <span>{playerCount.online}/{playerCount.max} online</span>
+                      </span>
+                    )}
                   </div>
+                  {server.status === "running" && playerList.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {playerList.slice(0, 8).map((p) => (
+                        <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[11px] text-emerald-400">
+                          <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                          {p.name}
+                        </span>
+                      ))}
+                      {playerList.length > 8 && (
+                        <span className="text-[11px] text-neutral-600 py-0.5">+{playerList.length - 8} more</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {server.status === "running" ? (
@@ -207,6 +249,7 @@ export default function ServerDetailPage() {
                 <div className={activeTab === "console" ? "" : "hidden"}><ConsoleTab serverId={serverId} serverStatus={server.status} /></div>
                 <div className={activeTab === "files" ? "" : "hidden"}><FileManagerTab serverId={serverId} /></div>
                 <div className={activeTab === "logs" ? "" : "hidden"}><LogsTab serverId={serverId} /></div>
+                <div className={activeTab === "settings" ? "" : "hidden"}><SettingsTab serverId={serverId} serverType={server.serverType} /></div>
               </section>
             </>
           )}
