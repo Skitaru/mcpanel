@@ -47,8 +47,8 @@ export function resolveJavaImage(mcVersion: string): string {
   // 1.12 – 1.16.4 → Java 11
   if (major === 1 && minor >= 12) return "eclipse-temurin:11-jre-alpine";
 
-  // Everything older → Java 8
-  return "eclipse-temurin:8-jre-alpine";
+  // Unknown format (e.g. user typos like "26.2") → Java 21
+  return "eclipse-temurin:21-jre-alpine";
 }
 
 // ---------------------------------------------------------------------------
@@ -166,11 +166,20 @@ export async function createContainer(
   return container.id;
 }
 
-/** Start a previously-created container. */
+/** Start a previously-created container. No-op if already running. */
 export async function startContainer(containerId: string): Promise<void> {
   const c = docker.getContainer(containerId);
-  await c.start();
-  console.log(`[docker] Started container ${containerId.slice(0, 12)}`);
+  try {
+    await c.start();
+    console.log(`[docker] Started container ${containerId.slice(0, 12)}`);
+  } catch (err: any) {
+    // Docker returns 304 when the container is already running — that's fine.
+    if (err.statusCode === 304) {
+      console.log(`[docker] Container ${containerId.slice(0, 12)} already running`);
+      return;
+    }
+    throw err;
+  }
 }
 
 /** Gracefully stop a container (SIGTERM, then force-kill after timeout). */
