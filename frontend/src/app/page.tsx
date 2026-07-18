@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
-  const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number }>>({});
+  const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number; players: { name: string; id: string }[] }>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
@@ -101,7 +101,7 @@ export default function DashboardPage() {
           if (res.ok) {
             const data = await res.json();
             if (!data.unreachable) {
-              setPlayerCounts((prev) => ({ ...prev, [s.id]: { online: data.online, max: data.max } }));
+              setPlayerCounts((prev) => ({ ...prev, [s.id]: { online: data.online, max: data.max, players: data.players ?? [] } }));
             }
           }
         } catch { /* ignore */ }
@@ -244,11 +244,28 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           {playerCounts[s.id] && (
-                            <div className="flex items-center gap-1 text-slate-400">
+                            <div className="flex items-center gap-1 text-slate-400 group relative">
                               <Users className="h-3 w-3" />
                               <span className="font-mono tabular-nums text-slate-300">
                                 {playerCounts[s.id].online}/{playerCounts[s.id].max}
                               </span>
+                              {playerCounts[s.id].players.length > 0 && (
+                                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20
+                                                rounded-lg border border-white/[0.06] bg-[#0a0a0a] px-3 py-2 shadow-xl min-w-[120px]">
+                                  <div className="text-[10px] font-medium text-neutral-500 mb-1 uppercase tracking-wider">Online</div>
+                                  {playerCounts[s.id].players.slice(0, 10).map((p) => (
+                                    <div key={p.id} className="flex items-center gap-1.5 py-0.5">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                      <span className="text-xs text-neutral-300 truncate">{p.name}</span>
+                                    </div>
+                                  ))}
+                                  {playerCounts[s.id].players.length > 10 && (
+                                    <div className="text-[10px] text-neutral-600 mt-1">
+                                      +{playerCounts[s.id].players.length - 10} more
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

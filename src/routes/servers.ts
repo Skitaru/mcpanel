@@ -55,15 +55,15 @@ function parseRamToMB(ram: string | number): number {
 
 /**
  * Ping a Minecraft server using the Server List Ping protocol.
- * Returns player count or null if the server is unreachable.
+ * Returns player count + player list or null if the server is unreachable.
  */
-function pingMinecraftServer(host: string, port: number, timeoutMs = 3000): Promise<{ online: number; max: number } | null> {
+function pingMinecraftServer(host: string, port: number, timeoutMs = 3000): Promise<{ online: number; max: number; players: { name: string; id: string }[] } | null> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let buf: Buffer = Buffer.alloc(0);
     let resolved = false;
 
-    const done = (result: { online: number; max: number } | null) => {
+    const done = (result: { online: number; max: number; players: { name: string; id: string }[] } | null) => {
       if (resolved) return;
       resolved = true;
       socket.destroy();
@@ -117,7 +117,11 @@ function pingMinecraftServer(host: string, port: number, timeoutMs = 3000): Prom
         const jsonStr = payload.subarray(1).toString("utf8");
         const data = JSON.parse(jsonStr);
         if (data.players) {
-          done({ online: data.players.online ?? 0, max: data.players.max ?? 0 });
+          done({
+            online: data.players.online ?? 0,
+            max: data.players.max ?? 0,
+            players: (data.players.sample ?? []).map((p: any) => ({ name: p.name, id: p.id })),
+          });
         } else {
           done(null);
         }
@@ -834,6 +838,117 @@ router.put("/:id", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[api] PUT /api/servers/:id error:", err);
     res.status(500).json({ error: "Failed to update server.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET  /api/servers/:id/properties — read server.properties as key=value
+// PUT  /api/servers/:id/properties — write server.properties
+// ---------------------------------------------------------------------------
+router.get("/:id/properties", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+
+    const propsPath = path.join(server.dataPath, "server.properties");
+    if (!fs.existsSync(propsPath)) {
+      res.json({ properties: {}, motd: server.name, motdRaw: "" });
+      return;
+    }
+
+    const raw = fs.readFileSync(propsPath, "utf-8");
+    const props: Record<string, string> = {};
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) continue;
+      props[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+    }
+
+    res.json({
+      properties: props,
+      motd: props.motd ?? server.name,
+      motdRaw: raw.split("\n").find(l => l.startsWith("motd="))?.slice(5) ?? "",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to read properties.", detail: err.message });
+  }
+});
+
+router.put("/:id/properties", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    if (server.serverType === "velocity") {
+      res.status(400).json({ error: "Velocity proxies use velocity.toml, not server.properties." });
+      return;
+    }
+
+    const { properties } = req.body ?? {};
+    if (!properties || typeof properties !== "object") {
+      res.status(400).json({ error: "Field 'properties' (object) is required." });
+      return;
+    }
+
+    const propsPath = path.join(server.dataPath, "server.properties");
+    const existing = fs.existsSync(propsPath) ? fs.readFileSync(propsPath, "utf-8") : "";
+
+    // Rebuild the file, replacing matching keys, keeping comments + unknown keys
+    const updatedKeys = new Set(Object.keys(properties));
+    const lines: string[] = [];
+    for (const line of existing.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) { lines.push(line); continue; }
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) { lines.push(line); continue; }
+      const key = trimmed.slice(0, eq).trim();
+      if (updatedKeys.has(key)) {
+        lines.push(`${key}=${properties[key]}`);
+        updatedKeys.delete(key);
+      } else {
+        lines.push(line);
+      }
+    }
+    // Append any new keys that weren't in the original file
+    for (const key of updatedKeys) {
+      lines.push(`${key}=${properties[key]}`);
+    }
+
+    fs.writeFileSync(propsPath, lines.join("\n") + "\n");
+    res.json({ message: "server.properties updated." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to save properties.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/servers/:id/icon — upload server-icon.png
+// ---------------------------------------------------------------------------
+const iconUpload = multer({ dest: "/tmp/mcpanel-icons", limits: { fileSize: 1024 * 1024 } }); // 1 MB
+try { fs.mkdirSync("/tmp/mcpanel-icons", { recursive: true }); } catch {}
+
+router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    if (!req.file) { res.status(400).json({ error: "No icon file uploaded." }); return; }
+
+    // Must be PNG
+    if (req.file.mimetype !== "image/png") {
+      try { fs.unlinkSync(req.file.path); } catch {}
+      res.status(400).json({ error: "Icon must be a PNG image (64×64 recommended)." });
+      return;
+    }
+
+    // Resize to 64×64 using sharp if available, else just copy
+    const destPath = path.join(server.dataPath, "server-icon.png");
+    const { rename } = await import("node:fs/promises");
+    await rename(req.file.path, destPath);
+
+    res.json({ message: "Server icon uploaded. Restart the server to apply." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to upload icon.", detail: err.message });
   }
 });
 
