@@ -17,18 +17,31 @@ const MC_PORT = 25565;
 
 /**
  * Return the correct `eclipse-temurin` Docker image tag for a given Minecraft
- * version string (e.g. "1.21.1", "1.16.5").
+ * version string (e.g. "1.21.1", "1.16.5", "26.2").
+ *
+ * Normalises short-form versions like "26.2" → "1.26.2".
  *
  * | Minecraft      | Java |
  * |----------------|------|
- * | 1.20.5+, 1.21+ | 21   |
+ * | 1.26+          | 25   |
+ * | 1.20.5 – 1.25  | 21   |
  * | 1.17 – 1.20.4  | 17   |
  * | 1.16.5          | 16   |
  * | 1.12 – 1.16.4   | 11   |
  * | older           |  8   |
  */
 export function resolveJavaImage(mcVersion: string): string {
-  const [major, minor = 0, patch = 0] = mcVersion.split(".").map(Number);
+  let [major, minor = 0, patch = 0] = mcVersion.split(".").map(Number);
+
+  // Normalise short-form versions ("26.2" → 1.26.2).
+  if (major > 1) {
+    patch = minor;
+    minor = major;
+    major = 1;
+  }
+
+  // 1.26+ → Java 25 (Paper bumped the requirement at 1.26)
+  if (major === 1 && minor >= 26) return "eclipse-temurin:25-jre-alpine";
 
   // 1.21+ → Java 21
   if (major === 1 && minor >= 21) return "eclipse-temurin:21-jre-alpine";
@@ -47,8 +60,8 @@ export function resolveJavaImage(mcVersion: string): string {
   // 1.12 – 1.16.4 → Java 11
   if (major === 1 && minor >= 12) return "eclipse-temurin:11-jre-alpine";
 
-  // Unknown format (e.g. user typos like "26.2") → Java 21
-  return "eclipse-temurin:21-jre-alpine";
+  // Older → Java 8
+  return "eclipse-temurin:8-jre-alpine";
 }
 
 // ---------------------------------------------------------------------------
