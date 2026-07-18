@@ -171,6 +171,15 @@ const httpServer = http.createServer(app);
 // ---- WebSocket (socket.io) ----
 setupWebSocket(httpServer);
 
+// Next.js strips trailing slashes, but Socket.IO requires /socket.io/
+// (with trailing slash). Must run AFTER setupWebSocket so our prependListener
+// fires BEFORE Socket.IO's own prependListener.
+httpServer.prependListener("request", (req) => {
+  if (req.url?.startsWith("/socket.io") && !req.url!.startsWith("/socket.io/")) {
+    req.url = req.url!.replace("/socket.io", "/socket.io/");
+  }
+});
+
 // ---- start ----
 httpServer.listen(PORT, () => {
   console.log(`[panel] Daemon listening on http://localhost:${PORT}`);
