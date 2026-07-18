@@ -58,7 +58,7 @@ export default function DashboardPage() {
 
   // ---- Socket.IO for live stats ----
   useEffect(() => {
-    const socket = io(API_BASE, { transports: ["websocket", "polling"] });
+    const socket = io(API_BASE, { transports: ["polling"] }); // no WebSocket — Next.js rewrites don't proxy WS upgrades in prod
     socketRef.current = socket;
 
     socket.on("connect", () => {
