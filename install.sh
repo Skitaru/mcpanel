@@ -124,7 +124,7 @@ step 6 $TOTAL_STEPS "Build panel"
 run "Backend deps" bash -c "cd $PANEL_DIR && npm install --silent"
 run "Backend build" bash -c "cd $PANEL_DIR && npx tsc"
 run "Frontend deps" bash -c "cd $PANEL_DIR/frontend && npm install --silent"
-run "Frontend build" bash -c "cd $PANEL_DIR/frontend && NEXT_PUBLIC_API_URL=http://127.0.0.1:$PANEL_PORT npx next build"
+run "Frontend build" bash -c "cd $PANEL_DIR/frontend && npx next build"
 
 step 7 $TOTAL_STEPS "Configure services"
 [ -z "$API_KEY" ] && API_KEY=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
@@ -166,6 +166,7 @@ After=network.target mcpanel-backend.service
 Type=simple
 User=root
 WorkingDirectory=/opt/mcpanel/frontend
+EnvironmentFile=/opt/mcpanel/.env
 ExecStart=/usr/bin/npx next start -p 3001
 Restart=always
 RestartSec=5
