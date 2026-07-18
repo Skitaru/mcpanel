@@ -242,11 +242,10 @@ export default function FileManagerTab({ serverId }: Props) {
     if (!selectedFile) return;
     try {
       const res = await fetch(
-        `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(selectedFile)}`,
+        `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(selectedFile)}&raw=true`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const blob = new Blob([data.content], { type: "application/octet-stream" });
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
