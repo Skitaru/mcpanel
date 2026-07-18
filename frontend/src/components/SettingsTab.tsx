@@ -62,28 +62,24 @@ export default function SettingsTab({ serverId, serverType }: Props) {
 
   useEffect(() => { loadProperties(); }, [loadProperties]);
 
-  // ---- load icon preview ----
+  // ---- load icon preview (fetch raw binary, create blob URL for <img>) ----
   useEffect(() => {
-    fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/server-icon.png")}`)
-      .then(r => { if (r.ok) return r.json(); throw null; })
-      .then(d => {
-        if (d.content) {
-          // Content is base64 of the image? No — it's text. The file read returns utf-8.
-          // We need a direct image URL. Use a different approach: check via HEAD/GET the actual file.
-          // For now, use a data URI via a separate fetch.
-          fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/server-icon.png")}`)
-            .then(r => r.json())
-            .then(d2 => {
-              if (d2.content && d2.size > 0) {
-                // The file content is binary, but we read as utf-8 — won't work for binary.
-                // Use a simple trick: set iconUrl to a timestamp-busting URL
-                setIconUrl(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/server-icon.png")}&_=${Date.now()}`);
-              }
-            })
-            .catch(() => {});
-        }
+    let cancelled = false;
+    const iconPath = `/server-icon.png`;
+    fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(iconPath)}&raw=true`)
+      .then((r) => {
+        if (!r.ok || cancelled) throw null;
+        return r.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        setIconUrl((prev) => {
+          if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [serverId]);
 
   // ---- save properties ----
@@ -125,7 +121,17 @@ export default function SettingsTab({ serverId, serverType }: Props) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      setIconUrl(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/server-icon.png")}&_=${Date.now()}`);
+      // Reload icon as blob URL (so auth interceptor attaches Bearer token)
+      try {
+        const iconRes = await fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/server-icon.png")}&raw=true`);
+        if (iconRes.ok) {
+          const blob = await iconRes.blob();
+          setIconUrl((prev) => {
+            if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+            return URL.createObjectURL(blob);
+          });
+        }
+      } catch {}
     } catch (err: unknown) {
       console.error("Icon upload failed:", err);
     } finally {
