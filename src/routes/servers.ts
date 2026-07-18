@@ -656,27 +656,45 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
       } catch { /* container might already be stopped */ }
     }
 
-    // Clear data directory (keep the directory itself)
+    // Extract to a temp directory first — only clear data if extraction succeeds
+    const tmpDir = path.join("/tmp/mcpanel-restore", server.id);
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const { execSync } = await import("node:child_process");
+    try {
+      execSync(`tar -xzf "${uploadPath}" -C "${tmpDir}"`, {
+        stdio: "pipe",
+        timeout: 300_000,
+      });
+    } catch (err: any) {
+      try { fs.unlinkSync(uploadPath); } catch {}
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      res.status(500).json({ error: "Restore failed — invalid archive?", detail: err.message });
+      return;
+    }
+
+    // Extraction succeeded — now clear data directory and move files
     try {
       for (const entry of fs.readdirSync(server.dataPath)) {
         fs.rmSync(path.join(server.dataPath, entry), { recursive: true, force: true });
       }
     } catch { /* dir might be empty or nonexistent */ }
 
-    // Extract uploaded tar.gz
-    const { execSync } = await import("node:child_process");
     try {
-      execSync(`tar -xzf "${uploadPath}" -C "${server.dataPath}"`, {
-        stdio: "pipe",
-        timeout: 300_000,
-      });
+      for (const entry of fs.readdirSync(tmpDir)) {
+        fs.renameSync(path.join(tmpDir, entry), path.join(server.dataPath, entry));
+      }
     } catch (err: any) {
-      res.status(500).json({ error: "Restore failed — invalid archive?", detail: err.message });
+      console.error("[api] Restore move failed:", err.message);
+      res.status(500).json({ error: "Restore failed — could not move files into data directory.", detail: err.message });
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
       try { fs.unlinkSync(uploadPath); } catch {}
       return;
     }
 
-    // Clean up temp file
+    // Clean up
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     try { fs.unlinkSync(uploadPath); } catch {}
 
     // Start container again

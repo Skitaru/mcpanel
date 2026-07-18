@@ -58,6 +58,18 @@ if (API_KEY) {
 }
 
 // ---- Auth routes ----
+// Rate-limit login attempts: max 10 per minute per IP
+let rateLimit: any;
+try { rateLimit = require("express-rate-limit"); } catch { rateLimit = null; }
+if (rateLimit) {
+  app.use("/api/auth/login", rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    message: { error: "Too many login attempts. Please wait a minute." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
+}
 app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) {
@@ -125,6 +137,32 @@ app.get("/api/paper/versions", async (_req, res) => {
 // ---- health-check ----
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+// ---- Fabric versions proxy ----
+app.get("/api/fabric/versions", async (_req, res) => {
+  try {
+    const r = await fetch("https://meta.fabricmc.net/v2/versions/game", {
+      headers: { "User-Agent": "MCPanel/1.0", Accept: "application/json" },
+    });
+    if (!r.ok) throw new Error(`Fabric API returned ${r.status}`);
+    const data = await r.json() as { version: string; stable: boolean }[];
+    const stable = data
+      .filter((v) => v.stable)
+      .map((v) => v.version)
+      .filter((v) => /^\d+\.\d+(\.\d+)?$/.test(v));
+    stable.sort((a, b) => {
+      const ap = a.split(".").map(Number);
+      const bp = b.split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((ap[i] || 0) !== (bp[i] || 0)) return (bp[i] || 0) - (ap[i] || 0);
+      }
+      return 0;
+    });
+    res.json({ versions: stable });
+  } catch (err: any) {
+    res.status(502).json({ error: "Failed to fetch Fabric versions.", detail: err.message });
+  }
 });
 
 // ---- HTTP server (needed so we can attach socket.io) ----

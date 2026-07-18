@@ -39,8 +39,9 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   // Form state
   const [name, setName] = useState("");
   const [ram, setRam] = useState("4G");
-  const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity">("paper");
+  const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity" | "custom">("paper");
   const [paperVersion, setPaperVersion] = useState("");
+  const [customVersion, setCustomVersion] = useState("");
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -66,10 +67,18 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
     : elapsed < 25 ? "Pulling Docker image…"
     : "Creating container…";
 
-  // ---- fetch PaperMC versions ----
+  // ---- fetch versions based on server type ----
 
   useEffect(() => {
-    if (!open) return; // only fetch when dialog opens
+    if (!open) return;
+
+    // Custom type doesn't need version fetching
+    if (serverType === "custom") {
+      setVersions([]);
+      setVersionsLoading(false);
+      setVersionsError(null);
+      return;
+    }
 
     let cancelled = false;
 
@@ -77,12 +86,14 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setVersionsLoading(true);
       setVersionsError(null);
       try {
-        const res = await fetch(`${API_BASE}/api/paper/versions`);
+        const endpoint = serverType === "fabric"
+          ? `${API_BASE}/api/fabric/versions`
+          : `${API_BASE}/api/paper/versions`;
+        const res = await fetch(endpoint);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (cancelled) return;
         const list: string[] = data.versions ?? [];
-        // Server returns newest first already — no need to reverse
         setVersions(list);
         if (list.length > 0) setPaperVersion(list[0]);
       } catch (err: unknown) {
@@ -100,7 +111,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, serverType]);
 
   // ---- reset form on open ----
 
@@ -117,7 +128,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!name.trim() || !paperVersion) return;
+      const version = serverType === "custom" ? customVersion.trim() : paperVersion;
+      if (!name.trim() || !version) return;
 
       setSubmitting(true);
       setError(null);
@@ -130,7 +142,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             name: name.trim(),
             ram,
             serverType,
-            paperVersion,
+            paperVersion: version,
           }),
         });
 
@@ -149,7 +161,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, serverType, paperVersion, onCreated, onClose],
+    [name, ram, serverType, paperVersion, customVersion, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -240,7 +252,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             <div className="relative">
               <select
                 value={serverType}
-                onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity")}
+                onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity" | "custom")}
                 disabled={submitting}
                 className="w-full appearance-none rounded-lg border
                            border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
@@ -250,6 +262,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                 <option value="paper" className="bg-[#0a0a0a] text-white">PaperMC (Vanilla)</option>
                 <option value="fabric" className="bg-[#0a0a0a] text-white">Fabric (Modded)</option>
                 <option value="velocity" className="bg-[#0a0a0a] text-white">Velocity (Proxy)</option>
+                <option value="custom" className="bg-[#0a0a0a] text-white">Custom (BYO JAR)</option>
               </select>
               <ChevronDown
                 className="pointer-events-none absolute right-3 top-1/2
@@ -289,9 +302,22 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           {/* Version */}
           <label className="mb-1.5 block">
             <span className="mb-1.5 block text-sm font-medium text-neutral-300">
-              {serverType === "velocity" ? "Velocity Version" : "Minecraft Version"}
+              {serverType === "velocity" ? "Velocity Version" : serverType === "custom" ? "Minecraft Version" : "Minecraft Version"}
             </span>
-            {versionsLoading ? (
+            {serverType === "custom" ? (
+              <input
+                type="text"
+                value={customVersion}
+                onChange={(e) => setCustomVersion(e.target.value)}
+                placeholder="e.g. 1.21.1"
+                disabled={submitting}
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                           px-3.5 py-2.5 text-sm text-white
+                           placeholder:text-neutral-600
+                           focus:border-sky-500/40 focus:outline-none
+                           disabled:opacity-50"
+              />
+            ) : versionsLoading ? (
               <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
                 <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
                 <span className="text-sm text-neutral-500">
@@ -345,7 +371,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           <button
             type="submit"
             disabled={
-              submitting || !name.trim() || !paperVersion || versionsLoading
+              submitting || !name.trim() || (serverType === "custom" ? !customVersion.trim() : !paperVersion) || versionsLoading
             }
             className="mt-2 flex w-full items-center justify-center gap-2
                        rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium

@@ -11,6 +11,7 @@
   "dependencies": {
     "dockerode": "^4.0.2",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.6.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "socket.io": "^4.7.5",

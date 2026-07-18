@@ -121,14 +121,14 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       ref={overlayRef}
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center
-                 bg-black/60 p-4 backdrop-blur-sm"
+                 bg-black/70 p-4 backdrop-blur-sm"
     >
       <div
         className="relative w-full max-w-md overflow-hidden rounded-2xl
-                   border border-slate-800 bg-slate-950 shadow-2xl"
+                   border border-white/[0.06] bg-[#0a0a0a] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/[0.04] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Settings className="h-5 w-5 text-sky-500" />
             <h2 className="text-lg font-semibold text-white">
@@ -138,8 +138,8 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
           <button
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg p-1.5 text-slate-500 transition
-                       hover:bg-slate-800 hover:text-slate-300
+            className="rounded-lg p-1.5 text-neutral-600 transition
+                       hover:bg-white/[0.04] hover:text-neutral-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -150,7 +150,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         <form onSubmit={handleSubmit} className="px-6 py-5">
           {/* Server name */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
               Server Name
             </span>
             <input
@@ -159,17 +159,17 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               onChange={(e) => setName(e.target.value)}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-slate-800 bg-slate-900
+              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
                          px-3.5 py-2.5 text-sm text-white
-                         placeholder:text-slate-600
-                         focus:border-sky-500/50 focus:outline-none
+                         placeholder:text-neutral-600
+                         focus:border-sky-500/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
 
           {/* RAM */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
               RAM
             </span>
             <div className="relative">
@@ -178,21 +178,21 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                 onChange={(e) => setRam(e.target.value)}
                 disabled={submitting}
                 className="w-full appearance-none rounded-lg border
-                           border-slate-800 bg-slate-900 px-3.5 py-2.5
-                           text-sm text-white focus:border-sky-500/50
+                           border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
+                           text-sm text-white focus:border-sky-500/40
                            focus:outline-none disabled:opacity-50"
               >
                 {RAM_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt} className="bg-[#0a0a0a] text-white">{opt}</option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600" />
             </div>
           </label>
 
           {/* Port */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
               Port
             </span>
             <input
@@ -203,15 +203,15 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               max={65535}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-slate-800 bg-slate-900
+              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
                          px-3.5 py-2.5 text-sm text-white
-                         focus:border-sky-500/50 focus:outline-none
+                         focus:border-sky-500/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
 
           {/* Note */}
-          <p className="mb-4 text-xs text-slate-600">
+          <p className="mb-4 text-xs text-neutral-600">
             RAM and port changes only take effect after restarting the server.
           </p>
 
