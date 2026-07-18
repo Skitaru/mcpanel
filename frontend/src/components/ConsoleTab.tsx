@@ -233,6 +233,25 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
     };
   }, [serverId, initTerminal, connectSocket]);
 
+  // ---- re-attach console + stats when server status changes ----
+  const prevStatusRef = useRef(serverStatus);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = serverStatus;
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+
+    if (serverStatus === "running" && prev !== "running") {
+      // Server came online — re-attach
+      socket.emit("console:attach", { serverId });
+      socket.emit("stats:subscribe", { serverId });
+    } else if (serverStatus !== "running" && prev === "running") {
+      // Server went offline — detach
+      socket.emit("console:detach", { serverId });
+      socket.emit("stats:unsubscribe", { serverId });
+    }
+  }, [serverStatus, serverId]);
+
   // ---- send command ----
 
   const sendCommand = useCallback(() => {
