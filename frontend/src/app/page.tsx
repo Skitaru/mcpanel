@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
@@ -131,6 +132,7 @@ export default function DashboardPage() {
   }, [fetchServers]);
 
   const handleDelete = useCallback(async (id: string) => {
+    setDeleteConfirmId(null);
     setDeletingId(id);
     try {
       const res = await fetch(`${API_BASE}/api/servers/${id}`, { method: "DELETE" });
@@ -271,14 +273,29 @@ export default function DashboardPage() {
                             {actingId === s.id ? "…" : "Start"}
                           </button>
                         )}
+                        {deleteConfirmId === s.id ? (
+                          <div className="flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1">
+                            <span className="text-xs text-red-400">Delete?</span>
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
+                              disabled={deletingId === s.id}
+                              className="rounded bg-red-600 px-2 py-0.5 text-xs text-white hover:bg-red-500 disabled:opacity-50">
+                              {deletingId === s.id ? "…" : "Yes"}
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }}
+                              className="rounded bg-neutral-700 px-2 py-0.5 text-xs text-neutral-300 hover:bg-neutral-600">
+                              No
+                            </button>
+                          </div>
+                        ) : (
                         <button
                           disabled={deletingId === s.id}
-                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }}
                           className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-600 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
                         >
                           <Trash2 className="h-3 w-3" />
                           {deletingId === s.id ? "Deleting…" : "Delete"}
                         </button>
+                        )}
                       </div>
                     </Link>
                   ))}

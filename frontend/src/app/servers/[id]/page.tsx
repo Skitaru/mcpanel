@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Settings, Upload,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Settings, Upload, LogOut,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
@@ -73,12 +73,15 @@ export default function ServerDetailPage() {
     try {
       if (action === "restart") {
         if (server?.status === "running") {
-          await fetch(`${API_BASE}/api/servers/${serverId}/stop`, { method: "POST" });
+          const stopRes = await fetch(`${API_BASE}/api/servers/${serverId}/stop`, { method: "POST" });
+          if (!stopRes.ok) throw new Error("Stop failed");
           await new Promise(r => setTimeout(r, 2000));
         }
-        await fetch(`${API_BASE}/api/servers/${serverId}/start`, { method: "POST" });
+        const startRes = await fetch(`${API_BASE}/api/servers/${serverId}/start`, { method: "POST" });
+        if (!startRes.ok) throw new Error("Start failed");
       } else {
-        await fetch(`${API_BASE}/api/servers/${serverId}/${action}`, { method: "POST" });
+        const res = await fetch(`${API_BASE}/api/servers/${serverId}/${action}`, { method: "POST" });
+        if (!res.ok) throw new Error(`${action} failed`);
       }
       await fetchServer();
       toast.success(`Server ${action === "restart" ? "restarted" : action + "ed"} successfully`);
@@ -184,6 +187,13 @@ export default function ServerDetailPage() {
                   ) : (
                     <button onClick={()=>setDeleteConfirm(true)} className="flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-3 py-2 text-xs text-neutral-600 transition hover:border-red-500/20 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
                   )}
+                  <button
+                    onClick={() => { localStorage.removeItem("mcpanel-token"); window.location.reload(); }}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-3 py-2 text-xs text-neutral-600 transition hover:border-red-500/20 hover:text-red-400"
+                    title="Logout"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> Logout
+                  </button>
                 </div>
               </header>
 
