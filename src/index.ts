@@ -38,7 +38,7 @@ app.use("/api", authMiddleware);
 const API_KEY = process.env.PANEL_API_KEY;
 if (API_KEY) {
   app.use((req, res, next) => {
-    if (req.path === "/api/health" || req.path === "/api/auth/login" || req.method === "OPTIONS")
+    if (req.path === "/api/health" || req.path === "/api/auth/login" || req.path.startsWith("/socket.io") || req.method === "OPTIONS")
       return next();
     // If already authenticated via JWT, skip
     if ((req as any)._authOk) return next();

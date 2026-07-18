@@ -14,6 +14,30 @@ import path from "node:path";
 import multer from "multer";
 import { getServer } from "../services/config-store";
 
+/** Map file extensions to MIME types for raw file serving. */
+const MIME_MAP: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".webp": "image/webp",
+  ".json": "application/json",
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "application/javascript",
+  ".xml": "application/xml",
+  ".txt": "text/plain",
+  ".log": "text/plain",
+  ".yml": "text/yaml",
+  ".yaml": "text/yaml",
+  ".toml": "text/plain",
+  ".properties": "text/plain",
+  ".cfg": "text/plain",
+  ".conf": "text/plain",
+};
+
 const router = Router();
 
 const upload = multer({
@@ -152,6 +176,18 @@ router.get("/:id/file", async (req: Request, res: Response) => {
     }
     if (stat.size > MAX_READ_SIZE) {
       res.status(413).json({ error: "File too large (max 10 MB)." });
+      return;
+    }
+
+    // ?raw=true — return binary file with proper Content-Type (for images etc.)
+    const isRaw = req.query.raw === "true" || req.query.raw === "1";
+    if (isRaw) {
+      const ext = path.extname(resolved.absolutePath).toLowerCase();
+      const mime = MIME_MAP[ext] ?? "application/octet-stream";
+      const buf = await fs.readFile(resolved.absolutePath);
+      res.set("Content-Type", mime);
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(buf);
       return;
     }
 
