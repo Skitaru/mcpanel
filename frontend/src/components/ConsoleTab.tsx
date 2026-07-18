@@ -120,7 +120,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
   const connectSocket = useCallback(
     (term: Terminal) => {
       const socket = io(API_BASE, {
-        transports: ["websocket", "polling"],
+        transports: ["polling"], // no WebSocket — Next.js rewrites don't proxy WS upgrades in prod
       });
 
       socket.on("connect", () => {
