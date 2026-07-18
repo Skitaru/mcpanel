@@ -6,3 +6,19 @@ servers.json
 *.log
 .env
 .env.local
+
+# Deep Code config (contains API keys)
+.deepcode/
+
+# Auth secrets — generated at runtime, never commit
+panel-config.json
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
