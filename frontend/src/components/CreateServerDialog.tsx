@@ -1,0 +1,382 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  X,
+  Server,
+  Loader2,
+  ChevronDown,
+  AlertTriangle,
+} from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "";
+
+const RAM_OPTIONS = ["512M", "1G", "2G", "4G", "6G", "8G", "12G", "16G"];
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  /** Called after the server is created so the parent can refresh. */
+  onCreated: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function CreateServerDialog({ open, onClose, onCreated }: Props) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Form state
+  const [name, setName] = useState("");
+  const [ram, setRam] = useState("4G");
+  const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity">("paper");
+  const [paperVersion, setPaperVersion] = useState("");
+
+  // PaperMC versions
+  const [versions, setVersions] = useState<string[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(true);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
+
+  // Submission
+  const [submitting, setSubmitting] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  // ---- elapsed timer during submission ----
+  useEffect(() => {
+    if (!submitting) { setElapsed(0); return; }
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [submitting]);
+
+  // phase label based on elapsed time
+  const phase =
+    elapsed < 4 ? "Creating directories…"
+    : elapsed < 15 ? "Downloading PaperMC jar…"
+    : elapsed < 25 ? "Pulling Docker image…"
+    : "Creating container…";
+
+  // ---- fetch PaperMC versions ----
+
+  useEffect(() => {
+    if (!open) return; // only fetch when dialog opens
+
+    let cancelled = false;
+
+    async function loadVersions() {
+      setVersionsLoading(true);
+      setVersionsError(null);
+      try {
+        const res = await fetch(`${API_BASE}/api/paper/versions`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        const list: string[] = data.versions ?? [];
+        // Server returns newest first already — no need to reverse
+        setVersions(list);
+        if (list.length > 0) setPaperVersion(list[0]);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setVersionsError(
+            err instanceof Error ? err.message : "Failed to load versions.",
+          );
+        }
+      } finally {
+        if (!cancelled) setVersionsLoading(false);
+      }
+    }
+
+    loadVersions();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  // ---- reset form on open ----
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setRam("4G");
+      setError(null);
+    }
+  }, [open]);
+
+  // ---- submit ----
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!name.trim() || !paperVersion) return;
+
+      setSubmitting(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/servers`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            ram,
+            serverType,
+            paperVersion,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail ?? data.error ?? `HTTP ${res.status}`);
+        }
+
+        onCreated(); // tell the dashboard to refresh
+        onClose(); // dismiss the modal
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error ? err.message : "Failed to create server.",
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [name, ram, serverType, paperVersion, onCreated, onClose],
+  );
+
+  // ---- close on backdrop click ----
+
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === overlayRef.current && !submitting) {
+        onClose();
+      }
+    },
+    [onClose, submitting],
+  );
+
+  // ---- close on Escape ----
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose, submitting]);
+
+  // ==================================================================
+  // Render
+  // ==================================================================
+
+  if (!open) return null;
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex items-center justify-center
+                 bg-black/70 p-4 backdrop-blur-sm"
+    >
+      <div
+        className="relative w-full max-w-md overflow-hidden rounded-2xl
+                   border border-white/[0.06] bg-[#0a0a0a] shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/[0.04] px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <Server className="h-5 w-5 text-sky-500" />
+            <h2 className="text-lg font-semibold text-white">
+              Create Server
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-lg p-1.5 text-neutral-600 transition
+                       hover:bg-white/[0.04] hover:text-neutral-400
+                       disabled:opacity-50"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="px-6 py-5">
+          {/* Server name */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              Server Name
+            </span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Survival World"
+              required
+              disabled={submitting}
+              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                         px-3.5 py-2.5 text-sm text-white
+                         placeholder:text-neutral-600
+                         focus:border-sky-500/40 focus:outline-none
+                         disabled:opacity-50"
+            />
+          </label>
+
+          {/* Server type */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              Server Type
+            </span>
+            <div className="relative">
+              <select
+                value={serverType}
+                onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity")}
+                disabled={submitting}
+                className="w-full appearance-none rounded-lg border
+                           border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
+                           text-sm text-white focus:border-sky-500/40
+                           focus:outline-none disabled:opacity-50"
+              >
+                <option value="paper" className="bg-[#0a0a0a] text-white">PaperMC (Vanilla)</option>
+                <option value="fabric" className="bg-[#0a0a0a] text-white">Fabric (Modded)</option>
+                <option value="velocity" className="bg-[#0a0a0a] text-white">Velocity (Proxy)</option>
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 top-1/2
+                           h-4 w-4 -translate-y-1/2 text-neutral-600"
+              />
+            </div>
+          </label>
+
+          {/* RAM */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              RAM
+            </span>
+            <div className="relative">
+              <select
+                value={ram}
+                onChange={(e) => setRam(e.target.value)}
+                disabled={submitting}
+                className="w-full appearance-none rounded-lg border
+                           border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
+                           text-sm text-white focus:border-sky-500/40
+                           focus:outline-none disabled:opacity-50"
+              >
+                {RAM_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt} className="bg-[#0a0a0a] text-white">
+                    {opt}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 top-1/2
+                           h-4 w-4 -translate-y-1/2 text-neutral-600"
+              />
+            </div>
+          </label>
+
+          {/* Version */}
+          <label className="mb-1.5 block">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              {serverType === "velocity" ? "Velocity Version" : "Minecraft Version"}
+            </span>
+            {versionsLoading ? (
+              <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
+                <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
+                <span className="text-sm text-neutral-500">
+                  Loading versions…
+                </span>
+              </div>
+            ) : versionsError ? (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3.5 py-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                <span className="text-sm text-amber-400">
+                  {versionsError}
+                </span>
+              </div>
+            ) : (
+              <div className="relative">
+                <select
+                  value={paperVersion}
+                  onChange={(e) => setPaperVersion(e.target.value)}
+                  disabled={submitting}
+                  className="w-full appearance-none rounded-lg border
+                             border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
+                             text-sm text-white focus:border-sky-500/40
+                             focus:outline-none disabled:opacity-50"
+                >
+                  {versions.map((v) => (
+                    <option key={v} value={v} className="bg-[#0a0a0a] text-white">
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-3 top-1/2
+                             h-4 w-4 -translate-y-1/2 text-neutral-600"
+                />
+              </div>
+            )}
+          </label>
+
+          {/* Error */}
+          {error && (
+            <div
+              className="mb-4 flex items-start gap-2 rounded-lg
+                          border border-red-500/30 bg-red-500/10 px-3 py-2.5"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+              <span className="text-sm text-red-400">{error}</span>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={
+              submitting || !name.trim() || !paperVersion || versionsLoading
+            }
+            className="mt-2 flex w-full items-center justify-center gap-2
+                       rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium
+                       text-white transition hover:bg-sky-500
+                       disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {phase}
+              </>
+            ) : (
+              "Create Server"
+            )}
+          </button>
+
+          {submitting && (
+            <div className="mt-3 space-y-2">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.04]">
+                <div
+                  className="h-full animate-pulse rounded-full bg-sky-500"
+                  style={{ width: `${Math.min(elapsed * 3, 90)}%` }}
+                />
+              </div>
+              <p className="text-center text-xs text-neutral-600">
+                {elapsed}s elapsed — this may take up to 30s
+              </p>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
