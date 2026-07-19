@@ -53,7 +53,7 @@ export function DetailSkeleton() {
         <Skeleton className="h-9 w-20 rounded-lg" />
         <Skeleton className="h-9 w-20 rounded-lg" />
       </div>
-      <Skeleton className="h-48 w-full rounded-xl" />
+      <Skeleton className="h-72 w-full rounded-xl" />
     </div>
   );
 }

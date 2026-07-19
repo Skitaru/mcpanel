@@ -347,10 +347,10 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
       {/* Terminal */}
       <div
         className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900"
-        style={{ minHeight: "17rem" }}
+        style={{ minHeight: "24rem" }}
       >
         {serverStatus !== "running" && !hasOutputRef.current ? (
-          <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-72 flex-col items-center justify-center gap-2 text-center">
             <TerminalSquare className="h-10 w-10 text-slate-700" />
             <p className="text-sm font-medium text-slate-400">Server is offline</p>
             <p className="text-xs text-slate-600">
@@ -358,7 +358,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
             </p>
           </div>
         ) : (
-          <div ref={terminalRef} className="h-48 w-full p-2" />
+          <div ref={terminalRef} className="h-72 w-full p-2" />
         )}
       </div>
       {/* Offline indicator — show when server stopped but terminal has content */}

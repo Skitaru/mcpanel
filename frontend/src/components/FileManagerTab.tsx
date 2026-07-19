@@ -431,7 +431,7 @@ export default function FileManagerTab({ serverId }: Props) {
           )}
 
           {/* File list */}
-          <div className="max-h-48 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
@@ -606,7 +606,7 @@ export default function FileManagerTab({ serverId }: Props) {
               <Loader2 className="h-6 w-6 animate-spin text-slate-600" />
             </div>
           ) : (
-            <div className="flex h-48">
+            <div className="flex h-72">
               {/* Line numbers */}
               <div
                 ref={lineNumberRef}
