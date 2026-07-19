@@ -134,6 +134,33 @@ app.get("/api/paper/versions", async (_req, res) => {
   }
 });
 
+// ---- Velocity versions proxy ----
+app.get("/api/velocity/versions", async (_req, res) => {
+  try {
+    const r = await fetch("https://fill.papermc.io/v3/projects/velocity", {
+      headers: { "User-Agent": "MCPanel/1.0", Accept: "application/json" },
+    });
+    if (!r.ok) throw new Error(`PaperMC API returned ${r.status}`);
+    const data = await r.json() as { versions?: Record<string, string[]> };
+    const flat: string[] = [];
+    if (data.versions) {
+      for (const group of Object.values(data.versions)) flat.push(...group);
+    }
+    const stable = flat.filter((v) => /^\d+\.\d+(\.\d+)?$/.test(v));
+    stable.sort((a, b) => {
+      const ap = a.split(".").map(Number);
+      const bp = b.split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((ap[i] || 0) !== (bp[i] || 0)) return (bp[i] || 0) - (ap[i] || 0);
+      }
+      return 0;
+    });
+    res.json({ versions: stable });
+  } catch (err: any) {
+    res.status(502).json({ error: "Failed to fetch Velocity versions.", detail: err.message });
+  }
+});
+
 // ---- health-check ----
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
