@@ -86,13 +86,13 @@ export default function LogsTab({ serverId }: Props) {
       {/* Toolbar */}
       <div
         className="flex flex-wrap items-center gap-3 rounded-xl border
-                    border-slate-800 bg-slate-900/70 px-5 py-3"
+                    border-slate-800 bg-slate-900/70 px-3 sm:px-5 py-3"
       >
         <div className="flex items-center gap-2 text-sm text-slate-400">
           <ScrollText className="h-4 w-4" />
           <span>logs/latest.log</span>
         </div>
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
           <input
             type="text"

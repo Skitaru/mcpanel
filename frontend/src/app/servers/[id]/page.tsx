@@ -193,7 +193,7 @@ export default function ServerDetailPage() {
         onCreateClick={() => router.push("/")}
       />
       <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-14" : "lg:ml-56"}`}>
-        <div className="mx-auto max-w-6xl px-6 py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
           {loading ? (
             <DetailSkeleton />
           ) : error || !server ? (
@@ -208,7 +208,7 @@ export default function ServerDetailPage() {
             <>
               <header className="mb-8">
                 {/* Top row: name + actions */}
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-3">
                   <div>
                     <h1 className="text-2xl font-semibold tracking-tight text-white">{server.name}</h1>
                     <div className="mt-1.5 flex items-center gap-3 text-sm text-slate-500">
