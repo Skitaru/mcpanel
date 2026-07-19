@@ -163,7 +163,9 @@ export async function createContainer(
       Memory: cfg.ram * 1024 * 1024,
       PortBindings: {
         [`${MC_PORT}/tcp`]: [{ HostPort: String(cfg.port) }],
-        [`${cfg.rconPort}/tcp`]: [{ HostPort: String(cfg.rconPort) }],
+        // RCON only needs to be reachable from the panel backend (localhost).
+        // Binding to 0.0.0.0 exposes it to the internet and attracts brute-force bots.
+        [`${cfg.rconPort}/tcp`]: [{ HostIp: "127.0.0.1", HostPort: String(cfg.rconPort) }],
       },
       // Auto-restart the container if it crashes or Docker restarts.
       RestartPolicy: { Name: "unless-stopped", MaximumRetryCount: 0 },
