@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   X,
   Server,
@@ -34,7 +34,6 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 export default function CreateServerDialog({ open, onClose, onCreated }: Props) {
-  const overlayRef = useRef<HTMLDivElement>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -184,10 +183,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   // ---- close on backdrop click ----
 
   const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === overlayRef.current && !submitting) {
-        onClose();
-      }
+    () => {
+      if (!submitting) onClose();
     },
     [onClose, submitting],
   );
@@ -211,12 +208,12 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
   return (
     <div
-      ref={overlayRef}
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center
                  bg-black/70 p-4 backdrop-blur-sm"
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-md overflow-hidden rounded-2xl
                    border border-white/[0.06] bg-[#0a0a0a] shadow-2xl"
       >
