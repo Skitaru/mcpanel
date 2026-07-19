@@ -307,7 +307,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
       {/* Unified Console Container */}
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
         {/* Stats header — compact, integrated */}
-        <div className="flex items-center gap-5 border-b border-slate-800/80 bg-slate-900/50 px-4 py-2.5">
+        <div className="flex items-center gap-3 sm:gap-5 flex-wrap border-b border-slate-800/80 bg-slate-900/50 px-3 sm:px-4 py-2.5">
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Cpu className="h-3.5 w-3.5" />
             <span className="font-mono tabular-nums text-white font-medium">
@@ -337,7 +337,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
         </div>
 
         {/* Terminal body */}
-        <div className="relative" style={{ height: "28rem" }}>
+        <div className="relative" style={{ height: "min(24rem, 60vh)" }}>
           {serverStatus !== "running" && !hasOutputRef.current ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <div className="rounded-full bg-slate-800/50 p-3 mb-1">

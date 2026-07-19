@@ -203,7 +203,7 @@ export default function DashboardPage() {
         onCreateClick={() => setDialogOpen(true)}
       />
       <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-14" : "lg:ml-56"}`}>
-        <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-12">
           {loading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
@@ -219,7 +219,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              <header className="mb-10 flex items-center justify-between">
+              <header className="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-white">Servers</h1>
                   <p className="mt-1 text-sm text-slate-400">{servers.length} server{servers.length !== 1 ? "s" : ""} configured</p>
