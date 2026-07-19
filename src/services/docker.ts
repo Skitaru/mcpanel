@@ -104,7 +104,7 @@ async function ensureImage(imageName: string): Promise<void> {
 export async function createContainer(
   cfg: ServerConfig,
   imageName: string,
-  opts?: { jarName?: string; extraCmd?: string[] },
+  opts?: { jarName?: string; extraCmd?: string[]; javaArgs?: string },
 ): Promise<string> {
   await ensureImage(imageName);
 
@@ -135,8 +135,8 @@ export async function createContainer(
     "-XX:MaxTenuringThreshold=1",
   ].join(" ");
 
-  const javaArgs = `-Xms512M -Xmx${javaHeap} ${aikarFlags}`;
-  const startCmd = `exec java ${javaArgs} -jar /data/${jarName} ${nogui}`.trim();
+  const javaArgs = opts?.javaArgs || aikarFlags;
+  const startCmd = `exec java -Xms512M -Xmx${javaHeap} ${javaArgs} -jar /data/${jarName} ${nogui}`.trim();
 
   const cmdParts = [`echo "eula=true" > /data/eula.txt`];
   if (opts?.extraCmd) cmdParts.push(...opts.extraCmd);

@@ -24,6 +24,8 @@ export interface ServerConfig {
   containerId: string | null;
   /** Absolute path on the host that holds this server's world / config / plugins */
   dataPath: string;
+  /** Custom JVM arguments (replaces Aikar GC flags). -Xms/-Xmx derived from ram. */
+  javaArgs?: string;
 }
 
 /** Request body for POST /api/servers */
@@ -39,6 +41,8 @@ export interface CreateServerRequest {
   paperVersion?: string;
   /** Velocity-only: backend servers (one per line, "name=host:port") */
   backendServers?: string;
+  /** Custom JVM arguments (replaces Aikar GC flags). Defaults to optimized flags. */
+  javaArgs?: string;
 }
 
 /** Returned by GET /api/servers */

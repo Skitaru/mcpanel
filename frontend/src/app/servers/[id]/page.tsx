@@ -54,6 +54,7 @@ export default function ServerDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
+  const [backingUp, setBackingUp] = useState(false);
 
   const fetchServer = useCallback(async () => {
     try {
@@ -121,6 +122,7 @@ export default function ServerDetailPage() {
   }, [serverId, router]);
 
   const handleBackup = useCallback(async () => {
+    setBackingUp(true);
     try {
       const res = await fetch(`${API_BASE}/api/servers/${serverId}/backup`, { method: "POST" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -129,6 +131,7 @@ export default function ServerDetailPage() {
       URL.revokeObjectURL(url);
       toast.success("Backup downloaded");
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Backup failed"); }
+    finally { setBackingUp(false); }
   }, [serverId]);
 
   const restoreInputRef = useRef<HTMLInputElement>(null);
@@ -217,7 +220,10 @@ export default function ServerDetailPage() {
                   ) : (
                     <button disabled={acting} onClick={() => handleAction("start")} className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400 transition hover:border-emerald-500/50 hover:bg-emerald-500/20 disabled:opacity-50"><Play className="h-3.5 w-3.5" /> Start</button>
                   )}
-                  <button onClick={handleBackup} className="flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-3 py-2 text-xs text-neutral-400 transition hover:border-white/[0.08] hover:text-neutral-200"><Download className="h-3.5 w-3.5" /> Backup</button>
+                  <button disabled={backingUp} onClick={handleBackup} className="flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-3 py-2 text-xs text-neutral-400 transition hover:border-white/[0.08] hover:text-neutral-200 disabled:opacity-50">
+                    {backingUp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    {backingUp ? "Backing up…" : "Backup"}
+                  </button>
                   <label className={`flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-3 py-2 text-xs text-neutral-400 transition hover:border-white/[0.08] hover:text-neutral-200 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`}>
                     <Upload className="h-3.5 w-3.5" />
                     {restoring ? "Restoring…" : "Restore"}
