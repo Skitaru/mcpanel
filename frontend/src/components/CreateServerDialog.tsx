@@ -42,6 +42,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity" | "custom">("paper");
   const [paperVersion, setPaperVersion] = useState("");
   const [customVersion, setCustomVersion] = useState("");
+  const [javaArgs, setJavaArgs] = useState("");
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -119,6 +120,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
     if (open) {
       setName("");
       setRam("4G");
+      setJavaArgs("");
       setError(null);
     }
   }, [open]);
@@ -143,6 +145,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             ram,
             serverType,
             paperVersion: version,
+            javaArgs: javaArgs.trim() || undefined,
           }),
         });
 
@@ -161,7 +164,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, serverType, paperVersion, customVersion, onCreated, onClose],
+    [name, ram, serverType, paperVersion, customVersion, javaArgs, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -355,6 +358,28 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
               </div>
             )}
           </label>
+
+          {/* Java Args (Advanced) */}
+          <details className="mb-4">
+            <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-400 transition">
+              Advanced: JVM Arguments
+            </summary>
+            <textarea
+              value={javaArgs}
+              onChange={(e) => setJavaArgs(e.target.value)}
+              placeholder="Custom JVM flags (replaces Aikar GC defaults)&#10;e.g. -XX:+UseZGC -XX:+ZGenerational"
+              rows={3}
+              disabled={submitting}
+              className="mt-2 w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                         px-3.5 py-2.5 text-xs text-white font-mono
+                         placeholder:text-neutral-600
+                         focus:border-sky-500/40 focus:outline-none
+                         disabled:opacity-50 resize-none"
+            />
+            <p className="mt-1 text-[10px] text-neutral-600">
+              -Xms512M and -Xmx are auto-set from RAM. Leave empty for optimized defaults.
+            </p>
+          </details>
 
           {/* Error */}
           {error && (

@@ -11,4 +11,5 @@ export interface ServerStatus {
   version: string;
   status: "running" | "exited" | "created" | "paused" | "unknown";
   containerId: string | null;
+  javaArgs?: string | null;
 }

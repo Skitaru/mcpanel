@@ -423,11 +423,12 @@ router.post("/", async (req: Request, res: Response) => {
       version: mcVersion,
       containerId: null,
       dataPath,
+      javaArgs: body.javaArgs?.trim() || undefined,
     };
     addServer(config);
 
     // ---- create Docker container ----
-    const containerId = await createContainer(config, javaImage, { jarName, extraCmd });
+    const containerId = await createContainer(config, javaImage, { jarName, extraCmd, javaArgs: config.javaArgs });
 
     // Update config with the real container id.
     config.containerId = containerId;
@@ -452,6 +453,7 @@ router.post("/", async (req: Request, res: Response) => {
       javaImage,
       containerId: config.containerId,
       dataPath: config.dataPath,
+      javaArgs: config.javaArgs ?? null,
     });
   } catch (err: any) {
     console.error("[api] POST /api/servers error:", err);
@@ -538,6 +540,7 @@ router.get("/", async (_req: Request, res: Response) => {
         version: s.version,
         status: (st?.status as ServerStatus["status"]) ?? "unknown",
         containerId: s.containerId,
+        javaArgs: s.javaArgs ?? null,
       };
     });
 
@@ -781,7 +784,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, ram: ramStr, port, version } = req.body ?? {};
+    const { name, ram: ramStr, port, version, javaArgs } = req.body ?? {};
 
     // Validate name if provided
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
@@ -820,11 +823,18 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
+    // Validate javaArgs if provided (optional, can be empty to clear)
+    if (javaArgs !== undefined && typeof javaArgs !== "string") {
+      res.status(400).json({ error: "Field 'javaArgs' must be a string." });
+      return;
+    }
+
     const updated = updateServer(server.id, {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(ram !== undefined ? { ram } : {}),
       ...(port !== undefined ? { port } : {}),
       ...(version !== undefined ? { version: version.trim() } : {}),
+      ...(javaArgs !== undefined ? { javaArgs: javaArgs?.trim() || (undefined as any) } : {}),
     });
 
     console.log(`[api] Updated server "${updated?.name}" config`);
@@ -834,6 +844,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       ram: updated?.ram,
       port: updated?.port,
       version: updated?.version,
+      javaArgs: updated?.javaArgs ?? null,
     });
   } catch (err: any) {
     console.error("[api] PUT /api/servers/:id error:", err);

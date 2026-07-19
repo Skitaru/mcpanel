@@ -46,6 +46,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
   const [name, setName] = useState("");
   const [ram, setRam] = useState("4G");
   const [port, setPort] = useState(25565);
+  const [javaArgs, setJavaArgs] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       setName(server.name);
       setRam(mbToRamString(server.ram));
       setPort(server.port);
+      setJavaArgs(server.javaArgs ?? "");
       setError(null);
     }
   }, [open, server]);
@@ -77,6 +79,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             name: name.trim(),
             ram,
             port,
+            javaArgs: javaArgs.trim() || undefined,
           }),
         });
 
@@ -93,7 +96,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         setSubmitting(false);
       }
     },
-    [server, name, ram, port, onUpdated, onClose],
+    [server, name, ram, port, javaArgs, onUpdated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -209,6 +212,28 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                          disabled:opacity-50"
             />
           </label>
+
+          {/* Java Args */}
+          <details className="mb-4">
+            <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-400 transition">
+              Advanced: JVM Arguments
+            </summary>
+            <textarea
+              value={javaArgs}
+              onChange={(e) => setJavaArgs(e.target.value)}
+              placeholder="Custom JVM flags (replaces Aikar GC defaults)"
+              rows={3}
+              disabled={submitting}
+              className="mt-2 w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                         px-3.5 py-2.5 text-xs text-white font-mono
+                         placeholder:text-neutral-600
+                         focus:border-sky-500/40 focus:outline-none
+                         disabled:opacity-50 resize-none"
+            />
+            <p className="mt-1 text-[10px] text-neutral-600">
+              -Xms512M and -Xmx are auto-set from RAM. Requires container recreation to apply.
+            </p>
+          </details>
 
           {/* Note */}
           <p className="mb-4 text-xs text-neutral-600">
