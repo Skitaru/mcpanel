@@ -70,11 +70,11 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
 
     const term = new Terminal({
       theme: {
-        background: "#0f172a", // slate-900
+        background: "#020617", // slate-950 — matches card bg
         foreground: "#cbd5e1", // slate-300
         cursor: "#38bdf8", // sky-400
-        selectionBackground: "#334155", // slate-700
-        black: "#1e293b",
+        selectionBackground: "#1e293b", // slate-800
+        black: "#0f172a",
         red: "#f87171",
         green: "#4ade80",
         yellow: "#facc15",
@@ -82,7 +82,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
         magenta: "#c084fc",
         cyan: "#22d3ee",
         white: "#e2e8f0",
-        brightBlack: "#475569",
+        brightBlack: "#334155",
         brightRed: "#fca5a5",
         brightGreen: "#86efac",
         brightYellow: "#fde047",
@@ -91,7 +91,7 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
         brightCyan: "#67e8f9",
         brightWhite: "#f8fafc",
       },
-      fontSize: 13,
+      fontSize: 14,
       fontFamily: 'var(--font-geist-mono), "Cascadia Code", monospace',
       cursorBlink: false,
       cursorStyle: "block",
@@ -337,17 +337,17 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
         </div>
 
         {/* Terminal body */}
-        <div style={{ minHeight: "22rem" }}>
+        <div className="relative" style={{ height: "28rem" }}>
           {serverStatus !== "running" && !hasOutputRef.current ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
-              <div className="rounded-full bg-slate-800 p-3 mb-1">
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="rounded-full bg-slate-800/50 p-3 mb-1">
                 <TerminalSquare className="h-6 w-6 text-slate-600" />
               </div>
               <p className="text-sm font-medium text-slate-400">Server is offline</p>
               <p className="text-xs text-slate-600">Start the server to view the live console.</p>
             </div>
           ) : (
-            <div ref={terminalRef} className="h-64 w-full p-3" />
+            <div ref={terminalRef} className="absolute inset-0 p-3" />
           )}
         </div>
 
