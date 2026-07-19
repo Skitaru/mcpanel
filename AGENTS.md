@@ -137,11 +137,22 @@
 - `card-actions` hover-reveal utility
 - Improved `.glass` and `.glass-hover` styles
 
+### 2026-07-19 — Security: RCON port hardening + JWT improvements
+
+**RCON Port Hardening (commit `a2e520f`):**
+- **Problem:** Docker containers bound RCON port to `0.0.0.0` (default), exposing it to the internet. Bots from `194.195.210.47`, `172.236.228.193` were brute-forcing RCON, flooding the Minecraft console with connect/disconnect spam.
+- **Fix:** `HostIp: "127.0.0.1"` in `PortBindings` so RCON is only reachable from the panel backend on localhost.
+- **⚠ Existing containers** were created with the old binding. Recreate them (delete + re-create) for the fix to take effect.
+
+**JWT Improvements (commit `a2e520f`):**
+- Token expiry extended from 12h → 7 days (self-hosted panel, convenience over strict security).
+- `AuthGuard` fetch interceptor now detects `401` responses, clears the token, and reloads the page so the user sees the login screen instead of silently failing API calls.
+
 ---
 
 ## Open / Pending
 
-- [ ] No known open issues at this time.
+- [ ] Existing Docker containers need recreation to apply the RCON `127.0.0.1` binding.
 
 ---
 
@@ -191,4 +202,4 @@ deepseek/                      # Local clone root
 
 ---
 
-> **Last updated:** 2026-07-19 · Session: UX Polish, 120% Zoom, JVM Args, Disk Usage, Bugfixes
+> **Last updated:** 2026-07-19 · Session: RCON security hardening + JWT improvements
