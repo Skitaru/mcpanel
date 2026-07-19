@@ -774,6 +774,36 @@ router.get("/:id/players", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/servers/:id/disk — disk usage in bytes (fast `du -sb`)
+// ---------------------------------------------------------------------------
+router.get("/:id/disk", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+
+    const { execSync } = await import("node:child_process");
+    const dataPath = server.dataPath;
+    if (!fs.existsSync(dataPath)) {
+      res.json({ bytes: 0, path: dataPath });
+      return;
+    }
+    const output = execSync(`du -sb "${dataPath}"`, {
+      timeout: 10_000,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const bytes = parseInt(output.trim().split(/\s+/)[0], 10) || 0;
+    res.json({ bytes, path: dataPath });
+  } catch (err: any) {
+    if (err.killed || err.code === "ETIMEDOUT") {
+      res.json({ bytes: -1, path: "", error: "Timeout" });
+    } else {
+      res.status(500).json({ error: "Failed to get disk usage.", detail: err.message });
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
 // PUT /api/servers/:id — update server config (name, ram, port, version)
 // ---------------------------------------------------------------------------
 router.put("/:id", async (req: Request, res: Response) => {

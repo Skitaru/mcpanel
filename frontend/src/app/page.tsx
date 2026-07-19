@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Trash2, Play, Square, Cpu, MemoryStick, Users, LogOut } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Trash2, Play, Square, Cpu, MemoryStick, Users, LogOut, HardDrive } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import ServerSidebar from "@/components/ServerSidebar";
@@ -43,6 +43,21 @@ function typeLabel(t: string) {
   }
 }
 
+function typeBadgeColor(t: string) {
+  switch (t) {
+    case "fabric": return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+    case "velocity": return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+    default: return "bg-sky-500/10 text-sky-400 border-sky-500/20";
+  }
+}
+
+function formatDisk(bytes: number | undefined) {
+  if (bytes == null || bytes < 0) return null;
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${(bytes / 1e3).toFixed(1)} KB`;
+}
+
 export default function DashboardPage() {
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +68,7 @@ export default function DashboardPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
   const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number; players: { name: string; id: string }[] }>>({});
+  const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
@@ -109,6 +125,24 @@ export default function DashboardPage() {
     };
     pollPlayers();
     const i = setInterval(pollPlayers, 15_000);
+    return () => clearInterval(i);
+  }, [servers]);
+
+  // ---- disk usage poll (every 60s, only for non-empty server list) ----
+  useEffect(() => {
+    const pollDisk = async () => {
+      for (const s of servers) {
+        try {
+          const res = await fetch(`${API_BASE}/api/servers/${s.id}/disk`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.bytes >= 0) setDiskUsage((prev) => ({ ...prev, [s.id]: data.bytes }));
+          }
+        } catch { /* ignore */ }
+      }
+    };
+    if (servers.length > 0) { pollDisk(); }
+    const i = setInterval(pollDisk, 60_000);
     return () => clearInterval(i);
   }, [servers]);
 
@@ -215,103 +249,105 @@ export default function DashboardPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {servers.map((s) => (
                     <Link key={s.id} href={`/servers/${s.id}`}
-                      className="group glass glass-hover animate-in relative rounded-2xl p-5 transition-all duration-200">
-                      <div className="mb-3 flex items-center gap-2">
-                        <span className={`inline-block h-2.5 w-2.5 rounded-full ${statusColor(s.status)}`} />
-                        <span className="text-xs font-medium text-slate-400">{statusLabel(s.status)}</span>
+                      className="group glass glass-hover animate-slide-up relative rounded-2xl p-5 transition-all duration-200 flex flex-col">
+                      {/* Top: Status + Name + Type Badge */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className={`inline-block h-2.5 w-2.5 rounded-full shrink-0 ${s.status === "running" ? "pulse-dot" : ""} ${statusColor(s.status)}`} />
+                        <h2 className="truncate text-base font-semibold text-white group-hover:text-sky-400 transition flex-1">{s.name}</h2>
+                        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${typeBadgeColor(s.serverType)}`}>
+                          {typeLabel(s.serverType)}
+                        </span>
                       </div>
-                      <h2 className="truncate text-base font-semibold text-white group-hover:text-sky-400 transition">{s.name}</h2>
-                      <div className="mt-3 flex gap-4 text-xs text-slate-500">
-                        <span>{formatRam(s.ram)}</span>
-                        <span>Port {s.port}</span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">{typeLabel(s.serverType)}</span>
+
+                      {/* Specs row */}
+                      <div className="flex items-center gap-4 text-xs text-slate-500 mb-3 flex-wrap">
+                        <span className="flex items-center gap-1"><MemoryStick className="h-3 w-3 text-slate-600" />{formatRam(s.ram)}</span>
+                        <span className="text-slate-700">·</span>
                         <span>{s.version}</span>
+                        <span className="text-slate-700">·</span>
+                        <span>:{s.port}</span>
+                        {diskUsage[s.id] != null && diskUsage[s.id] >= 0 && (
+                          <><span className="text-slate-700">·</span>
+                          <span className="flex items-center gap-1"><HardDrive className="h-3 w-3 text-slate-600" />{formatDisk(diskUsage[s.id])}</span></>
+                        )}
                       </div>
-                      {liveStats[s.id] && liveStats[s.id].cpu != null && s.status === "running" && (
-                        <div className="mt-3 flex items-center gap-3 text-xs">
-                          <div className="flex items-center gap-1 text-slate-400">
-                            <Cpu className="h-3 w-3" />
-                            <span className="font-mono tabular-nums text-slate-300">
-                              {liveStats[s.id].cpu.toFixed(1)}%
+                      {/* Live stats (only for running servers) */}
+                      {s.status === "running" && (
+                        <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.03]">
+                          <div className="flex items-center gap-1.5 text-slate-400 flex-1">
+                            <Cpu className="h-3.5 w-3.5" />
+                            <span className="font-mono text-xs tabular-nums text-white font-medium">
+                              {liveStats[s.id]?.cpu?.toFixed(1) ?? "—"}%
                             </span>
                           </div>
-                          <div className="flex items-center gap-1 text-slate-400">
-                            <MemoryStick className="h-3 w-3" />
-                            <span className="font-mono tabular-nums text-slate-300">
-                              {liveStats[s.id].mem >= 1e9
-                                ? `${(liveStats[s.id].mem / 1e9).toFixed(1)}G`
-                                : `${(liveStats[s.id].mem / 1e6).toFixed(0)}M`}
+                          <div className="w-px h-4 bg-white/[0.04]" />
+                          <div className="flex items-center gap-1.5 text-slate-400 flex-1">
+                            <MemoryStick className="h-3.5 w-3.5" />
+                            <span className="font-mono text-xs tabular-nums text-white font-medium">
+                              {liveStats[s.id] ? (liveStats[s.id].mem >= 1e9 ? `${(liveStats[s.id].mem / 1e9).toFixed(1)}G` : `${(liveStats[s.id].mem / 1e6).toFixed(0)}M`) : "—"}
                             </span>
                           </div>
                           {playerCounts[s.id] && (
-                            <div className="flex items-center gap-1 text-slate-400 group relative">
-                              <Users className="h-3 w-3" />
-                              <span className="font-mono tabular-nums text-slate-300">
-                                {playerCounts[s.id].online}/{playerCounts[s.id].max}
-                              </span>
-                              {playerCounts[s.id].players.length > 0 && (
-                                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20
-                                                rounded-lg border border-white/[0.06] bg-[#0a0a0a] px-3 py-2 shadow-xl min-w-[120px]">
-                                  <div className="text-[10px] font-medium text-neutral-500 mb-1 uppercase tracking-wider">Online</div>
-                                  {playerCounts[s.id].players.slice(0, 10).map((p) => (
-                                    <div key={p.id} className="flex items-center gap-1.5 py-0.5">
-                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                      <span className="text-xs text-neutral-300 truncate">{p.name}</span>
-                                    </div>
-                                  ))}
-                                  {playerCounts[s.id].players.length > 10 && (
-                                    <div className="text-[10px] text-neutral-600 mt-1">
-                                      +{playerCounts[s.id].players.length - 10} more
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                            <>
+                              <div className="w-px h-4 bg-white/[0.04]" />
+                              <div className="flex items-center gap-1.5 text-slate-400 relative group/players">
+                                <Users className="h-3.5 w-3.5" />
+                                <span className="font-mono text-xs tabular-nums text-white font-medium">
+                                  {playerCounts[s.id].online}/{playerCounts[s.id].max}
+                                </span>
+                                {playerCounts[s.id].players.length > 0 && (
+                                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/players:block z-20
+                                                  rounded-xl border border-white/[0.08] bg-[#0d0d0d] px-4 py-3 shadow-2xl min-w-[140px]">
+                                    <div className="text-[10px] font-semibold text-neutral-500 mb-2 uppercase tracking-wider">Players</div>
+                                    {playerCounts[s.id].players.slice(0, 8).map((p) => (
+                                      <div key={p.id} className="flex items-center gap-2 py-0.5">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                        <span className="text-xs text-neutral-300 truncate">{p.name}</span>
+                                      </div>
+                                    ))}
+                                    {playerCounts[s.id].players.length > 8 && (
+                                      <div className="text-[10px] text-neutral-600 mt-1.5">+{playerCounts[s.id].players.length - 8} more</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           )}
                         </div>
                       )}
-                      <div className="mt-4 flex items-center justify-end gap-1" onClick={(e) => e.preventDefault()}>
+
+                      {/* Status label (non-running) */}
+                      {s.status !== "running" && (
+                        <p className="text-xs text-slate-600 mb-4">{statusLabel(s.status)}</p>
+                      )}
+
+                      {/* Actions — hover-revealed, icon-only */}
+                      <div className="mt-auto flex items-center justify-end gap-1 card-actions" onClick={(e) => e.preventDefault()}>
                         {s.status === "running" ? (
-                          <button
-                            disabled={actingId === s.id}
+                          <button disabled={actingId === s.id}
                             onClick={(e) => { e.stopPropagation(); handleServerAction(s.id, "stop"); }}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50"
-                          >
-                            <Square className="h-3 w-3" />
-                            {actingId === s.id ? "…" : "Stop"}
-                          </button>
+                            className="rounded-lg p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Stop"
+                          ><Square className="h-3.5 w-3.5" /></button>
                         ) : (
-                          <button
-                            disabled={actingId === s.id}
+                          <button disabled={actingId === s.id}
                             onClick={(e) => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50"
-                          >
-                            <Play className="h-3 w-3" />
-                            {actingId === s.id ? "…" : "Start"}
-                          </button>
+                            className="rounded-lg p-1.5 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start"
+                          ><Play className="h-3.5 w-3.5" /></button>
                         )}
                         {deleteConfirmId === s.id ? (
                           <div className="flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1">
-                            <span className="text-xs text-red-400">Delete?</span>
+                            <span className="text-xs text-red-400">Sure?</span>
                             <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
                               disabled={deletingId === s.id}
-                              className="rounded bg-red-600 px-2 py-0.5 text-xs text-white hover:bg-red-500 disabled:opacity-50">
-                              {deletingId === s.id ? "…" : "Yes"}
-                            </button>
+                              className="rounded bg-red-600 px-2 py-0.5 text-xs text-white hover:bg-red-500 disabled:opacity-50">Yes</button>
                             <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }}
-                              className="rounded bg-neutral-700 px-2 py-0.5 text-xs text-neutral-300 hover:bg-neutral-600">
-                              No
-                            </button>
+                              className="rounded bg-neutral-700 px-2 py-0.5 text-xs text-neutral-300 hover:bg-neutral-600">No</button>
                           </div>
                         ) : (
-                        <button
-                          disabled={deletingId === s.id}
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }}
-                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-600 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          {deletingId === s.id ? "Deleting…" : "Delete"}
-                        </button>
+                          <button disabled={deletingId === s.id}
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }}
+                            className="rounded-lg p-1.5 text-slate-700 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50" title="Delete"
+                          ><Trash2 className="h-3.5 w-3.5" /></button>
                         )}
                       </div>
                     </Link>
