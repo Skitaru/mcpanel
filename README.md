@@ -12,11 +12,11 @@ A lightweight, modern web panel for managing Minecraft servers via Docker.
 curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash
 ```
 
-> Requires **Debian 11/12/13** or **Ubuntu 22.04/24.04** · Root access · Ports 3000 + 3001 open
+> Requires **Debian 11/12/13** or **Ubuntu 22.04/24.04** · Root access · Port 3001 open
 
 The installer handles everything:
-- Docker + Docker Compose
-- Node.js 20
+- Docker
+- Node.js 22
 - Builds frontend + backend
 - Creates systemd services
 - Auto-starts on boot
@@ -51,9 +51,10 @@ After installation:
 | URL | What |
 |-----|------|
 | `http://YOUR-IP:3001` | Panel (frontend) |
-| `http://YOUR-IP:3000` | API (backend) |
 
-No login required by default. Set `PANEL_API_KEY` in `/opt/mcpanel/.env` to enable API-key authentication.
+**Default login:** `admin` / `admin` — change the password via the login screen.
+
+The panel uses JWT-based authentication. An API-key fallback is available via `PANEL_API_KEY` in `/opt/mcpanel/.env`.
 
 ---
 
@@ -117,7 +118,9 @@ mcpanel/
 ## 🔒 Security
 
 - All servers run in isolated Docker containers
-- Optional API-key authentication
+- JWT-based authentication (change default password on first login)
+- API-key fallback authentication
+- RCON bound to localhost only — not exposed to the internet
 - Path-traversal protection on all file operations
 - 10 MB file read limit, 500 MB upload limit
 
