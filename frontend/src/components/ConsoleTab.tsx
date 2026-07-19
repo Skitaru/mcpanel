@@ -303,107 +303,91 @@ export default function ConsoleTab({ serverId, serverStatus }: Props) {
   // ==================================================================
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Stats bar */}
-      <div
-        className="flex items-center gap-6 rounded-xl border border-slate-800
-                    bg-slate-900/70 px-5 py-3 text-sm"
-      >
-        <div className="flex items-center gap-2 text-slate-400">
-          <Cpu className="h-4 w-4" />
-          <span className="font-mono tabular-nums text-white">
-            {stats?.cpuPercent != null ? `${stats.cpuPercent.toFixed(1)}%` : "—"}
-          </span>
-          <span className="text-slate-600">CPU</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-slate-400">
-          <MemoryStick className="h-4 w-4" />
-          <span className="font-mono tabular-nums text-white">
-            {stats ? formatBytes(stats.memoryUsage) : "—"}
-          </span>
-          <span className="text-slate-600">
-            / {stats ? formatBytes(stats.memoryLimit) : "—"}
-          </span>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              connected ? "bg-emerald-500" : "bg-amber-500"
-            }`}
-          />
-          <span className="text-xs text-slate-500">
-            {connected ? "Live" : error ? "Error" : "Connecting…"}
-          </span>
-          {error && (
-            <span className="text-xs text-amber-500 truncate max-w-[200px]">
-              {error}
+    <div className="flex flex-col">
+      {/* Unified Console Container */}
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+        {/* Stats header — compact, integrated */}
+        <div className="flex items-center gap-5 border-b border-slate-800/80 bg-slate-900/50 px-4 py-2.5">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <Cpu className="h-3.5 w-3.5" />
+            <span className="font-mono tabular-nums text-white font-medium">
+              {stats?.cpuPercent != null ? `${stats.cpuPercent.toFixed(1)}%` : "—"}
             </span>
+            <span className="text-slate-600">CPU</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <MemoryStick className="h-3.5 w-3.5" />
+            <span className="font-mono tabular-nums text-white font-medium">
+              {stats ? formatBytes(stats.memoryUsage) : "—"}
+            </span>
+            <span className="text-slate-600">
+              / {stats ? formatBytes(stats.memoryLimit) : "—"}
+            </span>
+          </div>
+          {/* Connection indicator */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className={`inline-block h-2 w-2 rounded-full ${connected ? "bg-emerald-500 pulse-dot" : "bg-amber-500"}`} />
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-600">
+              {connected ? "Live" : error ? "Error" : "…"}
+            </span>
+            {error && (
+              <span className="text-[10px] text-amber-500 truncate max-w-[160px]">{error}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Terminal body */}
+        <div style={{ minHeight: "22rem" }}>
+          {serverStatus !== "running" && !hasOutputRef.current ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
+              <div className="rounded-full bg-slate-800 p-3 mb-1">
+                <TerminalSquare className="h-6 w-6 text-slate-600" />
+              </div>
+              <p className="text-sm font-medium text-slate-400">Server is offline</p>
+              <p className="text-xs text-slate-600">Start the server to view the live console.</p>
+            </div>
+          ) : (
+            <div ref={terminalRef} className="h-64 w-full p-3" />
           )}
         </div>
-      </div>
 
-      {/* Terminal */}
-      <div
-        className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900"
-        style={{ minHeight: "24rem" }}
-      >
-        {serverStatus !== "running" && !hasOutputRef.current ? (
-          <div className="flex h-72 flex-col items-center justify-center gap-2 text-center">
-            <TerminalSquare className="h-10 w-10 text-slate-700" />
-            <p className="text-sm font-medium text-slate-400">Server is offline</p>
-            <p className="text-xs text-slate-600">
-              Start the server to view the console.
+        {/* Offline banner — inside the card */}
+        {serverStatus !== "running" && hasOutputRef.current && (
+          <div className="flex items-center gap-2 border-t border-amber-500/10 bg-amber-500/5 px-4 py-2">
+            <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+            <p className="text-xs text-amber-400/80">
+              Server stopped — console is read-only. Start the server to send commands.
             </p>
           </div>
-        ) : (
-          <div ref={terminalRef} className="h-72 w-full p-2" />
         )}
-      </div>
-      {/* Offline indicator — show when server stopped but terminal has content */}
-      {serverStatus !== "running" && hasOutputRef.current && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2">
-          <TerminalSquare className="h-4 w-4 shrink-0 text-amber-400" />
-          <p className="text-xs font-medium text-amber-400">
-            Server stopped — console is read-only. Start the server to send commands.
-          </p>
-        </div>
-      )}
 
-      {/* Command input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          sendCommand();
-        }}
-        className="flex gap-2"
-      >
-        <div className="relative flex-1">
-          <TerminalSquare className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+        {/* Command input — attached to bottom */}
+        <form
+          onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
+          className="flex items-center gap-2 border-t border-slate-800/80 bg-slate-900/30 px-3 py-2"
+        >
+          <TerminalSquare className="h-4 w-4 shrink-0 text-slate-600" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a command… (e.g. say Hello)"
+            placeholder="Type a command…"
             disabled={!connected}
             onKeyDown={handleCmdKeyDown}
-            className="w-full rounded-lg border border-slate-800 bg-slate-900 py-2.5
-                       pl-10 pr-4 font-mono text-sm text-slate-200
-                       placeholder:text-slate-600
-                       focus:border-sky-500/50 focus:outline-none
-                       disabled:opacity-50"
+            className="flex-1 bg-transparent py-1 font-mono text-sm text-slate-200
+                       placeholder:text-slate-600 focus:outline-none
+                       disabled:opacity-40"
           />
-        </div>
-        <button
-          type="submit"
-          disabled={!connected}
-          className="rounded-lg bg-sky-600 px-5 py-2.5 text-sm font-medium
-                     text-white transition hover:bg-sky-500
-                     disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Send
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={!connected}
+            className="shrink-0 rounded-md bg-sky-600 px-4 py-1.5 text-xs font-medium
+                       text-white transition hover:bg-sky-500
+                       disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Send
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
