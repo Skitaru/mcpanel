@@ -89,6 +89,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       try {
         const endpoint = serverType === "fabric"
           ? `${API_BASE}/api/fabric/versions`
+          : serverType === "velocity"
+          ? `${API_BASE}/api/velocity/versions`
           : `${API_BASE}/api/paper/versions`;
         const res = await fetch(endpoint);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
