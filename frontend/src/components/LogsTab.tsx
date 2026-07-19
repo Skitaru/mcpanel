@@ -155,7 +155,7 @@ export default function LogsTab({ serverId }: Props) {
           <pre
             ref={preRef}
             onScroll={handleScroll}
-            className="h-[500px] overflow-auto p-4 font-mono text-xs
+            className="h-56 overflow-auto p-4 font-mono text-xs
                        leading-relaxed text-slate-300 selection:bg-sky-500/30"
           >
             {search && logContent

@@ -6,6 +6,10 @@
 }
 
 /* ── Base ─────────────────────────────────────────────────── */
+html {
+  font-size: 150%; /* global zoom — scales all rem-based units */
+}
+
 html, body {
   background: #030303;
   color: #d1d5db;
