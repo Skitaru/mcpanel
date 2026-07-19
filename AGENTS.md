@@ -89,18 +89,53 @@
 
 ---
 
-### 2026-07-18 (Session 2) — Socket.IO 401 + server icon binary serving
+### 2026-07-19 — UX Polish, 120% Zoom, JVM Args, Disk Usage, Bugfixes
 
-**Bug: Socket.IO 401 Unauthorized**
-- **Root cause:** The global API-key fallback middleware (`index.ts` line 40) rejected `/socket.io` polling requests. The JWT `authMiddleware` only runs on `/api/*` routes, but the API-key fallback ran on ALL routes. Socket.IO polling doesn't carry a Bearer token, so it hit the `401` code path.
-- **Fix:** Added `req.path.startsWith("/socket.io")` to the skip-conditions in the API-key fallback middleware. Commit `6488380`.
+**Bugfixes (continued from 07-18):**
+- **Socket.IO 404 after 401 fix:** Next.js strips trailing slashes (`/socket.io/` → `/socket.io`), but Socket.IO only matches `/socket.io/`. Fix: `httpServer.prependListener` (placed AFTER `setupWebSocket` so it runs BEFORE Socket.IO's own prependListener) rewrites `/socket.io` → `/socket.io/` internally. Commit `0bc7529`.
+- **ConsoleTab freeze after stop/start:** Console only attached on mount, never re-attached when server came back online. Added `useEffect` watching `serverStatus` — re-emits `console:attach`/`stats:subscribe` when status transitions to "running", detaches when leaving "running". Commit `b268460`.
+- **FileManagerTab download corrupted binary files:** Same root cause as server icon — fetched JSON instead of raw binary. Fixed to `?raw=true` + `res.blob()`. Commit `bc7da45`.
 
-**Bug: Server icon 404 + not rendering**
-- **Root cause 1:** `SettingsTab.tsx` used `/api/servers/:id/file?path=/server-icon.png` as an `<img src>` URL. But the backend's GET `/file` endpoint reads files as UTF-8 and returns JSON — browsers can't render JSON as images.
-- **Root cause 2:** Even if the endpoint returned binary data, `<img src>` requests don't go through the fetch interceptor, so they wouldn't carry the JWT Bearer token — resulting in 401.
-- **Fix (backend):** Added `?raw=true` query param to GET `/file`. When set, the endpoint returns raw binary with a proper `Content-Type` header (mapped from file extension via `MIME_MAP`).
-- **Fix (frontend):** `SettingsTab` now fetches the icon via `fetch()` (which goes through the auth interceptor → adds Bearer token), creates a `blob:` URL from the response, and uses that as the `<img src>`. Old blob URLs are revoked to prevent memory leaks.
-- **MIME types:** Added extensive `MIME_MAP` (png, jpg, gif, svg, ico, webp, json, html, css, js, xml, txt, log, yml, yaml, toml, properties, cfg, conf).
+**Features:**
+- **JVM Start Arguments:** Custom `javaArgs` field in `ServerConfig`/`CreateServerRequest`. Stored in `servers.json`. When creating a container, `javaArgs` replaces the Aikar GC flags (but `-Xms`/`-Xmx` always auto-derived from RAM). Frontend: expandable "Advanced: JVM Arguments" textarea in CreateServerDialog + EditServerDialog. Commit `7840d76`.
+- **Disk Usage:** `GET /api/servers/:id/disk` returns `du -sb` output in bytes. Frontend polls every 60s, shows on dashboard cards + server detail header. Commit `c1b6ec0`.
+- **Backup Progress:** Backup button now shows loading spinner + "Backing up…" while tar is being created. Commit `7840d76`.
+
+**UX Polish — Dashboard Cards (commit `c1b6ec0`):**
+- Color-coded server type badges (Paper=blue, Fabric=amber, Velocity=purple)
+- Pulsing green dot animation for running servers
+- Specs row with icons + dot separators (instead of text blob)
+- Live stats in bordered stat bar with vertical dividers
+- Hover-revealed icon-only action buttons
+- Disk usage display on cards
+
+**UX Polish — Server Detail Header (commit `89ecb1b`):**
+- Action buttons grouped: Power (Start/Stop/Restart) | Management (Backup/Restore/Edit) | Delete
+- Type badge + pulsing status dot matching dashboard style
+- Disk usage in header info row
+- Removed duplicate logout button (already in sidebar)
+- Tab switching with fade-in animation (`tab-content` class)
+
+**UX Polish — ConsoleTab Redesign (commits `f6d357d`, `536a84a`):**
+- Single unified card instead of 3 separate elements
+- Stats as compact header bar inside the card (CPU | RAM | ● LIVE)
+- Terminal fills container via `absolute inset-0`
+- Command input attached to bottom (no gap)
+- xterm background matches card (`slate-950`) for seamless blend
+- xterm font size 13→14px for 120% zoom
+- Better offline empty state
+
+**Global — 120% Zoom (commit `51d7462`):**
+- `html { font-size: 120% }` scales all rem-based units
+- Container heights converted from px to rem: terminal/editor `h-72`, logs `h-80`, file list `max-h-72`
+- Tab navigation: larger padding, stronger active state, hover on inactive tabs
+
+**CSS additions (globals.css):**
+- `pulse-dot` animation for running server indicators
+- `slide-up` animation for card entry
+- `tab-content` fade-in for tab switching
+- `card-actions` hover-reveal utility
+- Improved `.glass` and `.glass-hover` styles
 
 ---
 
@@ -156,4 +191,4 @@ deepseek/                      # Local clone root
 
 ---
 
-> **Last updated:** 2026-07-18 · Session: Socket.IO 401 fix + binary file serving
+> **Last updated:** 2026-07-19 · Session: UX Polish, 120% Zoom, JVM Args, Disk Usage, Bugfixes
