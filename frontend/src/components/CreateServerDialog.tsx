@@ -43,6 +43,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [paperVersion, setPaperVersion] = useState("");
   const [customVersion, setCustomVersion] = useState("");
   const [javaArgs, setJavaArgs] = useState("");
+  const [port, setPort] = useState(25565);
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -124,6 +125,16 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setRam("4G");
       setJavaArgs("");
       setError(null);
+      // Auto-suggest next free port
+      fetch(`${API_BASE}/api/servers`)
+        .then(r => r.json())
+        .then((servers: { port: number }[]) => {
+          const used = new Set(servers.map(s => s.port));
+          let p = 25565;
+          while (used.has(p)) p++;
+          setPort(p);
+        })
+        .catch(() => setPort(25565));
     }
   }, [open]);
 
@@ -145,6 +156,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           body: JSON.stringify({
             name: name.trim(),
             ram,
+            port,
             serverType,
             paperVersion: version,
             javaArgs: javaArgs.trim() || undefined,
@@ -166,7 +178,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, serverType, paperVersion, customVersion, javaArgs, onCreated, onClose],
+    [name, ram, port, serverType, paperVersion, customVersion, javaArgs, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -274,6 +286,26 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                            h-4 w-4 -translate-y-1/2 text-neutral-600"
               />
             </div>
+          </label>
+
+          {/* Port */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              Port
+            </span>
+            <input
+              type="number"
+              value={port}
+              onChange={(e) => setPort(Math.max(1024, Math.min(65535, parseInt(e.target.value) || 25565)))}
+              min={1024}
+              max={65535}
+              disabled={submitting}
+              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                         px-3.5 py-2.5 text-sm text-white
+                         placeholder:text-neutral-600
+                         focus:border-sky-500/40 focus:outline-none
+                         disabled:opacity-50"
+            />
           </label>
 
           {/* RAM */}
