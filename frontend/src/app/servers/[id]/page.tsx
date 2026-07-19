@@ -307,9 +307,9 @@ export default function ServerDetailPage() {
                 </div>
               </header>
 
-              <nav className="mb-6 flex gap-1 overflow-x-auto rounded-xl bg-white/[0.02] p-1 w-fit max-w-full border border-white/[0.03]">
+              <nav className="mb-6 flex gap-0.5 overflow-x-auto rounded-xl bg-white/[0.03] p-1 w-fit max-w-full border border-white/[0.04]">
                 {TABS.map(({ id, label, icon: Icon }) => (
-                  <button key={id} onClick={()=>setActiveTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab===id?"bg-white/[0.06] text-white shadow-sm":"text-neutral-500 hover:text-neutral-300"}`}><Icon className="h-4 w-4"/>{label}</button>
+                  <button key={id} onClick={()=>setActiveTab(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${activeTab===id?"bg-white/[0.08] text-white shadow-sm":"text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.02]"}`}><Icon className="h-4 w-4"/>{label}</button>
                 ))}
               </nav>
 

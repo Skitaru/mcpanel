@@ -7,7 +7,7 @@
 
 /* ── Base ─────────────────────────────────────────────────── */
 html {
-  font-size: 150%; /* global zoom — scales all rem-based units */
+  font-size: 120%; /* global zoom — scales all rem-based units */
 }
 
 html, body {
