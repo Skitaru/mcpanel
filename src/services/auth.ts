@@ -74,9 +74,9 @@ export function changePassword(currentPassword: string, newPassword: string): { 
   return { success: true };
 }
 
-/** Generate a JWT token valid for 12 hours. */
+/** Generate a JWT token valid for 7 days. */
 export function generateToken(username: string): string {
-  return jwt.sign({ username }, getJwtSecret(), { expiresIn: "12h" });
+  return jwt.sign({ username }, getJwtSecret(), { expiresIn: "7d" });
 }
 
 /** Express middleware — checks for valid Bearer token. */

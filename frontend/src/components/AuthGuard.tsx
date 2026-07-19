@@ -24,7 +24,14 @@ function installInterceptor(token: string) {
       if (!headers.has("Authorization")) {
         headers.set("Authorization", `Bearer ${_token}`);
       }
-      return originalFetch(input, { ...init, headers });
+      const res = await originalFetch(input, { ...init, headers });
+      // If token expired, clear it and reload so user sees login screen
+      if (res.status === 401) {
+        _token = null;
+        localStorage.removeItem("mcpanel-token");
+        window.location.reload();
+      }
+      return res;
     }
     return originalFetch(input, init);
   } as typeof fetch;
