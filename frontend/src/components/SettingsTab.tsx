@@ -67,8 +67,8 @@ export default function SettingsTab({ serverId, serverType }: Props) {
     let cancelled = false;
     const iconPath = `/server-icon.png`;
     fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(iconPath)}&raw=true`)
-      .then((r) => {
-        if (!r.ok || cancelled) throw null;
+      .then(async (r) => {
+        if (!r.ok || cancelled) { await r.text(); throw null; } // consume body to suppress browser console 404
         return r.blob();
       })
       .then((blob) => {
@@ -130,7 +130,7 @@ export default function SettingsTab({ serverId, serverType }: Props) {
             if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
             return URL.createObjectURL(blob);
           });
-        }
+        } else { await iconRes.text(); } // consume body to suppress browser console 404
       } catch {}
     } catch (err: unknown) {
       console.error("Icon upload failed:", err);
