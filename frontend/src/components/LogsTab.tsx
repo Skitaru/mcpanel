@@ -36,6 +36,7 @@ export default function LogsTab({ serverId }: Props) {
         `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/logs/latest.log")}`,
       );
       if (res.status === 404) {
+        await res.text(); // consume body so browser doesn't log "Failed to load resource"
         setError("not_started");
         setLogContent(null);
         return;
