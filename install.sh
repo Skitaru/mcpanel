@@ -94,10 +94,10 @@ else
   run "Enable Docker" systemctl enable --now docker
 fi
 
-step 3 $TOTAL_STEPS "Install Node.js 20"
+step 3 $TOTAL_STEPS "Install Node.js 22"
 if command -v node &>/dev/null && node -e 'process.exit(+process.version.slice(1)>=18?0:1)' 2>/dev/null; then warn "Already installed ($(node --version))"
 else
-  run "NodeSource" bash -c "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+  run "NodeSource" bash -c "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -"
   run "nodejs" apt-get install -y -qq nodejs
 fi
 
@@ -157,7 +157,7 @@ StandardError=journal
 WantedBy=multi-user.target
 SVC
 
-cat > /etc/systemd/system/mcpanel-frontend.service << 'SVC'
+cat > /etc/systemd/system/mcpanel-frontend.service << SVC
 [Unit]
 Description=MCPanel Frontend
 After=network.target mcpanel-backend.service
@@ -167,7 +167,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/mcpanel/frontend
 EnvironmentFile=/opt/mcpanel/.env
-ExecStart=/usr/bin/npx next start -p 3001
+ExecStart=/usr/bin/npx next start -p $FRONTEND_PORT
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -187,7 +187,6 @@ systemctl is-active mcpanel-backend --quiet && ok "Backend running" || warn "Bac
 systemctl is-active mcpanel-frontend --quiet && ok "Frontend running" || warn "Frontend may need a moment"
 
 if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-  ufw allow $PANEL_PORT/tcp 2>/dev/null
   ufw allow $FRONTEND_PORT/tcp 2>/dev/null
 fi
 
