@@ -219,10 +219,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         // Pipe demuxed stdout / stderr → socket (cleaned)
         streams.demuxed.stdout.on("data", (chunk: Buffer) => {
-          const raw = chunk.toString();
-          const text = cleanAnsi(serverId, raw);
-          // DEBUG: log if raw differs from cleaned
-          if (raw !== text && raw.length < 200) console.log("[ws:debug] raw:", JSON.stringify(raw), "→ clean:", JSON.stringify(text));
+          const text = cleanAnsi(serverId, chunk.toString());
           if (!text) return;
           socket.emit("console:output", {
             serverId,
