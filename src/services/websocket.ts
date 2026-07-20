@@ -17,15 +17,18 @@ import {
 // ANSI / control-character cleaner
 // ---------------------------------------------------------------------------
 
-/** Strip ESC characters only — breaks all ANSI sequences by removing
- *  their start marker.  \r\n → \n, bare \r → nothing (browsers ignore
- *  \r in textContent).  Matches the Modpack_Server approach. */
+/** Clean console output for div-based rendering.
+ *  1. Strip ESC (breaks all ANSI start markers)
+ *  2. Strip orphaned ANSI parameters left after ESC removal
+ *  3. Normalize newlines, filter whitespace-only lines */
 function cleanAnsi(raw: string): string {
   return raw
     // eslint-disable-next-line no-control-regex
-    .replace(/\x1b/g, "")        // strip ESC — breaks all ANSI sequences
-    .replace(/\r\n/g, "\n")      // CRLF → LF
-    .replace(/\r/g, "");         // strip bare CR
+    .replace(/\x1b/g, "")                              // strip ESC
+    .replace(/\[[0-9;?]+[a-zA-Z]/g, "")                // strip orphaned CSI params
+    .replace(/\][0-9;]*[^\x07]*\x07/g, "")             // strip orphaned OSC params
+    .replace(/\r\n/g, "\n")                            // CRLF → LF
+    .replace(/\r/g, "");                               // strip bare CR
 }
 
 // ---------------------------------------------------------------------------
