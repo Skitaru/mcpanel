@@ -213,13 +213,13 @@ export default function ConsoleTab({
       "console:output",
       (payload: { serverId: string; data: string; stream: "stdout" | "stderr" }) => {
         if (payload.serverId !== serverId) return;
-        // Strip ANSI escape codes (CSI sequences including those with ?)
+        // Aggressive ANSI/control-char stripping
         // eslint-disable-next-line no-control-regex
         const clean = payload.data
-          .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-          .replace(/\x1b\][0-9;]*[^\x07]*\x07/g, "")
-          .replace(/\x1b/g, "");
-        // \r\n → normal newline; bare \r → same-line overwrite (keep last segment)
+          .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")  // CSI
+          .replace(/\x1b\][^\x07]*\x07/g, "")          // OSC
+          .replace(/\x1b./g, "")                        // any other ESC sequence
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); // control chars (keep \t \n)
         const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const rawLines = normalized.split("\n");
         for (const raw of rawLines) {
@@ -250,9 +250,10 @@ export default function ConsoleTab({
           if (data.content) {
             // eslint-disable-next-line no-control-regex
             const clean = data.content
-              .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-              .replace(/\x1b\][0-9;]*[^\x07]*\x07/g, "")
-              .replace(/\x1b/g, "");
+              .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")
+              .replace(/\x1b\][^\x07]*\x07/g, "")
+              .replace(/\x1b./g, "")
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
             const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
             const rawLines = normalized.split("\n");
             setLines(rawLines.filter((l: string) => l !== "").map((text: string) => ({

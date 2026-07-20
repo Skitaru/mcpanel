@@ -25,9 +25,10 @@ export default function LogsTab({ serverId }: Props) {
       const data = await res.json();
       // eslint-disable-next-line no-control-regex
       const clean = data.content
-        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-        .replace(/\x1b\][0-9;]*[^\x07]*\x07/g, "")
-        .replace(/\x1b/g, "");
+        .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")
+        .replace(/\x1b\][^\x07]*\x07/g, "")
+        .replace(/\x1b./g, "")
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
       setLogContent(clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
       setError(null);
     } catch (err: unknown) {
@@ -96,7 +97,7 @@ export default function LogsTab({ serverId }: Props) {
         ) : (
           <pre ref={preRef} onScroll={handleScroll}
             className="bg-[#0a0c10] p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 overflow-auto"
-            style={{ height: "calc(100vh - 12rem)" }}>
+            style={{ height: "calc(100vh - 14rem)" }}>
             {filteredLines ? filteredLines.join("\n") : logContent}
           </pre>
         )}
