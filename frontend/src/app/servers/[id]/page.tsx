@@ -153,8 +153,8 @@ export default function ServerDetailPage() {
   return (
     <div className="flex min-h-screen">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} />
-      <main className={`flex-1 transition-all duration-200 ${ml}`}>
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+      <main className={`flex-1 flex flex-col transition-all duration-200 ${ml}`}>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 flex-1 flex flex-col min-h-0 w-full">
 
           {loading ? <DetailSkeleton /> : error || !server ? (
             <div className="flex flex-col items-center justify-center gap-4 py-20">
@@ -239,8 +239,8 @@ export default function ServerDetailPage() {
               </nav>
 
               {/* ── Tab content ── */}
-              <section>
-                <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
+              <section className="flex-1 flex flex-col min-h-0">
+                <div className={`tab-content flex-1 min-h-0 ${activeTab === "console" ? "flex flex-col" : "hidden"}`}>
                   <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} />
                 </div>
                 <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}><FileManagerTab serverId={serverId} /></div>
