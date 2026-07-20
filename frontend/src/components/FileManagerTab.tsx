@@ -331,26 +331,26 @@ export default function FileManagerTab({ serverId }: Props) {
         onDrop={handleDrop}
       >
         <div
-          className={`relative overflow-hidden rounded-xl border border-slate-800
-                      bg-slate-900 ${dragOver ? "ring-2 ring-sky-500/50" : ""}`}
+          className={`relative overflow-hidden rounded-xl border border-[#1a1f2e]
+                      bg-[#0f1119] ${dragOver ? "ring-2 ring-violet-500/50" : ""}`}
         >
           {/* Drop overlay */}
           {dragOver && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-sky-500/10 backdrop-blur-sm">
-              <div className="rounded-xl border-2 border-dashed border-sky-500/50 px-6 py-4 text-center">
-                <p className="text-sm font-medium text-sky-400">Drop files to upload</p>
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-violet-500/10 backdrop-blur-sm">
+              <div className="rounded-xl border-2 border-dashed border-violet-500/50 px-6 py-4 text-center">
+                <p className="text-sm font-medium text-violet-400">Drop files to upload</p>
               </div>
             </div>
           )}
           {uploading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70">
-              <Loader2 className="h-6 w-6 animate-spin text-sky-400" />
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0a0c10]/70">
+              <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
             </div>
           )}
           {/* Breadcrumbs */}
           <div
             className="flex items-center gap-1 overflow-x-auto border-b
-                        border-slate-800 px-4 py-2.5 text-xs"
+                        border-[#1a1f2e] px-4 py-2.5 text-xs"
           >
             {breadcrumbs.map((crumb, i) => (
               <span key={crumb.path} className="flex items-center gap-1">
@@ -376,7 +376,7 @@ export default function FileManagerTab({ serverId }: Props) {
           {showCreate ? (
             <form
               onSubmit={(e) => { e.preventDefault(); handleCreate(); }}
-              className="flex items-center gap-2 border-b border-slate-800 px-4 py-2"
+              className="flex items-center gap-2 border-b border-[#1a1f2e] px-4 py-2"
             >
               <span className="text-xs text-slate-400 shrink-0">
                 New {showCreate === "folder" ? "folder" : "file"}:
@@ -388,15 +388,15 @@ export default function FileManagerTab({ serverId }: Props) {
                 placeholder={showCreate === "folder" ? "folder-name" : "file-name.yml"}
                 autoFocus
                 disabled={creating}
-                className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1
+                className="flex-1 rounded border border-[#1a1f2e] bg-slate-800 px-2 py-1
                            text-xs text-slate-200 placeholder:text-slate-600
-                           focus:border-sky-500/50 focus:outline-none"
+                           focus:border-violet-500/50 focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={creating || !createName.trim()}
                 className="rounded bg-sky-600 px-2.5 py-1 text-xs font-medium text-white
-                           hover:bg-sky-500 disabled:opacity-50"
+                           hover:bg-violet-500 disabled:opacity-50"
               >
                 {creating ? "…" : "Create"}
               </button>
@@ -410,7 +410,7 @@ export default function FileManagerTab({ serverId }: Props) {
               </button>
             </form>
           ) : (
-            <div className="flex items-center gap-1 border-b border-slate-800 px-2 py-1.5">
+            <div className="flex items-center gap-1 border-b border-[#1a1f2e] px-2 py-1.5">
               <button
                 onClick={() => setShowCreate("file")}
                 className="flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-500
@@ -441,7 +441,7 @@ export default function FileManagerTab({ serverId }: Props) {
                 <p className="text-sm text-red-400">{error}</p>
                 <button
                   onClick={fetchFiles}
-                  className="mt-2 text-xs text-sky-400 hover:underline"
+                  className="mt-2 text-xs text-violet-400 hover:underline"
                 >
                   Retry
                 </button>
@@ -460,7 +460,7 @@ export default function FileManagerTab({ serverId }: Props) {
                                  text-left text-sm text-slate-400 transition
                                  hover:bg-slate-800/70"
                     >
-                      <FolderOpen className="h-4 w-4 shrink-0 text-sky-500" />
+                      <FolderOpen className="h-4 w-4 shrink-0 text-violet-500" />
                       <span className="truncate">..</span>
                     </button>
                   </li>
@@ -473,11 +473,11 @@ export default function FileManagerTab({ serverId }: Props) {
                       }
                       className={`flex w-full items-center gap-2.5 px-4 py-2
                                  text-left text-sm transition hover:bg-slate-800/70
-                                 ${selectedFile === (currentPath === "/" ? `/${f.name}` : `${currentPath}/${f.name}`) ? "bg-sky-500/10 text-sky-300" : "text-slate-300"}
+                                 ${selectedFile === (currentPath === "/" ? `/${f.name}` : `${currentPath}/${f.name}`) ? "bg-violet-500/10 text-sky-300" : "text-slate-300"}
                                  `}
                     >
                       {f.isDirectory ? (
-                        <Folder className="h-4 w-4 shrink-0 text-sky-500" />
+                        <Folder className="h-4 w-4 shrink-0 text-violet-500" />
                       ) : (
                         <File className="h-4 w-4 shrink-0 text-slate-500" />
                       )}
@@ -538,13 +538,13 @@ export default function FileManagerTab({ serverId }: Props) {
       {/* ---- Right panel: editor ---- */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div
-          className="overflow-hidden rounded-xl border border-slate-800
-                      bg-slate-900"
+          className="overflow-hidden rounded-xl border border-[#1a1f2e]
+                      bg-[#0f1119]"
         >
           {/* Editor header */}
           <div
             className="flex items-center justify-between border-b
-                        border-slate-800 px-4 py-2.5"
+                        border-[#1a1f2e] px-4 py-2.5"
           >
             <span className="truncate font-mono text-xs text-slate-400">
               {selectedFile ?? "No file selected"}
@@ -566,8 +566,8 @@ export default function FileManagerTab({ serverId }: Props) {
                   <button
                     onClick={downloadFile}
                     className="flex items-center gap-1.5 rounded-lg border
-                               border-slate-800 px-3 py-1.5 text-xs
-                               text-slate-400 transition hover:border-slate-700
+                               border-[#1a1f2e] px-3 py-1.5 text-xs
+                               text-slate-400 transition hover:border-[#1a1f2e]
                                hover:text-slate-200"
                     title="Download file"
                   >
@@ -578,7 +578,7 @@ export default function FileManagerTab({ serverId }: Props) {
                     disabled={saving}
                     className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3
                                py-1.5 text-xs font-medium text-white transition
-                               hover:bg-sky-500 disabled:opacity-50"
+                               hover:bg-violet-500 disabled:opacity-50"
                   >
                     {saving ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -610,7 +610,7 @@ export default function FileManagerTab({ serverId }: Props) {
               {/* Line numbers */}
               <div
                 ref={lineNumberRef}
-                className="select-none overflow-hidden bg-slate-900 py-4 pl-3 pr-2
+                className="select-none overflow-hidden bg-[#0f1119] py-4 pl-3 pr-2
                            font-mono text-sm leading-relaxed text-slate-600 text-right"
                 style={{ minWidth: "3rem" }}
               >
@@ -628,7 +628,7 @@ export default function FileManagerTab({ serverId }: Props) {
                     lineNumberRef.current.scrollTop = textareaRef.current.scrollTop;
                   }
                 }}
-                className="block flex-1 resize-none bg-slate-950 p-4
+                className="block flex-1 resize-none bg-[#0a0c10] p-4
                            font-mono text-sm leading-relaxed text-slate-200
                            placeholder:text-slate-700 focus:outline-none"
                 spellCheck={false}

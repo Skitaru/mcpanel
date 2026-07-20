@@ -96,7 +96,7 @@ export default function LogsTab({ serverId }: Props) {
         ) : (
           <pre ref={preRef} onScroll={handleScroll}
             className="bg-[#0a0c10] p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 overflow-auto"
-            style={{ height: "22rem" }}>
+            style={{ height: "calc(100vh - 12rem)" }}>
             {filteredLines ? filteredLines.join("\n") : logContent}
           </pre>
         )}
