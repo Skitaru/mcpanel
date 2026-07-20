@@ -17,18 +17,13 @@ import {
 // ANSI / control-character cleaner
 // ---------------------------------------------------------------------------
 
-/** Clean console output for div-based rendering.
- *  1. Strip ESC (breaks all ANSI start markers)
- *  2. Strip orphaned ANSI parameters left after ESC removal
- *  3. Normalize newlines, filter whitespace-only lines */
+/** Clean console output: keep only printable ASCII, newlines, tabs. */
 function cleanAnsi(raw: string): string {
   return raw
     // eslint-disable-next-line no-control-regex
-    .replace(/\x1b/g, "")                              // strip ESC
-    .replace(/\[[0-9;?>]*[a-zA-Z]/g, "")                // strip orphaned CSI params
-    .replace(/\][0-9;]*[^\x07]*\x07/g, "")             // strip orphaned OSC params
-    .replace(/\r\n/g, "\n")                            // CRLF → LF
-    .replace(/\r/g, "");                               // strip bare CR
+    .replace(/[^\x20-\x7E\n\t]/g, "")   // keep only printable ASCII + \n + \t
+    .replace(/\r\n/g, "\n")             // CRLF → LF
+    .replace(/\r/g, "");                // strip bare CR
 }
 
 // ---------------------------------------------------------------------------
