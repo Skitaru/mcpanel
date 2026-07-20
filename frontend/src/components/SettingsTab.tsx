@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Loader2, Save, Upload, Image as ImageIcon, AlertTriangle,
+  Loader2, Save, Upload, Image as ImageIcon, AlertTriangle, Clock,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -43,6 +43,12 @@ export default function SettingsTab({ serverId, serverType }: Props) {
   // Icon state
   const [iconUrl, setIconUrl] = useState<string | null>(null);
   const [iconUploading, setIconUploading] = useState(false);
+
+  // Schedule state
+  const [schedRestart, setSchedRestart] = useState("");
+  const [schedBackup, setSchedBackup] = useState("");
+  const [schedSaving, setSchedSaving] = useState(false);
+  const [schedMsg, setSchedMsg] = useState<string | null>(null);
 
   // ---- load properties ----
   const loadProperties = useCallback(async () => {
@@ -140,6 +146,43 @@ export default function SettingsTab({ serverId, serverType }: Props) {
     }
   }, [serverId]);
 
+  // ---- load schedule ----
+  useEffect(() => {
+    fetch(`${API_BASE}/api/servers/${serverId}/schedule`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.schedule) {
+          setSchedRestart(data.schedule.restart ?? "");
+          setSchedBackup(data.schedule.backup ?? "");
+        }
+      })
+      .catch(() => {});
+  }, [serverId]);
+
+  // ---- save schedule ----
+  const handleSaveSchedule = useCallback(async () => {
+    setSchedSaving(true);
+    setSchedMsg(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restart: schedRestart || null,
+          backup: schedBackup || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setSchedMsg("Schedule saved.");
+      setTimeout(() => setSchedMsg(null), 4000);
+    } catch (err: unknown) {
+      setSchedMsg(`Error: ${err instanceof Error ? err.message : "unknown"}`);
+    } finally { setSchedSaving(false); }
+  }, [serverId, schedRestart, schedBackup]);
+
   // ---- update a single property ----
   const updateProp = (key: string, value: string) => {
     setProperties(prev => ({ ...prev, [key]: value }));
@@ -191,6 +234,62 @@ export default function SettingsTab({ serverId, serverType }: Props) {
                        focus:border-sky-500/40 focus:outline-none
                        resize-none"
           />
+        </div>
+
+        {/* Scheduled Tasks */}
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock className="h-4 w-4 text-neutral-500" />
+            <span className="text-sm font-medium text-neutral-300">Scheduled Tasks</span>
+          </div>
+          <div className="space-y-3">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Restart</span>
+              <input
+                type="text"
+                value={schedRestart}
+                onChange={(e) => setSchedRestart(e.target.value)}
+                placeholder="HH:MM (e.g. 04:00)"
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                           px-3 py-2 text-sm text-white font-mono
+                           placeholder:text-neutral-600
+                           focus:border-sky-500/40 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Backup</span>
+              <input
+                type="text"
+                value={schedBackup}
+                onChange={(e) => setSchedBackup(e.target.value)}
+                placeholder="HH:MM (e.g. 03:00)"
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                           px-3 py-2 text-sm text-white font-mono
+                           placeholder:text-neutral-600
+                           focus:border-sky-500/40 focus:outline-none"
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveSchedule}
+                disabled={schedSaving}
+                className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium
+                           text-white transition hover:bg-sky-500
+                           disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {schedSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {schedSaving ? "Saving…" : "Save"}
+              </button>
+              {schedMsg && (
+                <span className={`text-[11px] ${schedMsg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+                  {schedMsg}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-600 leading-relaxed">
+              Times are checked every 30 seconds. Leave empty to disable. Backups keep the 5 most recent.
+            </p>
+          </div>
         </div>
       </div>
 

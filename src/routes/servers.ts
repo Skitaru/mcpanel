@@ -993,4 +993,93 @@ router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Re
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/servers/:id/recreate — stop, remove, re-create container (keeps /data)
+// ---------------------------------------------------------------------------
+router.post("/:id/recreate", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    if (!server.containerId) { res.status(500).json({ error: "Server has no container." }); return; }
+
+    // Stop + remove container (best-effort)
+    try { await stopContainer(server.containerId); } catch {}
+    try { await deleteContainer(server.containerId); } catch {}
+
+    const javaImage = server.serverType === "velocity"
+      ? "eclipse-temurin:21-jre-alpine"
+      : server.serverType === "fabric"
+        ? (resolveJavaImage(server.version) === "eclipse-temurin:16-jre-alpine" || resolveJavaImage(server.version) === "eclipse-temurin:8-jre-alpine"
+          ? "eclipse-temurin:17-jre-alpine" : resolveJavaImage(server.version))
+        : resolveJavaImage(server.version);
+
+    const jarName = server.serverType === "fabric" ? "fabric-server-launch.jar"
+      : server.serverType === "velocity" ? "velocity.jar"
+      : "paper.jar";
+
+    const newId = await createContainer(server, javaImage, {
+      jarName,
+      javaArgs: server.javaArgs,
+    });
+
+    updateServer(server.id, { containerId: newId } as any);
+
+    try { await startContainer(newId); }
+    catch (startErr: any) { console.error("[api] Recreate auto-start failed:", startErr.message); }
+
+    console.log(`[api] Recreated container for "${server.name}" — new id ${newId.slice(0, 12)}`);
+    res.json({ message: `Container recreated. New id: ${newId.slice(0, 12)}`, containerId: newId });
+  } catch (err: any) {
+    console.error("[api] POST /api/servers/:id/recreate error:", err);
+    res.status(500).json({ error: "Failed to recreate container.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET  /api/servers/:id/schedule — read scheduled tasks
+// PUT  /api/servers/:id/schedule — write scheduled tasks
+// ---------------------------------------------------------------------------
+router.get("/:id/schedule", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    res.json({ schedule: server.schedule ?? {} });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to read schedule.", detail: err.message });
+  }
+});
+
+router.put("/:id/schedule", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    const { restart, backup } = req.body ?? {};
+
+    // Validate HH:MM format
+    const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (restart !== undefined && restart !== null && restart !== "" && !timeRe.test(restart)) {
+      res.status(400).json({ error: "restart must be HH:MM format or null." }); return;
+    }
+    if (backup !== undefined && backup !== null && backup !== "" && !timeRe.test(backup)) {
+      res.status(400).json({ error: "backup must be HH:MM format or null." }); return;
+    }
+
+    const schedule: any = { ...(server.schedule ?? {}) };
+    if (restart !== undefined) schedule.restart = restart || undefined;
+    if (backup !== undefined) schedule.backup = backup || undefined;
+
+    // Clean up empty schedule
+    if (!schedule.restart && !schedule.backup) {
+      (server as any).schedule = undefined;
+    } else {
+      (server as any).schedule = schedule;
+    }
+
+    updateServer(server.id, { schedule: (server as any).schedule } as any);
+    res.json({ message: "Schedule updated.", schedule: (server as any).schedule ?? {} });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to save schedule.", detail: err.message });
+  }
+});
+
 export default router;

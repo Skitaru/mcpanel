@@ -145,6 +145,18 @@ export default function ServerDetailPage() {
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Delete failed"); setDeleting(false); setDeleteConfirm(false); }
   }, [serverId, router]);
 
+  const handleRecreate = useCallback(async () => {
+    setActing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/recreate`, { method: "POST" });
+      if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.error ?? "Recreate failed"); }
+      toast.success("Container recreated. Server restarting…");
+      await fetchServer();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Recreate failed");
+    } finally { setActing(false); }
+  }, [serverId, fetchServer]);
+
   const handleBackup = useCallback(async () => {
     setBackingUp(true);
     try {
@@ -287,6 +299,13 @@ export default function ServerDetailPage() {
                         <Settings className="h-3.5 w-3.5" />Edit
                       </button>
                     </div>
+
+                    {/* Recreate */}
+                    <button disabled={acting} onClick={handleRecreate}
+                      className="flex items-center gap-1.5 rounded-lg border border-white/[0.04] px-2.5 py-1.5 text-xs text-neutral-500 transition hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"
+                      title="Stop, remove and re-create the container (keeps data)">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
 
                     {/* Delete */}
                     {deleteConfirm ? (

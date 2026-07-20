@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  Cpu, MemoryStick, TerminalSquare, Server, HardDrive,
+  Cpu, MemoryStick, TerminalSquare, Server, Users,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +100,8 @@ export default function ConsoleTab({
   const [upSeconds, setUpSeconds] = useState(-1);
   const startTimeRef = useRef<number | null>(null);
   const uptimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
+  const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
 
   // ---- auto-scroll ----
   const autoScrollRef = useRef(true);
@@ -149,6 +151,30 @@ export default function ConsoleTab({
       if (uptimeIntervalRef.current) clearInterval(uptimeIntervalRef.current);
     };
   }, [serverStatus]);
+
+  // ---- player polling (15 s) ----
+  useEffect(() => {
+    if (serverStatus !== "running") {
+      setPlayerCount({ online: 0, max: 0 });
+      setPlayerList([]);
+      return;
+    }
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/servers/${serverId}/players`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.unreachable) {
+            setPlayerCount({ online: data.online, max: data.max });
+            setPlayerList(data.players ?? []);
+          }
+        }
+      } catch {}
+    };
+    poll();
+    const i = setInterval(poll, 15_000);
+    return () => clearInterval(i);
+  }, [serverId, serverStatus]);
 
   // ---- socket connection ----
   useEffect(() => {
@@ -407,6 +433,32 @@ export default function ConsoleTab({
           <div className="text-sm font-medium text-slate-200 tabular-nums">
             {typeof window !== "undefined" ? window.location.hostname : "—"}:{port}
           </div>
+        </div>
+
+        {/* Players */}
+        <div className="px-4 py-3 border-b border-slate-800/60">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Users className="h-3 w-3 text-slate-500" />
+            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
+              Players
+            </span>
+          </div>
+          <div className="text-sm font-medium text-slate-200 tabular-nums">
+            {isOnline ? `${playerCount.online}/${playerCount.max}` : "—"}
+          </div>
+          {isOnline && playerList.length > 0 && (
+            <div className="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
+              {playerList.map((p) => (
+                <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="truncate">{p.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {isOnline && playerCount.online === 0 && (
+            <div className="text-[11px] text-slate-600 mt-1">No players online</div>
+          )}
         </div>
 
         {/* Uptime */}
