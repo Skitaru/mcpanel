@@ -333,9 +333,9 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]">
+    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119] flex-1 min-h-0">
       {/* ── Console panel ── */}
-      <div className="flex flex-1 flex-col min-w-0 min-h-0" style={{ height: "min(24rem, 60vh)" }}>
+      <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Output area */}
         <div
           ref={outputRef}
