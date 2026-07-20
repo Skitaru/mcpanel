@@ -27,19 +27,19 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans text-gray-300">
+      <body className="min-h-full font-sans text-slate-300 bg-[#0a0c10]">
         <Toaster
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "rgba(15, 15, 15, 0.95)",
-              color: "#d1d5db",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: "#0f1119",
+              color: "#cbd5e1",
+              border: "1px solid #1a1f2e",
               fontSize: "13px",
-              backdropFilter: "blur(12px)",
+              borderRadius: "8px",
             },
-            error: { iconTheme: { primary: "#f87171", secondary: "#0f0f0f" } },
-            success: { iconTheme: { primary: "#34d399", secondary: "#0f0f0f" } },
+            error:   { iconTheme: { primary: "#f87171", secondary: "#0f1119" } },
+            success: { iconTheme: { primary: "#34d399", secondary: "#0f1119" } },
           }}
         />
         <AuthGuard>{children}</AuthGuard>

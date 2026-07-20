@@ -87,22 +87,22 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm overflow-hidden rounded-2xl
-                   border border-white/[0.06] bg-[#0a0a0a] shadow-2xl"
+        className="relative w-full max-w-sm overflow-hidden rounded-xl
+                   border border-[#1a1f2e] bg-[#0f1119] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.04] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3.5">
           <div className="flex items-center gap-2.5">
-            <KeyRound className="h-5 w-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">
+            <KeyRound className="h-5 w-5 text-violet-400" />
+            <h2 className="text-base font-bold text-white">
               Change Password
             </h2>
           </div>
           <button
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg p-1.5 text-neutral-600 transition
-                       hover:bg-white/[0.04] hover:text-neutral-400
+            className="rounded-md p-1.5 text-slate-600 transition
+                       hover:bg-white/[0.04] hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />

@@ -44,58 +44,50 @@ export default function LoginScreen({ onLogin }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030303]">
-      {/* Background glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_30%,rgba(14,165,233,0.08),transparent)]" />
-
-      <div className="relative w-full max-w-sm animate-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0c10]">
+      <div className="w-full max-w-xs animate-in">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">MCPanel</h1>
-          <p className="mt-1 text-sm text-neutral-500">Minecraft Server Dashboard</p>
+          <h1 className="text-xl font-bold tracking-tight text-white">MCPanel</h1>
+          <p className="mt-1 text-sm text-slate-500">Minecraft Server Dashboard</p>
         </div>
 
-        {/* Login form */}
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#0a0a0a] p-6">
-            <div className="mb-4">
-              <label className="mb-1.5 block text-xs font-medium text-neutral-400">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
-                autoFocus
-                disabled={loading}
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
-                           px-3.5 py-2.5 text-sm text-white
-                           placeholder:text-neutral-600
-                           focus:border-sky-500/40 focus:outline-none
-                           disabled:opacity-50"
-              />
-            </div>
-            <div className="mb-1">
-              <label className="mb-1.5 block text-xs font-medium text-neutral-400">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={loading}
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
-                           px-3.5 py-2.5 text-sm text-white
-                           placeholder:text-neutral-600
-                           focus:border-sky-500/40 focus:outline-none
-                           disabled:opacity-50"
-              />
-            </div>
+        {/* Form */}
+        <form onSubmit={handleLogin} className="space-y-3">
+          <div className="surface p-5">
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
+              autoFocus
+              disabled={loading}
+              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm
+                         text-white placeholder:text-slate-700
+                         focus:border-violet-500/40 focus:outline-none
+                         disabled:opacity-50"
+            />
+
+            <label className="mt-3 mb-1.5 block text-xs font-medium text-slate-500">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="········"
+              disabled={loading}
+              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm
+                         text-white placeholder:text-slate-700
+                         focus:border-violet-500/40 focus:outline-none
+                         disabled:opacity-50"
+            />
 
             {error && (
-              <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              <div className="mt-3 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-400">
                 {error}
               </div>
             )}
@@ -104,16 +96,12 @@ export default function LoginScreen({ onLogin }: Props) {
           <button
             type="submit"
             disabled={loading || !username || !password}
-            className="flex w-full items-center justify-center gap-2 rounded-xl
-                       bg-sky-600 px-4 py-3 text-sm font-medium text-white
-                       transition hover:bg-sky-500
+            className="flex w-full items-center justify-center gap-2 rounded-lg
+                       bg-violet-600 px-4 py-2.5 text-sm font-medium text-white
+                       transition hover:bg-violet-500
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <LogIn className="h-4 w-4" />
-            )}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>

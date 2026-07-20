@@ -333,14 +333,14 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0" style={{ height: "min(28rem, 65vh)" }}>
         {/* Output area */}
         <div
           ref={outputRef}
           onScroll={handleOutputScroll}
-          className="flex-1 overflow-y-auto bg-[#060809] p-4 font-mono text-[12.5px] leading-[1.75] scrollbar-thin"
+          className="flex-1 overflow-y-auto bg-[#0a0c10] p-4 font-mono text-[12.5px] leading-[1.75]"
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -373,7 +373,7 @@ export default function ConsoleTab({
 
         {/* Offline banner */}
         {!isOnline && hasOutput && (
-          <div className="flex items-center gap-2 border-t border-amber-500/10 bg-amber-500/5 px-4 py-2">
+          <div className="flex items-center gap-2 border-t border-amber-500/20 bg-amber-500/5 px-4 py-2">
             <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-amber-400" />
             <p className="text-xs text-amber-400/80">
               Server stopped — console is read-only. Start the server to send commands.
@@ -384,7 +384,7 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2.5 border-t border-slate-800 bg-slate-900/50 px-4 py-2.5"
+          className="flex items-center gap-2.5 border-t border-[#1a1f2e] bg-[#0f1119] px-4 py-2.5"
         >
           <span className="select-none font-mono text-sm text-violet-400 shrink-0">❯</span>
           <input
