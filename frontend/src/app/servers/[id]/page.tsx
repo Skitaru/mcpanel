@@ -182,44 +182,32 @@ export default function ServerDetailPage() {
                   )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {/* Power */}
-                  <div className="flex items-center rounded-lg border border-[#1a1f2e] bg-white/[0.02] p-0.5">
-                    {server.status === "running" ? (<>
-                      <button disabled={acting} onClick={() => handleAction("restart")} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />Restart</button>
-                      <span className="w-px h-4 bg-[#1a1f2e]" />
-                      <button disabled={acting} onClick={() => handleAction("stop")} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"><Square className="h-3.5 w-3.5" />Stop</button>
-                    </>) : (
-                      <button disabled={acting} onClick={() => handleAction("start")} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50"><Play className="h-3.5 w-3.5" />Start</button>
-                    )}
-                  </div>
-
-                  {/* Management */}
-                  <div className="flex items-center rounded-lg border border-[#1a1f2e] p-0.5">
-                    <button disabled={backingUp} onClick={handleBackup} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-white/[0.03] hover:text-slate-300 disabled:opacity-50">
-                      {backingUp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}{backingUp ? "…" : "Backup"}
-                    </button>
-                    <label className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-slate-500 transition hover:bg-white/[0.03] hover:text-slate-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`}>
-                      <Upload className="h-3.5 w-3.5" />Restore
-                      <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
-                    </label>
-                  </div>
-
-                  {/* Recreate */}
-                  <button disabled={acting} onClick={handleRecreate} className="rounded-lg border border-[#1a1f2e] p-1.5 text-slate-600 transition hover:border-amber-500/30 hover:text-amber-400 disabled:opacity-50" title="Recreate container (keeps data)">
-                    <RefreshCw className="h-3.5 w-3.5" />
+                {/* Actions — single icon row */}
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {server.status === "running" ? (<>
+                    <button disabled={acting} onClick={() => handleAction("restart")} className="rounded-md p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => handleAction("stop")} className="rounded-md p-1.5 text-red-400 transition hover:bg-red-500/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
+                  </>) : (
+                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-md p-1.5 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
+                  )}
+                  <span className="w-px h-5 bg-[#1a1f2e] mx-1" />
+                  <button disabled={backingUp} onClick={handleBackup} className="rounded-md p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</button>
+                  <label className={`rounded-md p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
+                    <Upload className="h-4 w-4" />
+                    <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
+                  </label>
+                  <button disabled={acting} onClick={handleRecreate} className="rounded-md p-1.5 text-slate-500 transition hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50" title="Recreate container">
+                    <RefreshCw className="h-4 w-4" />
                   </button>
-
-                  {/* Delete */}
+                  <span className="w-px h-5 bg-[#1a1f2e] mx-1" />
                   {deleteConfirm ? (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5">
-                      <span className="text-xs text-red-400">Delete?</span>
-                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-red-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
-                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-600">No</button>
+                    <div className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1">
+                      <span className="text-[11px] text-red-400">Delete?</span>
+                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-red-500 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
+                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-slate-600 px-1.5 py-0.5 text-[11px] text-slate-300 hover:bg-slate-500">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg border border-[#1a1f2e] p-1.5 text-slate-600 transition hover:border-red-500/30 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => setDeleteConfirm(true)} className="rounded-md p-1.5 text-slate-600 transition hover:bg-red-500/10 hover:text-red-400" title="Delete Server"><Trash2 className="h-4 w-4" /></button>
                   )}
                 </div>
               </div>
