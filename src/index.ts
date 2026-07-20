@@ -11,6 +11,7 @@ import {
   generateToken,
   changePassword,
 } from "./services/auth";
+import { startScheduler } from "./services/scheduler";
 
 const PORT = process.env.PANEL_PORT ? parseInt(process.env.PANEL_PORT, 10) : 3000;
 
@@ -59,17 +60,15 @@ if (API_KEY) {
 
 // ---- Auth routes ----
 // Rate-limit login attempts: max 10 per minute per IP
-let rateLimit: any;
-try { rateLimit = require("express-rate-limit"); } catch { rateLimit = null; }
-if (rateLimit) {
-  app.use("/api/auth/login", rateLimit({
-    windowMs: 60_000,
-    max: 10,
-    message: { error: "Too many login attempts. Please wait a minute." },
-    standardHeaders: true,
-    legacyHeaders: false,
-  }));
-}
+import rateLimit from "express-rate-limit";
+app.use("/api/auth/login", rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  message: { error: "Too many login attempts. Please wait a minute." },
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
 app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) {
@@ -213,4 +212,5 @@ httpServer.listen(PORT, () => {
   console.log(
     `[panel] Store: ${process.cwd()}/servers.json  |  Data root: ${process.cwd()}/data`,
   );
+  startScheduler();
 });

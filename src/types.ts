@@ -26,6 +26,8 @@ export interface ServerConfig {
   dataPath: string;
   /** Custom JVM arguments (replaces Aikar GC flags). -Xms/-Xmx derived from ram. */
   javaArgs?: string;
+  /** Scheduled tasks: { restart?: "HH:MM", backup?: "HH:MM" } */
+  schedule?: { restart?: string; backup?: string };
 }
 
 /** Request body for POST /api/servers */
