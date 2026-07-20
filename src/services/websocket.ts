@@ -29,6 +29,8 @@ function cleanAnsi(serverId: string, raw: string): string {
     .replace(/\x1b\][^\x07]*\x07/g, "")                     // OSC
     .replace(/\x1b[PX^_].*?(\x1b\\)?/g, "")                 // DCS/SOS/PM/APC
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // control chars
+    .replace(/\n> /g, "\n")                                 // JLine prompt indicator
+    .replace(/^> /, "")                                     // JLine prompt at start
     .replace(/\r\n/g, "\n")                                 // CRLF → LF
     .replace(/\r/g, "");                                    // bare CR
 
@@ -208,7 +210,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         // Pipe demuxed stdout / stderr → socket (cleaned)
         streams.demuxed.stdout.on("data", (chunk: Buffer) => {
-          const text = cleanAnsi(serverId, chunk.toString());
+          const raw = chunk.toString();
+          const text = cleanAnsi(serverId, raw);
+          // DEBUG: log if raw differs from cleaned
+          if (raw !== text && raw.length < 200) console.log("[ws:debug] raw:", JSON.stringify(raw), "→ clean:", JSON.stringify(text));
           if (!text) return;
           socket.emit("console:output", {
             serverId,
