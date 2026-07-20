@@ -127,22 +127,22 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                  bg-black/70 p-4 backdrop-blur-sm"
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl
-                   border border-white/[0.06] bg-[#0a0a0a] shadow-2xl"
+        className="relative w-full max-w-md overflow-hidden rounded-xl
+                   border border-[#1a1f2e] bg-[#0f1119] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.04] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3.5">
           <div className="flex items-center gap-2.5">
-            <Settings className="h-5 w-5 text-sky-500" />
-            <h2 className="text-lg font-semibold text-white">
+            <Settings className="h-5 w-5 text-violet-400" />
+            <h2 className="text-base font-bold text-white">
               Edit Server
             </h2>
           </div>
           <button
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg p-1.5 text-neutral-600 transition
-                       hover:bg-white/[0.04] hover:text-neutral-400
+            className="rounded-md p-1.5 text-slate-600 transition
+                       hover:bg-white/[0.04] hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -162,10 +162,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               onChange={(e) => setName(e.target.value)}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+              className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-sm text-white
                          placeholder:text-neutral-600
-                         focus:border-sky-500/40 focus:outline-none
+                         focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
@@ -181,8 +181,8 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                 onChange={(e) => setRam(e.target.value)}
                 disabled={submitting}
                 className="w-full appearance-none rounded-lg border
-                           border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5
-                           text-sm text-white focus:border-sky-500/40
+                           border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
+                           text-sm text-white focus:border-violet-500/40
                            focus:outline-none disabled:opacity-50"
               >
                 {RAM_OPTIONS.map((opt) => (
@@ -206,9 +206,9 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               max={65535}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+              className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-sm text-white
-                         focus:border-sky-500/40 focus:outline-none
+                         focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
@@ -224,10 +224,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               placeholder="Custom JVM flags (replaces Aikar GC defaults)"
               rows={3}
               disabled={submitting}
-              className="mt-2 w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+              className="mt-2 w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-xs text-white font-mono
                          placeholder:text-neutral-600
-                         focus:border-sky-500/40 focus:outline-none
+                         focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50 resize-none"
             />
             <p className="mt-1 text-[10px] text-neutral-600">
@@ -253,8 +253,8 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             type="submit"
             disabled={submitting || !name.trim()}
             className="flex w-full items-center justify-center gap-2
-                       rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium
-                       text-white transition hover:bg-sky-500
+                       rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium
+                       text-white transition hover:bg-violet-500
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (

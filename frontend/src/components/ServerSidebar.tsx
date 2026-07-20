@@ -36,7 +36,7 @@ export default function ServerSidebar({
 
       <aside className={`fixed left-0 top-0 z-50 flex h-full flex-col
         border-r border-[#1a1f2e] bg-[#0a0c10] transition-all duration-200
-        ${collapsed ? "-translate-x-full lg:translate-x-0 lg:w-13" : "w-52 lg:w-52"}`}>
+        ${collapsed ? "-translate-x-full lg:translate-x-0 lg:w-13" : "w-52"}`}>
 
         {/* Brand */}
         <Link href="/" className={`flex items-center border-b border-[#1a1f2e] px-4 py-3.5
