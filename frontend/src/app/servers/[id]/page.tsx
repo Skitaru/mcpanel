@@ -110,16 +110,7 @@ export default function ServerDetailPage() {
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Delete failed"); setDeleting(false); setDeleteConfirm(false); }
   }, [serverId, router]);
 
-  const handleRecreate = useCallback(async () => {
-    setActing(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/servers/${serverId}/recreate`, { method: "POST" });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? "Recreate failed"); }
-      toast.success("Container recreated. Server restarting…");
-      await fetchServer();
-    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Recreate failed"); }
-    finally { setActing(false); }
-  }, [serverId, fetchServer]);
+
 
   const handleBackup = useCallback(async () => {
     setBackingUp(true);
@@ -196,9 +187,6 @@ export default function ServerDetailPage() {
                     <Upload className="h-4 w-4" />
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
-                  <button disabled={acting} onClick={handleRecreate} className="rounded-md p-1.5 text-slate-500 transition hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50" title="Recreate container">
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
                   <span className="w-px h-5 bg-[#1a1f2e] mx-1" />
                   {deleteConfirm ? (
                     <div className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1">
