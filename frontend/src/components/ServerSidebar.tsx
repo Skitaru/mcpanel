@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { LogOut, PanelLeft, Plus } from "lucide-react";
+import { LogOut, PanelLeft, Plus, KeyRound } from "lucide-react";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import type { ServerStatus } from "@/lib/types";
 
 interface Props {
@@ -27,6 +29,8 @@ export default function ServerSidebar({
   onToggle,
   onCreateClick,
 }: Props) {
+  const [pwDialogOpen, setPwDialogOpen] = useState(false);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -101,6 +105,15 @@ export default function ServerSidebar({
             {!collapsed && "New Server"}
           </button>
           <button
+            onClick={() => setPwDialogOpen(true)}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium
+              text-neutral-500 transition hover:bg-amber-500/10 hover:text-amber-400 w-full
+              ${collapsed ? "justify-center" : ""}`}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" />
+            {!collapsed && "Password"}
+          </button>
+          <button
             onClick={() => { localStorage.removeItem("mcpanel-token"); window.location.reload(); }}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium
               text-neutral-600 transition hover:bg-red-500/10 hover:text-red-400 w-full
@@ -111,6 +124,8 @@ export default function ServerSidebar({
           </button>
         </div>
       </aside>
+
+      <ChangePasswordDialog open={pwDialogOpen} onClose={() => setPwDialogOpen(false)} />
     </>
   );
 }

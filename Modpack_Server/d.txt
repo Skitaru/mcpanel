@@ -1,0 +1,1 @@
+bash /mnt/c/Users/bross/Desktop/Claude/Modpack_Server/deploy.sh
