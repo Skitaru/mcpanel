@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
 # ║           MCPanel — One-Line Installer                      ║
-# ║   curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | bash  ║
+# ║   curl -fsSL ... | bash   — or —   wget -qO- ... | bash     ║
 # ╚══════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
