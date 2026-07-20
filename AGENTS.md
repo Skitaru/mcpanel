@@ -150,9 +150,79 @@
 
 ---
 
+### 2026-07-20 — Major UX Overhaul, Security Hardening, Scheduler, Bugfixes
+
+**Installation UX:**
+- README + install.sh now show both `curl` and `wget` commands since Debian 13 doesn't ship curl by default. Commit `1ccea5b`.
+
+**Password Change Fix:**
+- **Problem:** "Change Password" was on the login screen but required a valid JWT token — impossible since the user is on the login screen because they have no token.
+- **Fix:** Removed from LoginScreen, added `ChangePasswordDialog.tsx` component accessible from the sidebar footer (KeyRound icon between "New Server" and "Logout"). After successful change, auto-logs out after 2s. Commit `b4d8e12`.
+
+**Docker Root-User Hardening:**
+- **Problem:** Containers ran Java as root. If Minecraft process was exploited, attacker had root in the container and potentially on the host via volume mounts.
+- **Fix:** `docker.ts` Cmd now creates `mc` user (UID 1000) via `adduser -D`, chowns `/data`, and runs Java via `exec su mc -c "exec java ..."`. Also sets `TERM=dumb` env to suppress JLine "Advanced terminal features not available" warning. Commits `cb9c22d`, `3891874`.
+- **⚠ Existing containers** need to be deleted + re-created for these fixes to apply.
+
+**Console Rewrite — xterm.js → Div-based:**
+- Removed `@xterm/xterm` + `@xterm/addon-fit` dependencies (~150KB saved).
+- New `ConsoleTab.tsx`: div-based output (`font-mono text-[12.5px] leading-[1.75]`), color-coded lines (stdout=`text-slate-300`, stderr=`text-red-400`, system=`text-slate-600 italic`), `❯` prompt, compact command input bar.
+- Stats sidebar on the right (matching Modpack_Server design): Status, Address (with copy button), Players, Uptime, CPU (with bar), Memory (with bar), RAM Limit, Server Type.
+- Player list polled every 15s from `/api/servers/:id/players`.
+- ANSI cleaning: handles CSI sequences with `?` (JLine), OSC sequences, and proper `\r\n`/`\r` normalization.
+- Commit `cb9c22d`.
+
+**Recreate Container (added then removed):**
+- Added `POST /api/servers/:id/recreate` endpoint + frontend button, but removed in commit `c31393a` — user preferred the existing Restart button.
+
+**Rate-Limit Cleanup:**
+- `express-rate-limit` was imported via `try/require` in `index.ts` despite being in `package.json`. Cleaned up to proper ES import. Commit `439c0b2`.
+
+**Scheduled Tasks (Scheduler):**
+- **Backend:** `src/services/scheduler.ts` — checks every 30s for due tasks. `startScheduler()` called from `index.ts` on startup.
+- **API:** `GET/PUT /api/servers/:id/schedule` — stores `{ restart?: "HH:MM", backup?: "HH:MM" }` per-server in `servers.json`.
+- **Frontend:** SettingsTab "Scheduled Tasks" card with Auto-Restart and Auto-Backup time inputs.
+- Scheduled backups keep the 5 most recent; older are auto-deleted.
+- Commit `439c0b2` (with critical follow-up fix in `a3a9a30`).
+
+**UX Overhaul — Design System Unification (commits `ca4d663`, `98d5094`, `5f9e49f`, `4c9b1b5`, `f354cc4`, `1c8ccad`):**
+
+| Token | Old | New |
+|-------|-----|-----|
+| Background | `#030303` + radial glow | `#0a0c10` flat |
+| Card/surface | `border-white/[0.06] bg-white/[0.02]` | `border-[#1a1f2e] bg-[#0f1119]` |
+| Input background | `bg-white/[0.02]` | `bg-[#0a0c10]` |
+| Accent | `sky-500/600` | `violet-500/600` |
+| Sidebar width | `w-56` | `w-52` |
+| Card border-radius | `rounded-2xl` | `rounded-xl` |
+| Tab style | Pill buttons in box | Underline tabs (`border-b-2`) |
+
+- **globals.css:** Removed body::before glow, added `.surface` + `.surface-hover` utilities.
+- **LoginScreen:** Minimal — no glow, violet accent, compact `surface` card.
+- **ServerSidebar:** Slimmer (w-52), no PanelLeft toggle icon, brand dot + name, consistent footer with violet "New Server" button.
+- **Dashboard (page.tsx):** Cards use `surface surface-hover`, cleaner stats bar, icon-only actions on hover.
+- **Server Detail (servers/[id]/page.tsx):** Compact header with inline info (name · status · type · version · port · disk), icon-only action row (Start/Stop/Restart | Backup/Restore | Delete), underline tabs.
+- **ConsoleTab:** Matched to new palette (`border-[#1a1f2e] bg-[#0f1119]`), console output `bg-[#0a0c10]`, stats sidebar `bg-white/[0.02]`.
+- **LogsTab:** Complete restyle matching Console design — same font, colors, borders. Added Copy-log button and ANSI cleaning.
+- **CreateServerDialog + EditServerDialog:** `surface` style, violet accents, `bg-[#0a0c10]` inputs.
+- **ChangePasswordDialog:** `surface` style, violet KeyRound icon.
+
+**Critical Bugfixes:**
+- **`updateServer` didn't save `containerId` or `schedule`** — the `Partial<Pick<...>>` type only included `name|ram|port|version|javaArgs`. Recreate endpoint silently failed to update the container ID, causing cascading 500s. Added `containerId` + `schedule` to the patch type. Commit `a3a9a30`.
+- **`authMiddleware` blocked API-key fallback** — returned 401 immediately on missing/invalid JWT instead of calling `next()`. The API-key middleware never got a chance to validate the token as an API key. Fixed: authMiddleware now always calls `next()`, letting the fallback middleware decide. Commit `2d2ef35`.
+- **404 console noise on missing server-icon:** `files.ts` now returns `204 No Content` instead of 404 when `raw=true` and file doesn't exist. Commit `4f111d7`.
+
+**UX Polish (commit `b32d314`):**
+- Header actions simplified from 3 bordered groups to one clean icon row.
+- Sidebar mobile: redundant `lg:w-52` removed, collapsed sidebar hides completely on mobile via `-translate-x-full`.
+
+---
+
 ## Open / Pending
 
-- [ ] Existing Docker containers need recreation to apply the RCON `127.0.0.1` binding.
+- [ ] Existing Docker containers need recreation to apply non-root user + RCON `127.0.0.1` + TERM=dumb fixes. Use Restart button (which does a full stop/recreate/start cycle).
+- [ ] Scheduled tasks rely on container recreation — verify scheduler correctly updates containerId after recreate.
+- [ ] Modpack_Server folder in the repo is reference-only (alternative panel design), not part of MCPanel itself.
 
 ---
 
@@ -166,40 +236,45 @@ deepseek/                      # Local clone root
 ├── update.ps1                 # Windows PowerShell update script
 ├── deploy.sh / deploy.ps1     # Manual deploy scripts
 ├── src/                       # Backend
-│   ├── index.ts               # Express entry point, routes, CORS
-│   ├── types.ts               # Shared TypeScript types
+│   ├── index.ts               # Express entry point, routes, CORS, rate-limit, scheduler start
+│   ├── types.ts               # Shared TypeScript types (+ schedule field)
 │   ├── routes/
-│   │   ├── servers.ts         # CRUD, start/stop, backup/restore
-│   │   └── files.ts           # File browser, editor, upload
+│   │   ├── servers.ts         # CRUD, start/stop, backup/restore, schedule get/put
+│   │   └── files.ts           # File browser, editor, upload (204 for missing raw files)
 │   └── services/
-│       ├── auth.ts            # JWT auth, password management
-│       ├── config-store.ts    # servers.json persistence
-│       ├── docker.ts          # Dockerode wrapper
+│       ├── auth.ts            # JWT auth, password management (passes through to API-key fallback)
+│       ├── config-store.ts    # servers.json persistence (containerId + schedule patchable)
+│       ├── docker.ts          # Dockerode wrapper (non-root mc user, TERM=dumb)
+│       ├── scheduler.ts       # Task scheduler — checks every 30s for restart/backup
 │       ├── rcon.ts            # RCON client
 │       └── websocket.ts       # Socket.IO for live stats + console
 ├── dist/                      # Compiled backend JS
 ├── frontend/                  # Next.js App Router
 │   ├── next.config.ts         # Rewrites: /api/* → backend proxy
+│   ├── package.json           # No more @xterm/xterm or @xterm/addon-fit
 │   ├── src/app/
-│   │   ├── layout.tsx         # Root layout + AuthGuard wrapper
-│   │   ├── page.tsx           # Dashboard (server cards)
-│   │   ├── globals.css        # Tailwind + dark theme
-│   │   └── servers/[id]/page.tsx  # Server detail (console/files/logs)
+│   │   ├── layout.tsx         # Root layout + AuthGuard wrapper, #0a0c10 bg
+│   │   ├── page.tsx           # Dashboard (surface cards, violet accent)
+│   │   ├── globals.css        # Design tokens, .surface utility, animations
+│   │   └── servers/[id]/page.tsx  # Server detail (underline tabs, icon actions)
 │   ├── src/components/
 │   │   ├── AuthGuard.tsx      # JWT check + fetch interceptor
-│   │   ├── LoginScreen.tsx    # Login form
-│   │   ├── ServerSidebar.tsx  # Collapsible sidebar (server list + logout)
-│   │   ├── CreateServerDialog.tsx  # New server modal
-│   │   ├── EditServerDialog.tsx
-│   │   ├── ConsoleTab.tsx     # xterm.js WebSocket console
+│   │   ├── LoginScreen.tsx    # Minimal login, violet accent
+│   │   ├── ServerSidebar.tsx  # w-52 sidebar, violet brand dot
+│   │   ├── CreateServerDialog.tsx  # surface style, violet accents
+│   │   ├── EditServerDialog.tsx    # surface style
+│   │   ├── ChangePasswordDialog.tsx # surface style
+│   │   ├── ConsoleTab.tsx     # Div-based console + stats sidebar + IP copy
 │   │   ├── FileManagerTab.tsx # File browser/editor/upload
-│   │   ├── LogsTab.tsx
+│   │   ├── LogsTab.tsx        # Restyled to match console
+│   │   ├── SettingsTab.tsx    # Server properties + scheduled tasks card
 │   │   └── Skeleton.tsx       # Loading skeletons
 │   └── src/lib/types.ts       # Frontend TypeScript types
+├── Modpack_Server/            # Reference design (not part of MCPanel)
 └── .deepcode/
     └── settings.json          # Deep Code config (model, API key)
 ```
 
 ---
 
-> **Last updated:** 2026-07-19 · Session: RCON security hardening + JWT improvements
+> **Last updated:** 2026-07-20 · Session: Major UX overhaul, scheduler, security hardening, bugfixes
