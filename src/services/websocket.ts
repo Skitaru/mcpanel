@@ -14,20 +14,37 @@ import {
 } from "./docker";
 
 // ---------------------------------------------------------------------------
-// ANSI / control-character cleaner
+// ANSI / control-character cleaner (stateful — handles split chunks)
 // ---------------------------------------------------------------------------
 
-/** Clean console output: strip full ANSI sequences (ESC + parameters),
- *  then remove remaining control characters. */
-function cleanAnsi(raw: string): string {
-  return raw
-    // eslint-disable-next-line no-control-regex
-    .replace(/\x1b\[[0-9;>?]*[a-zA-Z]/g, "")              // CSI: ESC [ params letter
-    .replace(/\x1b\][^\x07]*\x07/g, "")                     // OSC: ESC ] ... BEL
+const chunkBuffers = new Map<string, string>();
+
+function cleanAnsi(serverId: string, raw: string): string {
+  const prev = chunkBuffers.get(serverId) ?? "";
+  let text = prev + raw;
+
+  // eslint-disable-next-line no-control-regex
+  text = text
+    .replace(/\x1b\[[0-9;>?]*[a-zA-Z]/g, "")              // CSI
+    .replace(/\x1b\][^\x07]*\x07/g, "")                     // OSC
     .replace(/\x1b[PX^_].*?(\x1b\\)?/g, "")                 // DCS/SOS/PM/APC
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // remaining control chars
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // control chars
     .replace(/\r\n/g, "\n")                                 // CRLF → LF
-    .replace(/\r/g, "");                                    // strip bare CR
+    .replace(/\r/g, "");                                    // bare CR
+
+  // Buffer dangling ESC for the next chunk
+  const escIdx = text.lastIndexOf("\x1b");
+  if (escIdx >= 0) {
+    chunkBuffers.set(serverId, text.slice(escIdx));
+    text = text.slice(0, escIdx);
+  } else {
+    chunkBuffers.delete(serverId);
+  }
+  return text;
+}
+
+function flushBuffer(serverId: string): void {
+  chunkBuffers.delete(serverId);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +208,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         // Pipe demuxed stdout / stderr → socket (cleaned)
         streams.demuxed.stdout.on("data", (chunk: Buffer) => {
-          const text = cleanAnsi(chunk.toString());
+          const text = cleanAnsi(serverId, chunk.toString());
           if (!text) return;
           socket.emit("console:output", {
             serverId,
@@ -201,7 +218,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         });
 
         streams.demuxed.stderr.on("data", (chunk: Buffer) => {
-          const text = cleanAnsi(chunk.toString());
+          const text = cleanAnsi(serverId, chunk.toString());
           if (!text) return;
           socket.emit("console:output", {
             serverId,
@@ -214,6 +231,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         const cleanup = () => {
           streams.demuxed.stdout.removeAllListeners("data");
           streams.demuxed.stderr.removeAllListeners("data");
+          flushBuffer(serverId);
           session.consoleSubs.delete(serverId);
           streams.close();
         };
@@ -239,6 +257,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         // is not sent to the frontend as corrupted output
         streams.demuxed.stdout.removeAllListeners("data");
         streams.demuxed.stderr.removeAllListeners("data");
+        flushBuffer(serverId);
         streams.close();
         session.consoleSubs.delete(serverId);
         socket.emit("console:detached", { serverId });
