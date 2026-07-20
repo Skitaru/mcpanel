@@ -56,7 +56,7 @@ export function removeServer(id: string): boolean {
 /** Update an existing server config by id. Returns the updated config or null. */
 export function updateServer(
   id: string,
-  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs">>,
+  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs" | "containerId" | "schedule">>,
 ): ServerConfig | null {
   const servers = loadServers();
   const s = servers.find((s) => s.id === id);
@@ -66,6 +66,8 @@ export function updateServer(
   if (patch.port !== undefined) s.port = patch.port;
   if (patch.version !== undefined) s.version = patch.version;
   if (patch.javaArgs !== undefined) s.javaArgs = patch.javaArgs || undefined;
+  if (patch.containerId !== undefined) s.containerId = patch.containerId;
+  if (patch.schedule !== undefined) s.schedule = patch.schedule;
   saveServers(servers);
   return s;
 }
