@@ -24,12 +24,10 @@ export default function LogsTab({ serverId }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       // eslint-disable-next-line no-control-regex
-      const clean = data.content
-        .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")
-        .replace(/\x1b\][^\x07]*\x07/g, "")
-        .replace(/\x1b./g, "")
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
-      setLogContent(clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
+      setLogContent(data.content
+        .replace(/\x1b/g, "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, ""));
       setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load logs.");
