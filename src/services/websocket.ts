@@ -17,13 +17,17 @@ import {
 // ANSI / control-character cleaner
 // ---------------------------------------------------------------------------
 
-/** Clean console output: keep only printable ASCII, newlines, tabs. */
+/** Clean console output: strip full ANSI sequences (ESC + parameters),
+ *  then remove remaining control characters. */
 function cleanAnsi(raw: string): string {
   return raw
     // eslint-disable-next-line no-control-regex
-    .replace(/[^\x20-\x7E\n\t]/g, "")   // keep only printable ASCII + \n + \t
-    .replace(/\r\n/g, "\n")             // CRLF → LF
-    .replace(/\r/g, "");                // strip bare CR
+    .replace(/\x1b\[[0-9;>?]*[a-zA-Z]/g, "")              // CSI: ESC [ params letter
+    .replace(/\x1b\][^\x07]*\x07/g, "")                     // OSC: ESC ] ... BEL
+    .replace(/\x1b[PX^_].*?(\x1b\\)?/g, "")                 // DCS/SOS/PM/APC
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // remaining control chars
+    .replace(/\r\n/g, "\n")                                 // CRLF → LF
+    .replace(/\r/g, "");                                    // strip bare CR
 }
 
 // ---------------------------------------------------------------------------
