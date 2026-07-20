@@ -213,18 +213,12 @@ export default function ConsoleTab({
       "console:output",
       (payload: { serverId: string; data: string; stream: "stdout" | "stderr" }) => {
         if (payload.serverId !== serverId) return;
-        // Aggressive ANSI/control-char stripping
+        // Strip ESC, normalize newlines, split (matches Modpack_Server approach)
         // eslint-disable-next-line no-control-regex
-        const clean = payload.data
-          .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")  // CSI
-          .replace(/\x1b\][^\x07]*\x07/g, "")          // OSC
-          .replace(/\x1b./g, "")                        // any other ESC sequence
-          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); // control chars (keep \t \n)
-        const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        const rawLines = normalized.split("\n");
-        for (const raw of rawLines) {
-          if (raw === "") continue;
-          addLine(payload.stream, raw);
+        const text = payload.data.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
+        const lines = text.split("\n").filter((l: string) => l.trim());
+        for (const line of lines) {
+          addLine(payload.stream, line);
         }
       },
     );
@@ -249,14 +243,9 @@ export default function ConsoleTab({
           const data = await res.json();
           if (data.content) {
             // eslint-disable-next-line no-control-regex
-            const clean = data.content
-              .replace(/\x1b\[[^a-zA-Z]*[a-zA-Z]/g, "")
-              .replace(/\x1b\][^\x07]*\x07/g, "")
-              .replace(/\x1b./g, "")
-              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
-            const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-            const rawLines = normalized.split("\n");
-            setLines(rawLines.filter((l: string) => l !== "").map((text: string) => ({
+            const text = data.content.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
+            const lines = text.split("\n").filter((l: string) => l.trim());
+            setLines(lines.map((text: string) => ({
               type: "stdout" as const,
               text,
               time: Date.now(),
