@@ -191,6 +191,8 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         // If the attach stream closes (container dies etc.), clean up
         const cleanup = () => {
+          streams.demuxed.stdout.removeAllListeners("data");
+          streams.demuxed.stderr.removeAllListeners("data");
           session.consoleSubs.delete(serverId);
           streams.close();
         };
@@ -212,6 +214,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       const { serverId } = payload;
       const streams = session.consoleSubs.get(serverId);
       if (streams) {
+        // Remove listeners first so any buffered data flushed during close()
+        // is not sent to the frontend as corrupted output
+        streams.demuxed.stdout.removeAllListeners("data");
+        streams.demuxed.stderr.removeAllListeners("data");
         streams.close();
         session.consoleSubs.delete(serverId);
         socket.emit("console:detached", { serverId });
