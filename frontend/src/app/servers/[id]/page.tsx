@@ -314,7 +314,7 @@ export default function ServerDetailPage() {
               </nav>
 
               <section>
-                <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}><ConsoleTab serverId={serverId} serverStatus={server.status} /></div>
+                <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}><ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} /></div>
                 <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}><FileManagerTab serverId={serverId} /></div>
                 <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}><LogsTab serverId={serverId} /></div>
                 <div className={`tab-content ${activeTab === "settings" ? "" : "hidden"}`}><SettingsTab serverId={serverId} serverType={server.serverType} /></div>
