@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  Cpu, MemoryStick, TerminalSquare, Server, Users,
+  Cpu, MemoryStick, TerminalSquare, Server, Users, Copy, Check,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -102,6 +102,7 @@ export default function ConsoleTab({
   const uptimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
+  const [addrCopied, setAddrCopied] = useState(false);
 
   // ---- auto-scroll ----
   const autoScrollRef = useRef(true);
@@ -212,12 +213,16 @@ export default function ConsoleTab({
       "console:output",
       (payload: { serverId: string; data: string; stream: "stdout" | "stderr" }) => {
         if (payload.serverId !== serverId) return;
+        // Strip ANSI escape codes (CSI sequences including those with ?)
         // eslint-disable-next-line no-control-regex
-        const clean = payload.data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b/g, "");
-        // Split by newlines and add each as a separate line
-        const rawLines = clean.split(/\r?\n/);
+        const clean = payload.data
+          .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+          .replace(/\x1b\][0-9;]*[^\x07]*\x07/g, "")
+          .replace(/\x1b/g, "");
+        // \r\n → normal newline; bare \r → same-line overwrite (keep last segment)
+        const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const rawLines = normalized.split("\n");
         for (const raw of rawLines) {
-          // Skip completely empty
           if (raw === "") continue;
           addLine(payload.stream, raw);
         }
@@ -244,8 +249,12 @@ export default function ConsoleTab({
           const data = await res.json();
           if (data.content) {
             // eslint-disable-next-line no-control-regex
-            const clean = data.content.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b/g, "");
-            const rawLines = clean.split(/\r?\n/);
+            const clean = data.content
+              .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+              .replace(/\x1b\][0-9;]*[^\x07]*\x07/g, "")
+              .replace(/\x1b/g, "");
+            const normalized = clean.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+            const rawLines = normalized.split("\n");
             setLines(rawLines.filter((l: string) => l !== "").map((text: string) => ({
               type: "stdout" as const,
               text,
@@ -410,9 +419,9 @@ export default function ConsoleTab({
       </div>
 
       {/* ── Stats sidebar ── */}
-      <div className="flex-shrink-0 border-t border-slate-800 lg:border-t-0 lg:border-l lg:w-[232px] bg-slate-900/30 flex flex-col overflow-y-auto">
+      <div className="flex-shrink-0 border-t border-[#1a1f2e] lg:border-t-0 lg:border-l lg:w-[232px] bg-white/[0.02] flex flex-col overflow-y-auto">
         {/* Status indicator */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
               isOnline ? "bg-emerald-500 pulse-dot" : "bg-amber-500"
@@ -426,17 +435,31 @@ export default function ConsoleTab({
         </div>
 
         {/* Address */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
-          <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {typeof window !== "undefined" ? window.location.hostname : "—"}:{port}
+          <div className="flex items-center gap-1.5 group/addr">
+            <span className="text-sm font-medium text-slate-200 tabular-nums">
+              {typeof window !== "undefined" ? window.location.hostname : "—"}:{port}
+            </span>
+            <button
+              onClick={() => {
+                const addr = `${window.location.hostname}:${port}`;
+                navigator.clipboard.writeText(addr);
+                setAddrCopied(true);
+                setTimeout(() => setAddrCopied(false), 1500);
+              }}
+              className="opacity-0 group-hover/addr:opacity-100 transition rounded p-0.5 text-slate-600 hover:text-slate-400"
+              title="Copy address"
+            >
+              {addrCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            </button>
           </div>
         </div>
 
         {/* Players */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="flex items-center gap-1.5 mb-1">
             <Users className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -462,7 +485,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Uptime */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Uptime
           </div>
@@ -472,7 +495,7 @@ export default function ConsoleTab({
         </div>
 
         {/* CPU */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="flex items-center gap-1.5 mb-1">
             <Cpu className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -495,7 +518,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Memory */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="flex items-center gap-1.5 mb-1">
             <MemoryStick className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -525,7 +548,7 @@ export default function ConsoleTab({
         </div>
 
         {/* RAM Limit */}
-        <div className="px-4 py-3 border-b border-slate-800/60">
+        <div className="px-4 py-3 border-b border-[#1a1f2e]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             RAM Limit
           </div>
