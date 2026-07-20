@@ -220,61 +220,10 @@
 
 ## Open / Pending
 
-- [ ] Existing Docker containers need recreation to apply non-root user + RCON `127.0.0.1` + TERM=dumb fixes. Use Restart button (which does a full stop/recreate/start cycle).
+- [ ] Existing Docker containers need recreation to apply non-root user + RCON `127.0.0.1` + TERM=dumb fixes.
 - [ ] Scheduled tasks rely on container recreation — verify scheduler correctly updates containerId after recreate.
 - [ ] Modpack_Server folder in the repo is reference-only (alternative panel design), not part of MCPanel itself.
 
 ---
 
-## File Structure Quick Reference
-
-```
-deepseek/                      # Local clone root
-├── AGENTS.md                  # ← THIS FILE (project context + session log)
-├── README.md                  # Public README
-├── install.sh                 # One-line installer for Debian/Ubuntu
-├── update.ps1                 # Windows PowerShell update script
-├── deploy.sh / deploy.ps1     # Manual deploy scripts
-├── src/                       # Backend
-│   ├── index.ts               # Express entry point, routes, CORS, rate-limit, scheduler start
-│   ├── types.ts               # Shared TypeScript types (+ schedule field)
-│   ├── routes/
-│   │   ├── servers.ts         # CRUD, start/stop, backup/restore, schedule get/put
-│   │   └── files.ts           # File browser, editor, upload (204 for missing raw files)
-│   └── services/
-│       ├── auth.ts            # JWT auth, password management (passes through to API-key fallback)
-│       ├── config-store.ts    # servers.json persistence (containerId + schedule patchable)
-│       ├── docker.ts          # Dockerode wrapper (non-root mc user, TERM=dumb)
-│       ├── scheduler.ts       # Task scheduler — checks every 30s for restart/backup
-│       ├── rcon.ts            # RCON client
-│       └── websocket.ts       # Socket.IO for live stats + console
-├── dist/                      # Compiled backend JS
-├── frontend/                  # Next.js App Router
-│   ├── next.config.ts         # Rewrites: /api/* → backend proxy
-│   ├── package.json           # No more @xterm/xterm or @xterm/addon-fit
-│   ├── src/app/
-│   │   ├── layout.tsx         # Root layout + AuthGuard wrapper, #0a0c10 bg
-│   │   ├── page.tsx           # Dashboard (surface cards, violet accent)
-│   │   ├── globals.css        # Design tokens, .surface utility, animations
-│   │   └── servers/[id]/page.tsx  # Server detail (underline tabs, icon actions)
-│   ├── src/components/
-│   │   ├── AuthGuard.tsx      # JWT check + fetch interceptor
-│   │   ├── LoginScreen.tsx    # Minimal login, violet accent
-│   │   ├── ServerSidebar.tsx  # w-52 sidebar, violet brand dot
-│   │   ├── CreateServerDialog.tsx  # surface style, violet accents
-│   │   ├── EditServerDialog.tsx    # surface style
-│   │   ├── ChangePasswordDialog.tsx # surface style
-│   │   ├── ConsoleTab.tsx     # Div-based console + stats sidebar + IP copy
-│   │   ├── FileManagerTab.tsx # File browser/editor/upload
-│   │   ├── LogsTab.tsx        # Restyled to match console
-│   │   ├── SettingsTab.tsx    # Server properties + scheduled tasks card
-│   │   └── Skeleton.tsx       # Loading skeletons
-│   └── src/lib/types.ts       # Frontend TypeScript types
-├── Modpack_Server/            # Reference design (not part of MCPanel)
-└── .deepcode/
-    └── settings.json          # Deep Code config (model, API key)
-```
-
----
-
-> **Last updated:** 2026-07-20 · Session: Major UX overhaul, scheduler, security hardening, bugfixes
+> **Last updated:** 2026-07-20 · Session: UX overhaul, scheduler, security, console ANSI saga, FileManager/Settings redesign
