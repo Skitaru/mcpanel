@@ -335,7 +335,7 @@ export default function ConsoleTab({
   return (
     <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]">
       {/* ── Console panel ── */}
-      <div className="flex flex-1 flex-col min-w-0 min-h-0" style={{ height: "min(28rem, 65vh)" }}>
+      <div className="flex flex-1 flex-col min-w-0 min-h-0" style={{ height: "min(24rem, 60vh)" }}>
         {/* Output area */}
         <div
           ref={outputRef}
@@ -384,7 +384,7 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2.5 border-t border-[#1a1f2e] bg-[#0f1119] px-4 py-2.5"
+          className="flex items-center gap-2 border-t border-[#1a1f2e] bg-[#0a0c10] px-3 py-2"
         >
           <span className="select-none font-mono text-sm text-violet-400 shrink-0">❯</span>
           <input
@@ -393,14 +393,14 @@ export default function ConsoleTab({
             placeholder="Type a command…"
             disabled={!connected}
             onKeyDown={handleCmdKeyDown}
-            className="flex-1 bg-transparent py-0.5 font-mono text-[12.5px] text-slate-200
+            className="flex-1 bg-transparent py-0 font-mono text-[12.5px] text-slate-200
                        placeholder:text-slate-600 focus:outline-none
                        disabled:opacity-40"
           />
           <button
             type="submit"
             disabled={!connected}
-            className="shrink-0 rounded-md bg-violet-600 px-4 py-1.5 text-xs font-medium
+            className="shrink-0 rounded-md bg-violet-600 px-3 py-1 text-xs font-medium
                        text-white transition hover:bg-violet-500
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
