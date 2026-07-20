@@ -89,16 +89,16 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Unauthorized. Provide a Bearer token." });
-    return;
+    // No Bearer token — let API-key fallback middleware handle it
+    return next();
   }
 
   const token = auth.slice(7);
   try {
     jwt.verify(token, getJwtSecret());
     (req as any)._authOk = true;
-    next();
   } catch {
-    res.status(401).json({ error: "Invalid or expired token." });
+    // Invalid JWT — let API-key fallback try the token as raw API key
   }
+  next();
 }
