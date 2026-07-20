@@ -157,6 +157,7 @@ export async function createContainer(
       cmdParts.join(" && "),
     ],
     WorkingDir: "/data",
+    Env: ["TERM=dumb"], // suppress JLine "Advanced terminal features not available" warning
     // Required for WebSocket console (stdin / stdout / stderr attach).
     AttachStdin: true,
     AttachStdout: true,
