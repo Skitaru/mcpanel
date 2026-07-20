@@ -446,7 +446,15 @@ export default function ConsoleTab({
             <button
               onClick={() => {
                 const addr = `${window.location.hostname}:${port}`;
-                navigator.clipboard.writeText(addr);
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(addr);
+                } else {
+                  // Fallback for HTTP (non-secure context)
+                  const ta = document.createElement("textarea");
+                  ta.value = addr; ta.style.position = "fixed"; ta.style.opacity = "0";
+                  document.body.appendChild(ta); ta.select();
+                  document.execCommand("copy"); document.body.removeChild(ta);
+                }
                 setAddrCopied(true);
                 setTimeout(() => setAddrCopied(false), 1500);
               }}
