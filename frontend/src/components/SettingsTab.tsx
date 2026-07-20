@@ -74,11 +74,11 @@ export default function SettingsTab({ serverId, serverType }: Props) {
     const iconPath = `/server-icon.png`;
     fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(iconPath)}&raw=true`)
       .then(async (r) => {
-        if (!r.ok || cancelled) { await r.text(); throw null; } // consume body to suppress browser console 404
+        if (!r.ok || cancelled || r.status === 204) return null;
         return r.blob();
       })
       .then((blob) => {
-        if (cancelled) return;
+        if (cancelled || !blob) return;
         setIconUrl((prev) => {
           if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
           return URL.createObjectURL(blob);

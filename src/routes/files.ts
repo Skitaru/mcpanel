@@ -169,7 +169,20 @@ router.get("/:id/file", async (req: Request, res: Response) => {
       return;
     }
 
-    const stat = await fs.stat(resolved.absolutePath);
+    // ?raw=true — return binary file with proper Content-Type (for images etc.)
+    const isRaw = req.query.raw === "true" || req.query.raw === "1";
+
+    let stat;
+    try {
+      stat = await fs.stat(resolved.absolutePath);
+    } catch {
+      // File doesn't exist. For raw binary requests (icons, etc.), return 204
+      // instead of 404 to suppress browser console noise.
+      if (isRaw) { res.status(204).end(); return; }
+      res.status(404).json({ error: "File not found." });
+      return;
+    }
+
     if (stat.isDirectory()) {
       res.status(400).json({ error: "Path is a directory, not a file." });
       return;
@@ -179,8 +192,6 @@ router.get("/:id/file", async (req: Request, res: Response) => {
       return;
     }
 
-    // ?raw=true — return binary file with proper Content-Type (for images etc.)
-    const isRaw = req.query.raw === "true" || req.query.raw === "1";
     if (isRaw) {
       const ext = path.extname(resolved.absolutePath).toLowerCase();
       const mime = MIME_MAP[ext] ?? "application/octet-stream";
