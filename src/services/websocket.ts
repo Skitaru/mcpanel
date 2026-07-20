@@ -28,11 +28,20 @@ function cleanAnsi(serverId: string, raw: string): string {
     .replace(/\x1b\[[0-9;>?]*[a-zA-Z]/g, "")              // CSI
     .replace(/\x1b\][^\x07]*\x07/g, "")                     // OSC
     .replace(/\x1b[PX^_].*?(\x1b\\)?/g, "")                 // DCS/SOS/PM/APC
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // control chars
-    .replace(/\n> /g, "\n")                                 // JLine prompt indicator
-    .replace(/^> /, "")                                     // JLine prompt at start
-    .replace(/\r\n/g, "\n")                                 // CRLF → LF
-    .replace(/\r/g, "");                                    // bare CR
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")      // control chars (keep \r \n \t)
+    .replace(/\r\n/g, "\n");                                // CRLF → LF
+
+  // Handle \r overwrites: for each line, keep only text after the last \r
+  text = text.split("\n").map(line => {
+    const lastCR = line.lastIndexOf("\r");
+    return lastCR >= 0 ? line.slice(lastCR + 1) : line;
+  }).join("\n");
+
+  // Strip JLine prompt and leading spaces
+  text = text
+    .replace(/\n> /g, "\n")
+    .replace(/^> /, "")
+    .replace(/\n  +/g, "\n");                               // collapse leading spaces
 
   // Buffer dangling ESC for the next chunk
   const escIdx = text.lastIndexOf("\x1b");
