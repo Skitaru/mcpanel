@@ -141,21 +141,40 @@ function isClientOnlyMod(jarPath: string): boolean {
   return false;
 }
 
-async function downloadFile(url: string, dest: string): Promise<void> {
+async function downloadFile(url: string, dest: string, expectedBytes?: number, apiKey?: string): Promise<void> {
+  const headers: Record<string, string> = {
+    "User-Agent": "MCPanel/1.0",
+    Accept: "application/octet-stream, */*;q=0.8",
+  };
+  if (apiKey) headers["x-api-key"] = apiKey;
   const res = await fetch(url, {
-    headers: { "User-Agent": "MCPanel/1.0" },
+    headers,
     signal: AbortSignal.timeout(300_000), // 5 min for large downloads
   });
   if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
+
+  // Reject HTML/JSON responses (CDN errors, captchas, etc.)
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (ct.includes("text/html") || ct.includes("application/json")) {
+    const preview = (await res.text()).slice(0, 500);
+    throw new Error(`Download returned ${ct} (expected binary): ${preview}`);
+  }
+
   // Stream to disk instead of buffering in RAM
   const writer = fs.createWriteStream(dest);
   const reader = res.body?.getReader();
   if (!reader) throw new Error("No response body");
   try {
+    let bytesWritten = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       writer.write(Buffer.from(value));
+      bytesWritten += value.length;
+    }
+    // If we know the expected size, verify
+    if (expectedBytes && bytesWritten < expectedBytes * 0.95) {
+      throw new Error(`Download truncated: got ${bytesWritten} bytes, expected ~${expectedBytes}`);
     }
   } finally {
     writer.end();
@@ -218,13 +237,13 @@ export async function runModpackInstall(
       headers: cfHeaders(apiKey), signal: AbortSignal.timeout(15_000),
     });
     if (!fileInfo.ok) throw new Error(`Failed to get file info (HTTP ${fileInfo.status})`);
-    const fileData = (await fileInfo.json()) as { data: { downloadUrl: string; displayName: string } };
+    const fileData = (await fileInfo.json()) as { data: { downloadUrl: string; displayName: string; fileLength?: number } };
     if (!fileData.data.downloadUrl) throw new Error("No download URL available.");
 
-    // 2. Download zip
+    // 2. Download zip (with CF API key — some CDN URLs require it)
     emitProgress(serverId, "Downloading modpack…", 10);
     const zipPath = path.join(dataPath, "_modpack.zip");
-    await downloadFile(fileData.data.downloadUrl, zipPath);
+    await downloadFile(fileData.data.downloadUrl, zipPath, fileData.data.fileLength, apiKey);
 
     // 3. Extract
     emitProgress(serverId, "Extracting modpack…", 20);
