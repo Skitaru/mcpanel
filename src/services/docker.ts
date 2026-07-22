@@ -210,8 +210,17 @@ export async function startContainer(containerId: string): Promise<void> {
 /** Gracefully stop a container (SIGTERM, then force-kill after timeout). */
 export async function stopContainer(containerId: string): Promise<void> {
   const c = docker.getContainer(containerId);
-  await c.stop({ t: 30 }); // 30 s grace period for Minecraft to save
-  console.log(`[docker] Stopped container ${containerId.slice(0, 12)}`);
+  try {
+    await c.stop({ t: 30 }); // 30 s grace period for Minecraft to save
+    console.log(`[docker] Stopped container ${containerId.slice(0, 12)}`);
+  } catch (err: any) {
+    // Docker returns 304 when the container is already stopped — that's fine.
+    if (err.statusCode === 304) {
+      console.log(`[docker] Container ${containerId.slice(0, 12)} already stopped`);
+      return;
+    }
+    throw err;
+  }
 }
 
 /** Stop (if running) and remove a container + its volumes. Best-effort. */
