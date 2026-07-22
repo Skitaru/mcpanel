@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive, Search } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import ServerSidebar from "@/components/ServerSidebar";
@@ -34,11 +34,17 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [stopConfirmId, setStopConfirmId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
   const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number; players: { name: string; id: string }[] }>>({});
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const socketRef = useRef<Socket | null>(null);
+
+  const filteredServers = servers.filter(s =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // ---- Socket.IO ----
   useEffect(() => {
@@ -97,7 +103,7 @@ export default function DashboardPage() {
   useEffect(() => { fetchServers(); const i = setInterval(fetchServers, POLL_INTERVAL_MS); return () => clearInterval(i); }, [fetchServers]);
 
   const handleServerAction = useCallback(async (id: string, action: "start" | "stop") => {
-    setActingId(id);
+    setStopConfirmId(null); setActingId(id);
     try { await fetch(`${API_BASE}/api/servers/${id}/${action}`, { method: "POST" }); await fetchServers(); }
     catch (err) { console.error(`[panel] ${action} failed:`, err); }
     finally { setActingId(null); }
@@ -129,11 +135,18 @@ export default function DashboardPage() {
               <header className="mb-8 flex items-center justify-between">
                 <div>
                   <h1 className="text-xl font-bold tracking-tight text-white">Servers</h1>
-                  <p className="mt-0.5 text-sm text-slate-600">{servers.length} server{servers.length !== 1 ? "s" : ""}</p>
+                  <p className="mt-0.5 text-sm text-slate-600">{servers.length} server{servers.length !== 1 ? "s" : ""}{searchQuery ? ` · ${filteredServers.length} match${filteredServers.length !== 1 ? "es" : ""}` : ""}</p>
                 </div>
-                <button onClick={fetchServers} className="rounded-lg border border-[#1a1f2e] p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
-                  <RefreshCw className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600 pointer-events-none" />
+                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter servers…"
+                      className="w-48 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                  </div>
+                  <button onClick={fetchServers} className="rounded-lg border border-[#1a1f2e] p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
               </header>
 
               {servers.length === 0 ? (
@@ -143,9 +156,14 @@ export default function DashboardPage() {
                     <Plus className="h-4 w-4" /> Create your first server
                   </button>
                 </div>
+              ) : filteredServers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#1a1f2e] py-20">
+                  <Search className="h-8 w-8 text-slate-700 mb-3" />
+                  <p className="text-sm font-medium text-slate-500">No servers match &quot;{searchQuery}&quot;</p>
+                </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {servers.map((s) => (
+                  {filteredServers.map((s) => (
                     <Link key={s.id} href={`/servers/${s.id}`}
                       className="group surface surface-hover animate-slide-up relative p-4 flex flex-col">
 
@@ -211,10 +229,18 @@ export default function DashboardPage() {
                       {/* Actions — hover reveal */}
                       <div className="mt-auto flex items-center justify-end gap-1 card-actions" onClick={e => e.preventDefault()}>
                         {s.status === "running" ? (
-                          <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "stop"); }}
-                            className="rounded-md p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Stop">
-                            <Square className="h-3.5 w-3.5" />
-                          </button>
+                          stopConfirmId === s.id ? (
+                            <div className="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1">
+                              <span className="text-xs text-amber-400">Stop?</span>
+                              <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "stop"); }} disabled={actingId === s.id} className="rounded bg-amber-600 px-2 py-0.5 text-xs text-white hover:bg-amber-500 disabled:opacity-50">Yes</button>
+                              <button onClick={e => { e.stopPropagation(); setStopConfirmId(null); }} className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-600">No</button>
+                            </div>
+                          ) : (
+                            <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setStopConfirmId(s.id); }}
+                              className="rounded-md p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Stop">
+                              <Square className="h-3.5 w-3.5" />
+                            </button>
+                          )
                         ) : (
                           <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
                             className="rounded-md p-1.5 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start">

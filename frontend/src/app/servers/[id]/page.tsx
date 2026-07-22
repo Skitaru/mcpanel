@@ -56,6 +56,7 @@ export default function ServerDetailPage() {
   const [acting, setActing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [actionConfirm, setActionConfirm] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
@@ -90,7 +91,7 @@ export default function ServerDetailPage() {
   }, [serverId]);
 
   const handleAction = useCallback(async (action: "start" | "stop" | "restart") => {
-    setActing(true);
+    setActionConfirm(null); setActing(true);
     try {
       if (action === "restart") {
         if (server?.status === "running") { const r = await fetch(`${API_BASE}/api/servers/${serverId}/stop`, { method: "POST" }); if (!r.ok) throw new Error("Stop failed"); await new Promise(r => setTimeout(r, 2000)); }
@@ -175,9 +176,15 @@ export default function ServerDetailPage() {
 
                 {/* Actions — single icon row */}
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {server.status === "running" ? (<>
-                    <button disabled={acting} onClick={() => handleAction("restart")} className="rounded-md p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
-                    <button disabled={acting} onClick={() => handleAction("stop")} className="rounded-md p-1.5 text-red-400 transition hover:bg-red-500/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
+                  {actionConfirm ? (
+                    <div className="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1">
+                      <span className="text-[11px] text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
+                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-amber-600 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-amber-500 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-slate-600 px-1.5 py-0.5 text-[11px] text-slate-300 hover:bg-slate-500">No</button>
+                    </div>
+                  ) : server.status === "running" ? (<>
+                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-md p-1.5 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-md p-1.5 text-red-400 transition hover:bg-red-500/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
                   </>) : (
                     <button disabled={acting} onClick={() => handleAction("start")} className="rounded-md p-1.5 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
                   )}
