@@ -195,7 +195,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-3 mb-3 p-2.5 rounded-lg bg-white/[0.02] border border-[#1a1f2e]">
                           <div className="flex items-center gap-1.5 text-slate-400 flex-1">
                             <Cpu className="h-3.5 w-3.5" />
-                            <span className="font-mono text-xs tabular-nums text-white font-medium">{liveStats[s.id]?.cpu?.toFixed(1) ?? "—"}%</span>
+                            <span className="font-mono text-xs tabular-nums text-white font-medium">{(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0).toFixed(1)}%</span>
                           </div>
                           <div className="w-px h-4 bg-[#1a1f2e]" />
                           <div className="flex items-center gap-1.5 text-slate-400 flex-1">

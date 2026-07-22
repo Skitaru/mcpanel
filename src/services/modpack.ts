@@ -9,7 +9,7 @@ import { execSync } from "node:child_process";
 import { v4 as uuid } from "uuid";
 import { ServerConfig, ServerType } from "../types";
 import { addServer, loadServers } from "./config-store";
-import { createContainer, resolveJavaImage } from "./docker";
+import { createContainer, startContainer, resolveJavaImage } from "./docker";
 
 const CF_BASE = "https://api.curseforge.com/v1";
 const DATA_ROOT = path.resolve(process.cwd(), "data");
@@ -310,7 +310,15 @@ export async function runModpackInstall(
       fs.writeFileSync(path.resolve(process.cwd(), "servers.json"), JSON.stringify(servers, null, 2));
     }
 
-    emitProgress(serverId, "Done!", 100);
+    // 10. Auto-start the container
+    emitProgress(serverId, "Starting server…", 98);
+    try {
+      await startContainer(containerId);
+      emitProgress(serverId, "Done!", 100);
+    } catch (startErr: any) {
+      emitProgress(serverId, "Installed (manual start required)", 100);
+      console.error(`[modpack:${serverId.slice(0, 8)}] Auto-start failed: ${startErr.message}`);
+    }
 
   } catch (err: any) {
     installProgress.set(serverId, { step: "Error", percent: 0, error: err.message });

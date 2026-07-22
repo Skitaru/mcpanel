@@ -514,7 +514,7 @@ export default function ConsoleTab({
             </span>
           </div>
           <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {stats?.cpuPercent != null ? `${stats.cpuPercent.toFixed(1)}%` : "—"}
+            {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
           </div>
           {stats?.cpuPercent != null && (
             <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
