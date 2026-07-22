@@ -221,9 +221,54 @@
 ## Open / Pending
 
 - [ ] Existing Docker containers need recreation to apply non-root user + RCON `127.0.0.1` + TERM=dumb fixes.
-- [ ] Scheduled tasks rely on container recreation — verify scheduler correctly updates containerId after recreate.
 - [ ] Modpack_Server folder in the repo is reference-only (alternative panel design), not part of MCPanel itself.
 
 ---
 
-> **Last updated:** 2026-07-20 · Session: UX overhaul, scheduler, security, console ANSI saga, FileManager/Settings redesign
+### 2026-07-22 — Modpack Installer, UX Improvements, Review Fixes
+
+**Schedule Fix:**
+- **Schedule clearing bug:** `updateServer({ schedule: undefined })` was ignored because `patch.schedule !== undefined` was false. Changed to `"schedule" in patch` so explicit undefined values are persisted. Commit `c2ccb72`.
+
+**UX Improvements:**
+- **Delete button removed from dashboard cards** — delete only available from server detail page. Commit `24758c0`.
+- **Stop/Restart confirm dialogs** — dashboard Stop and server-detail Stop/Restart now show "Stop? Yes/No" before executing. Start remains direct. Commits `97699d2`.
+- **Console command history** persists in `localStorage` (keyed by server ID, max 100 entries). Arrow key navigation unchanged. Commit `97699d2`.
+- **Server search/filter** on dashboard — text input filters server cards case-insensitively with match count. Commit `97699d2`.
+- **CPU display capped at 100%** — Docker reports per-core CPU (can exceed 100% on multi-core). `Math.min(100, ...)` in ConsoleTab + dashboard cards. Commit `0929fef`.
+
+**CurseForge Modpack Installer:**
+- **Replaced Modrinth with CurseForge** — Modrinth had too few modpacks. CurseForge supports Forge, NeoForge, Fabric, Quilt. Commit `0a62ae8`.
+- **New files:** `src/services/modpack.ts` (319 lines) — `searchModpacks()`, `getModpackFiles()`, `createModpackServer()` (fast), `runModpackInstall()` (async).
+- **New endpoints:**
+  - `POST /api/servers/curseforge/search` — proxy CF search (apiKey in body, not stored server-side)
+  - `POST /api/servers/curseforge/files` — proxy CF version list
+  - `POST /api/servers/modpack` — responds immediately with server ID, installs async
+  - `GET /api/servers/modpack/progress/:id` — poll install progress (step + percent)
+- **Frontend:** `InstallModpackDialog.tsx` — CF API key input (saved in localStorage), search field, 2-column results grid, version selector, RAM/Port/Name config, progress bar with polling.
+- **Loader support:**
+  - **Forge:** Downloads `forge-<mc>-<ver>-installer.jar` from Maven, runs `--installServer` in Docker. Copies universal JAR → `server.jar` (1.12-1.16) or sets `jarName = "run.sh"` (1.17+).
+  - **NeoForge:** Downloads from neoforged Maven, runs `--installServer` in Docker. Uses `run.sh`.
+  - **Fabric:** Downloads fabric-installer from Maven, runs `server -mcversion <ver> -downloadMinecraft` in Docker. Creates `fabric-server-launch.jar`.
+  - **Quilt:** Downloads quilt-installer from Quilt Maven, runs `install server <ver> --download-server` in Docker.
+  - **Java 8 for old Forge:** MC < 1.13 Forge/NeoForge uses `eclipse-temurin:8-jre-alpine` (URLClassLoader removed in Java 9+).
+
+**Bugfixes during modpack development:**
+- **Missing `User-Agent` header** caused CF to return 403. Added to all CF API calls. Commit `31ed440`.
+- **Forge/NeoForge run.sh containers failed:** `java -jar run.sh` tried to run a shell script as JAR. Fixed in `docker.ts`: when `jarName === "run.sh"`, executes `sh run.sh --nogui` instead. Commit `0ec7fc6`.
+- **ENOBUFS on large modpacks:** `execSync` default maxBuffer 1MB too small for Forge installer output (SkyFactory 5 had ~290 mods). Increased to 100MB for `docker run` and 10MB for `unzip`. Commit `54d2035`.
+- **Auto-start after modpack install:** Added `startContainer()` call after container creation. Commit `0929fef`.
+- **run.sh ignored panel RAM:** `user_jvm_args.txt` now overridden with `-Xms`/`-Xmx` from panel config. Commit `ef8f9ae`.
+- **Double CF API calls per mod:** Merged into single `getModFileInfo()` returning `{url, fileName}`. Commit `ef8f9ae`.
+- **Memory leak:** `installProgress` Map entries now auto-deleted after 60s. Commit `ef8f9ae`.
+- **Streaming downloads:** `downloadFile()` now streams to disk via `ReadableStream` reader instead of buffering in RAM. 5-min timeout on downloads. Commit `bc8835f`.
+- **Docker image inconsistency:** `getJavaDockerImage()` now returns `-alpine` suffix matching `resolveJavaImage()` — prevents duplicate image pulls. Commit `bc8835f`.
+- **Missing CF timeouts:** All `fetch()` calls to CF API now have `AbortSignal.timeout(15_000)`. Commit `bc8835f`.
+
+**Deleted files:**
+- `src/services/modrinth.ts` — replaced by `modpack.ts`
+- `/opt/mcpanel/frontend/page.tsx` — stale duplicate of server detail page causing build errors
+
+---
+
+> **Last updated:** 2026-07-22 · Session: Modpack installer, review fixes, UX polish
