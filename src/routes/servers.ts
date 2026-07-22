@@ -22,7 +22,7 @@ import {
   listManagedContainerStatuses,
   resolveJavaImage,
 } from "../services/docker";
-import { installCfModpack, searchModpacks, getModpackFiles } from "../services/modpack";
+import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
 
 const router = Router();
 
@@ -1105,25 +1105,37 @@ router.post("/modpack", async (req: Request, res: Response) => {
       return;
     }
 
-    console.log(`[api] Installing CF modpack ${modpackId} file ${fileId} (name=${serverName})`);
-    // Disable timeout — modpack installation can take 1-2 minutes
-    res.setTimeout(0);
-    req.setTimeout(0);
-    const config = await installCfModpack(apiKey, modpackId, fileId, serverName, ram, serverPort);
+    // Create server config immediately (fast)
+    const config = await createModpackServer(serverName, ram, serverPort);
+    console.log(`[api] Modpack install queued: ${config.id.slice(0, 8)} (modpack ${modpackId})`);
 
+    // Start install in background
+    runModpackInstall(config, apiKey, modpackId, fileId);
+
+    // Respond immediately with server ID
     res.status(201).json({
       id: config.id,
       name: config.name,
-      serverType: config.serverType,
       ram: config.ram,
       port: config.port,
-      version: config.version,
-      containerId: config.containerId,
     });
   } catch (err: any) {
     console.error("[api] Modpack install error:", err.message);
     res.status(400).json({ error: err.message || "Failed to install modpack." });
   }
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/modpack/progress/:id — poll install progress
+// ---------------------------------------------------------------------------
+router.get("/modpack/progress/:id", (req: Request, res: Response) => {
+  const progress = installProgress.get(req.params.id);
+  if (!progress) {
+    res.json({ step: "Starting…", percent: 0 });
+    return;
+  }
+  res.json(progress);
+});
+
 
 export default router;

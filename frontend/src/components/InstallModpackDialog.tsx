@@ -55,6 +55,26 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
   // ---- Installing ----
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
+  const [installServerId, setInstallServerId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ step: string; percent: number; error?: string } | null>(null);
+
+  // ---- Poll progress ----
+  useEffect(() => {
+    if (!installServerId) return;
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/servers/modpack/progress/${installServerId}`);
+        const p = await res.json();
+        setProgress(p);
+        if (p.percent >= 100 || p.error) {
+          clearInterval(poll);
+          if (p.percent >= 100) { setInstalling(false); onCreated(); onClose(); }
+          if (p.error) setInstallError(p.error);
+        }
+      } catch {}
+    }, 800);
+    return () => clearInterval(poll);
+  }, [installServerId, onCreated, onClose]);
 
   // ---- Search ----
   const doSearch = useCallback(async () => {
@@ -98,12 +118,11 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
   // ---- Install ----
   const handleInstall = useCallback(async () => {
     if (!selectedPack || !selectedFile) return;
-    setInstalling(true); setInstallError(null);
+    setInstalling(true); setInstallError(null); setProgress(null);
     try {
       const res = await fetch(`${API_BASE}/api/servers/modpack`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(300_000), // 5 min timeout for large modpacks
         body: JSON.stringify({
           apiKey: apiKey.trim(),
           modpackId: selectedPack.id,
@@ -114,11 +133,11 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
         }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || `HTTP ${res.status}`); }
-      onCreated(); onClose();
+      const data = await res.json();
+      setInstallServerId(data.id); // start polling progress
       setSearchQuery(""); setResults([]); setSelectedPack(null); setFiles([]); setSelectedFile(null);
-    } catch (err: unknown) { setInstallError(err instanceof Error ? err.message : "Installation failed"); }
-    finally { setInstalling(false); }
-  }, [apiKey, selectedPack, selectedFile, ram, port, name, onCreated, onClose]);
+    } catch (err: unknown) { setInstallError(err instanceof Error ? err.message : "Installation failed"); setInstalling(false); }
+  }, [apiKey, selectedPack, selectedFile, ram, port, name]);
 
   const formatSize = (bytes: number) => bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
   const formatCount = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n);
@@ -287,12 +306,20 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
             </div>
           )}
 
-          {/* Installing spinner */}
+          {/* Installing progress */}
           {installing && (
             <div className="flex flex-col items-center gap-3 py-6">
               <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
-              <p className="text-sm text-slate-400">Downloading and installing modpack…</p>
-              <p className="text-[11px] text-slate-600">This may take a few minutes depending on mod count.</p>
+              <div className="w-full max-w-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-slate-400">{progress?.step || "Starting…"}</span>
+                  <span className="text-xs text-slate-500 tabular-nums">{progress?.percent ?? 0}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-[#1a1f2e] overflow-hidden">
+                  <div className="h-full rounded-full bg-violet-500 transition-all duration-500 ease-out"
+                    style={{ width: `${progress?.percent ?? 0}%` }} />
+                </div>
+              </div>
             </div>
           )}
         </div>
