@@ -67,7 +67,7 @@ export function updateServer(
   if (patch.version !== undefined) s.version = patch.version;
   if (patch.javaArgs !== undefined) s.javaArgs = patch.javaArgs || undefined;
   if (patch.containerId !== undefined) s.containerId = patch.containerId;
-  if (patch.schedule !== undefined) s.schedule = patch.schedule;
+  if ("schedule" in patch) s.schedule = patch.schedule;
   saveServers(servers);
   return s;
 }
