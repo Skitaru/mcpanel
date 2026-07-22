@@ -116,6 +116,31 @@ async function getModFileInfo(apiKey: string, projectId: number, fileId: number)
   return { url: data.data.downloadUrl, fileName: data.data.fileName || `${projectId}-${fileId}.jar` };
 }
 
+/** Check if a JAR is client-only by inspecting its mod metadata. */
+function isClientOnlyMod(jarPath: string): boolean {
+  try {
+    const tomlData = execSync(`unzip -p "${jarPath}" META-INF/mods.toml 2>/dev/null`, {
+      encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+    }).trim();
+    if (tomlData) {
+      // Find all side declarations; if all are CLIENT, the JAR is client-only
+      const sides = [...tomlData.matchAll(/^side\s*=\s*"(\w+)"/gm)].map(m => m[1]);
+      if (sides.length > 0 && sides.every(s => s === "CLIENT")) return true;
+      if (sides.length > 0) return false; // At least one BOTH/SERVER entry
+    }
+  } catch { /* not a Forge mod or no mods.toml */ }
+  try {
+    const jsonData = execSync(`unzip -p "${jarPath}" fabric.mod.json 2>/dev/null`, {
+      encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+    }).trim();
+    if (jsonData) {
+      const meta = JSON.parse(jsonData);
+      if (meta?.environment === "client") return true;
+    }
+  } catch { /* not a Fabric mod or no fabric.mod.json */ }
+  return false;
+}
+
 async function downloadFile(url: string, dest: string): Promise<void> {
   const res = await fetch(url, {
     headers: { "User-Agent": "MCPanel/1.0" },
@@ -304,6 +329,7 @@ export async function runModpackInstall(
       const total = manifest.files.length;
       const batchSize = 5;
       let downloaded = 0;
+      const skippedMods: string[] = [];
 
       for (let i = 0; i < total; i += batchSize) {
         const batch = manifest.files.slice(i, i + batchSize);
@@ -311,7 +337,14 @@ export async function runModpackInstall(
           try {
             const info = await getModFileInfo(apiKey, projectID, fileID);
             if (!info) return false;
-            await downloadFile(info.url, path.join(modsDir, info.fileName));
+            const dest = path.join(modsDir, info.fileName);
+            await downloadFile(info.url, dest);
+            // Skip client-only mods (e.g. Zume, inventory HUD mods, etc.)
+            if (isClientOnlyMod(dest)) {
+              fs.unlinkSync(dest);
+              skippedMods.push(info.fileName);
+              return false;
+            }
             return true;
           } catch { return false; }
         }));
@@ -319,6 +352,9 @@ export async function runModpackInstall(
         const done = Math.min(i + batchSize, total);
         const pct = 40 + Math.floor((done / total) * 50); // 40%→90%
         emitProgress(serverId, `Downloading mods (${downloaded}/${done})…`, pct);
+      }
+      if (skippedMods.length > 0) {
+        console.log(`[modpack:${serverId.slice(0, 8)}] Skipped ${skippedMods.length} client-only mod(s): ${skippedMods.join(", ")}`);
       }
     }
 
