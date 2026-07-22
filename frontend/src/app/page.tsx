@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Trash2, Play, Square, Cpu, MemoryStick, Users, HardDrive } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import ServerSidebar from "@/components/ServerSidebar";
@@ -32,8 +32,6 @@ export default function DashboardPage() {
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
@@ -97,13 +95,6 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => { fetchServers(); const i = setInterval(fetchServers, POLL_INTERVAL_MS); return () => clearInterval(i); }, [fetchServers]);
-
-  const handleDelete = useCallback(async (id: string) => {
-    setDeleteConfirmId(null); setDeletingId(id);
-    try { await fetch(`${API_BASE}/api/servers/${id}`, { method: "DELETE" }); await fetchServers(); }
-    catch (err) { console.error("[panel] delete failed:", err); }
-    finally { setDeletingId(null); }
-  }, [fetchServers]);
 
   const handleServerAction = useCallback(async (id: string, action: "start" | "stop") => {
     setActingId(id);
@@ -228,18 +219,6 @@ export default function DashboardPage() {
                           <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
                             className="rounded-md p-1.5 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start">
                             <Play className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {deleteConfirmId === s.id ? (
-                          <div className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1">
-                            <span className="text-xs text-red-400">Sure?</span>
-                            <button onClick={e => { e.stopPropagation(); handleDelete(s.id); }} disabled={deletingId === s.id} className="rounded bg-red-600 px-2 py-0.5 text-xs text-white hover:bg-red-500 disabled:opacity-50">Yes</button>
-                            <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(null); }} className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-600">No</button>
-                          </div>
-                        ) : (
-                          <button disabled={deletingId === s.id} onClick={e => { e.stopPropagation(); setDeleteConfirmId(s.id); }}
-                            className="rounded-md p-1.5 text-slate-700 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50" title="Delete">
-                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
