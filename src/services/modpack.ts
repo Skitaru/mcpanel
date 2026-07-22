@@ -153,33 +153,22 @@ async function downloadFile(url: string, dest: string, expectedBytes?: number, a
   });
   if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
 
-  // Reject HTML/JSON responses (CDN errors, captchas, etc.)
   const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const cl = res.headers.get("content-length");
+  console.log(`[download] ${url.slice(0, 80)}… → ${res.status} ${ct || "(no content-type)"} ${cl ? `len=${cl}` : ""}`);
+
+  // Reject HTML/JSON responses (CDN errors, captchas, etc.)
   if (ct.includes("text/html") || ct.includes("application/json")) {
     const preview = (await res.text()).slice(0, 500);
     throw new Error(`Download returned ${ct} (expected binary): ${preview}`);
   }
 
-  // Stream to disk instead of buffering in RAM
-  const writer = fs.createWriteStream(dest);
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No response body");
-  try {
-    let bytesWritten = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writer.write(Buffer.from(value));
-      bytesWritten += value.length;
-    }
-    // If we know the expected size, verify
-    if (expectedBytes && bytesWritten < expectedBytes * 0.95) {
-      throw new Error(`Download truncated: got ${bytesWritten} bytes, expected ~${expectedBytes}`);
-    }
-  } finally {
-    writer.end();
-    reader.releaseLock();
+  // Read entire response into memory (modpack ZIPs are typically <500MB, server has 15GB RAM)
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (expectedBytes && buf.length < expectedBytes * 0.95) {
+    throw new Error(`Download truncated: got ${buf.length} bytes, expected ~${expectedBytes}`);
   }
+  fs.writeFileSync(dest, buf);
 }
 
 function getJavaDockerImage(mcVersion: string): string {
@@ -243,14 +232,36 @@ export async function runModpackInstall(
     // 2. Download zip (with CF API key — some CDN URLs require it)
     emitProgress(serverId, "Downloading modpack…", 10);
     const zipPath = path.join(dataPath, "_modpack.zip");
-    await downloadFile(fileData.data.downloadUrl, zipPath, fileData.data.fileLength, apiKey);
+    const downloadUrl = fileData.data.downloadUrl;
+    console.log(`[modpack:${serverId.slice(0, 8)}] Downloading from ${downloadUrl.slice(0, 100)}… (${fileData.data.fileLength ?? "?"} bytes)`);
+    await downloadFile(downloadUrl, zipPath, fileData.data.fileLength, apiKey);
 
-    // 3. Extract
+    // 3. Validate ZIP integrity before unzipping
+    {
+      const buf = fs.readFileSync(zipPath);
+      if (buf.length < 22) throw new Error(`Downloaded file too small (${buf.length} bytes)`);
+      const magic = buf[0] === 0x50 && buf[1] === 0x4b; // PK
+      if (!magic) {
+        const preview = buf.slice(0, 200).toString("utf-8").replace(/[^\x20-\x7e]/g, ".");
+        throw new Error(`Download is not a ZIP file (starts with 0x${buf[0]?.toString(16)}${buf[1]?.toString(16)}): ${preview}`);
+      }
+      // Check for EOCD (end of central directory) record
+      const eocd = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+      let found = false;
+      for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+        if (buf[i] === 0x50 && buf[i+1] === 0x4b && buf[i+2] === 0x05 && buf[i+3] === 0x06) {
+          found = true; break;
+        }
+      }
+      if (!found) throw new Error(`Downloaded ${buf.length} bytes but ZIP is incomplete (missing end-of-central-directory). The download may have been interrupted by the CDN.`);
+    }
+
+    // 4. Extract
     emitProgress(serverId, "Extracting modpack…", 20);
     execSync(`unzip -o "${zipPath}" -d "${dataPath}"`, { stdio: "pipe", timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
     fs.unlinkSync(zipPath);
 
-    // 4. Parse manifest
+    // 5. Parse manifest
     const manifestPath = path.join(dataPath, "manifest.json");
     if (!fs.existsSync(manifestPath)) throw new Error("manifest.json not found in modpack.");
     const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
