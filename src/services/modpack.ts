@@ -117,17 +117,33 @@ async function getModFileInfo(apiKey: string, projectId: number, fileId: number)
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
-  const res = await fetch(url, { headers: { "User-Agent": "MCPanel/1.0" } });
+  const res = await fetch(url, {
+    headers: { "User-Agent": "MCPanel/1.0" },
+    signal: AbortSignal.timeout(300_000), // 5 min for large downloads
+  });
   if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
-  fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+  // Stream to disk instead of buffering in RAM
+  const writer = fs.createWriteStream(dest);
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      writer.write(Buffer.from(value));
+    }
+  } finally {
+    writer.end();
+    reader.releaseLock();
+  }
 }
 
 function getJavaDockerImage(mcVersion: string): string {
   const minor = parseInt(mcVersion.split(".")[1] || "0") || 0;
-  if (minor >= 21) return "eclipse-temurin:21-jre";
-  if (minor >= 17) return "eclipse-temurin:17-jre";
-  if (minor >= 13) return "eclipse-temurin:11-jre";
-  return "eclipse-temurin:8-jre";
+  if (minor >= 21) return "eclipse-temurin:21-jre-alpine";
+  if (minor >= 17) return "eclipse-temurin:17-jre-alpine";
+  if (minor >= 13) return "eclipse-temurin:11-jre-alpine";
+  return "eclipse-temurin:8-jre-alpine";
 }
 
 function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): void {
@@ -173,7 +189,9 @@ export async function runModpackInstall(
   try {
     // 1. Get download URL
     emitProgress(serverId, "Fetching modpack info…", 5);
-    const fileInfo = await fetch(`${CF_BASE}/mods/${modpackId}/files/${fileId}`, { headers: cfHeaders(apiKey) });
+    const fileInfo = await fetch(`${CF_BASE}/mods/${modpackId}/files/${fileId}`, {
+      headers: cfHeaders(apiKey), signal: AbortSignal.timeout(15_000),
+    });
     if (!fileInfo.ok) throw new Error(`Failed to get file info (HTTP ${fileInfo.status})`);
     const fileData = (await fileInfo.json()) as { data: { downloadUrl: string; displayName: string } };
     if (!fileData.data.downloadUrl) throw new Error("No download URL available.");
