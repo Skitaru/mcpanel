@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText, Settings2,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, HardDrive, MemoryStick,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, HardDrive, MemoryStick, FileText,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
@@ -63,6 +63,7 @@ export default function ServerDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
+  const [dockerLogs, setDockerLogs] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
 
   const fetchServer = useCallback(async () => {
     try {
@@ -95,23 +96,31 @@ export default function ServerDetailPage() {
   const handleAction = useCallback(async (action: "start" | "stop" | "restart") => {
     setActionConfirm(null); setActing(true);
     try {
-      if (action === "restart") {
-        if (server?.status === "running") { const r = await fetch(`${API_BASE}/api/servers/${serverId}/stop`, { method: "POST" }); if (!r.ok) throw new Error("Stop failed"); await new Promise(r => setTimeout(r, 2000)); }
-        const r = await fetch(`${API_BASE}/api/servers/${serverId}/start`, { method: "POST" }); if (!r.ok) throw new Error("Start failed");
-      } else {
-        const r = await fetch(`${API_BASE}/api/servers/${serverId}/${action}`, { method: "POST" }); if (!r.ok) throw new Error(`${action} failed`);
-      }
+      const r = await fetch(`${API_BASE}/api/servers/${serverId}/${action}`, { method: "POST" });
+      if (!r.ok) throw new Error(`${action} failed`);
       await fetchServer();
       toast.success(`Server ${action}ed`);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : `${action} failed`); }
     finally { setActing(false); }
-  }, [serverId, server, fetchServer]);
+  }, [serverId, fetchServer]);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
     try { await fetch(`${API_BASE}/api/servers/${serverId}`, { method: "DELETE" }); router.push("/"); }
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Delete failed"); setDeleting(false); setDeleteConfirm(false); }
   }, [serverId, router]);
+
+  const handleDockerLogs = useCallback(async () => {
+    setDockerLogs({ loading: true, text: null });
+    try {
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/logs?tail=200`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setDockerLogs({ loading: false, text: data.logs || "(empty)" });
+    } catch (err: unknown) {
+      setDockerLogs({ loading: false, text: `Error: ${err instanceof Error ? err.message : "Failed"}` });
+    }
+  }, [serverId]);
 
 
 
@@ -196,6 +205,7 @@ export default function ServerDetailPage() {
                     <Upload className="h-4 w-4" />
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
+                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-md p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-violet-400 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}</button>
                   <span className="w-px h-5 bg-[#1a1f2e] mx-1" />
                   {deleteConfirm ? (
                     <div className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1">
@@ -238,6 +248,19 @@ export default function ServerDetailPage() {
       </main>
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />
       <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={fetchServer} />
+
+      {/* ── Docker Logs Dialog ── */}
+      {dockerLogs.text != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
+          <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3">
+              <h3 className="text-sm font-semibold text-white">Docker Logs — {server?.name}</h3>
+              <button onClick={() => setDockerLogs({ loading: false, text: null })} className="rounded-md p-1 text-slate-500 transition hover:text-slate-300">✕</button>
+            </div>
+            <pre className="flex-1 overflow-auto p-5 text-xs font-mono leading-relaxed text-slate-400 bg-[#0a0c10] whitespace-pre-wrap break-all">{dockerLogs.text}</pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
