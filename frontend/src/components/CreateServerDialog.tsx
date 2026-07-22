@@ -38,9 +38,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   // Form state
   const [name, setName] = useState("");
   const [ram, setRam] = useState("4G");
-  const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity" | "custom">("paper");
+  const [serverType, setServerType] = useState<"paper" | "fabric" | "velocity">("paper");
   const [paperVersion, setPaperVersion] = useState("");
-  const [customVersion, setCustomVersion] = useState("");
   const [javaArgs, setJavaArgs] = useState("");
   const [port, setPort] = useState(25565);
 
@@ -72,14 +71,6 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
   useEffect(() => {
     if (!open) return;
-
-    // Custom type doesn't need version fetching
-    if (serverType === "custom") {
-      setVersions([]);
-      setVersionsLoading(false);
-      setVersionsError(null);
-      return;
-    }
 
     let cancelled = false;
 
@@ -142,8 +133,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const version = serverType === "custom" ? customVersion.trim() : paperVersion;
-      if (!name.trim() || !version) return;
+      if (!name.trim() || !paperVersion) return;
 
       setSubmitting(true);
       setError(null);
@@ -157,7 +147,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             ram,
             port,
             serverType,
-            paperVersion: version,
+            paperVersion,
             javaArgs: javaArgs.trim() || undefined,
           }),
         });
@@ -177,7 +167,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, port, serverType, paperVersion, customVersion, javaArgs, onCreated, onClose],
+    [name, ram, port, serverType, paperVersion, javaArgs, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -266,7 +256,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             <div className="relative">
               <select
                 value={serverType}
-                onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity" | "custom")}
+                onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity")}
                 disabled={submitting}
                 className="w-full appearance-none rounded-lg border
                            border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
@@ -276,7 +266,6 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                 <option value="paper" className="bg-[#0a0a0a] text-white">PaperMC (Vanilla)</option>
                 <option value="fabric" className="bg-[#0a0a0a] text-white">Fabric (Modded)</option>
                 <option value="velocity" className="bg-[#0a0a0a] text-white">Velocity (Proxy)</option>
-                <option value="custom" className="bg-[#0a0a0a] text-white">Custom (BYO JAR)</option>
               </select>
               <ChevronDown
                 className="pointer-events-none absolute right-3 top-1/2
@@ -336,22 +325,9 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           {/* Version */}
           <label className="mb-1.5 block">
             <span className="mb-1.5 block text-sm font-medium text-neutral-300">
-              {serverType === "velocity" ? "Velocity Version" : serverType === "custom" ? "Minecraft Version" : "Minecraft Version"}
+              {serverType === "velocity" ? "Velocity Version" : "Minecraft Version"}
             </span>
-            {serverType === "custom" ? (
-              <input
-                type="text"
-                value={customVersion}
-                onChange={(e) => setCustomVersion(e.target.value)}
-                placeholder="e.g. 1.21.1"
-                disabled={submitting}
-                className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
-                           px-3.5 py-2.5 text-sm text-white
-                           placeholder:text-neutral-600
-                           focus:border-violet-500/40 focus:outline-none
-                           disabled:opacity-50"
-              />
-            ) : versionsLoading ? (
+            {versionsLoading ? (
               <div className="flex items-center gap-2 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5">
                 <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
                 <span className="text-sm text-neutral-500">
@@ -427,7 +403,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           <button
             type="submit"
             disabled={
-              submitting || !name.trim() || (serverType === "custom" ? !customVersion.trim() : !paperVersion) || versionsLoading
+              submitting || !name.trim() || !paperVersion || versionsLoading
             }
             className="mt-2 flex w-full items-center justify-center gap-2
                        rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium
