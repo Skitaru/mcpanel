@@ -11,6 +11,7 @@ import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import EditServerDialog from "@/components/EditServerDialog";
+import InstallModpackDialog from "@/components/InstallModpackDialog";
 import SettingsTab from "@/components/SettingsTab";
 import ServerSidebar from "@/components/ServerSidebar";
 import { DetailSkeleton } from "@/components/Skeleton";
@@ -58,6 +59,7 @@ export default function ServerDetailPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [actionConfirm, setActionConfirm] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
@@ -144,7 +146,7 @@ export default function ServerDetailPage() {
 
   return (
     <div className="flex min-h-screen">
-      <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} />
+      <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
 
@@ -235,6 +237,7 @@ export default function ServerDetailPage() {
         </div>
       </main>
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />
+      <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={fetchServer} />
     </div>
   );
 }
