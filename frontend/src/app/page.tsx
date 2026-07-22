@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive, Search } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
+import InstallModpackDialog from "@/components/InstallModpackDialog";
 import ServerSidebar from "@/components/ServerSidebar";
 import { CardSkeleton } from "@/components/Skeleton";
 import type { ServerStatus } from "@/lib/types";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [stopConfirmId, setStopConfirmId] = useState<string | null>(null);
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
@@ -115,7 +117,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen">
-      <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} />
+      <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} onInstallModpack={() => setModpackDialogOpen(true)} />
       <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-13" : "lg:ml-52"}`}>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-12">
 
@@ -257,6 +259,7 @@ export default function DashboardPage() {
         </div>
       </main>
       <CreateServerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => fetchServers()} />
+      <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={() => fetchServers()} />
     </div>
   );
 }

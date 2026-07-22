@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, Plus, KeyRound } from "lucide-react";
+import { LogOut, Plus, KeyRound, Download } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import type { ServerStatus } from "@/lib/types";
 
@@ -12,6 +12,7 @@ interface Props {
   collapsed: boolean;
   onToggle: () => void;
   onCreateClick: () => void;
+  onInstallModpack: () => void;
 }
 
 function statusColor(status: ServerStatus["status"]) {
@@ -23,7 +24,7 @@ function statusColor(status: ServerStatus["status"]) {
 }
 
 export default function ServerSidebar({
-  servers, activeId, collapsed, onToggle, onCreateClick,
+  servers, activeId, collapsed, onToggle, onCreateClick, onInstallModpack,
 }: Props) {
   const [pwDialogOpen, setPwDialogOpen] = useState(false);
 
@@ -81,6 +82,15 @@ export default function ServerSidebar({
           >
             <Plus className="h-4 w-4 shrink-0" />
             {!collapsed && "New Server"}
+          </button>
+          <button
+            onClick={onInstallModpack}
+            className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium
+              text-slate-600 transition hover:bg-white/[0.03] hover:text-slate-400 w-full
+              ${collapsed ? "justify-center" : ""}`}
+          >
+            <Download className="h-4 w-4 shrink-0" />
+            {!collapsed && "Modpack"}
           </button>
           <button
             onClick={() => setPwDialogOpen(true)}

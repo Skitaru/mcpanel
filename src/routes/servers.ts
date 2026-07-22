@@ -22,6 +22,7 @@ import {
   listManagedContainerStatuses,
   resolveJavaImage,
 } from "../services/docker";
+import { installModrinthModpack, parseModrinthSlug } from "../services/modrinth";
 
 const router = Router();
 
@@ -1040,6 +1041,62 @@ router.put("/:id/schedule", async (req: Request, res: Response) => {
     res.json({ message: "Schedule updated.", schedule: (server as any).schedule ?? {} });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to save schedule.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/servers/modpack — install a Modrinth modpack
+// ---------------------------------------------------------------------------
+router.post("/modpack", async (req: Request, res: Response) => {
+  try {
+    const { url, name, ram: ramRaw, port } = req.body ?? {};
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ error: "Field 'url' (Modrinth URL or slug) is required." });
+      return;
+    }
+
+    const slug = parseModrinthSlug(url);
+    if (!slug) {
+      res.status(400).json({ error: "Could not parse a valid project slug from the URL." });
+      return;
+    }
+
+    const serverName = name?.trim() || slug;
+    let ram: number;
+    try {
+      ram = ramRaw ? parseRamToMB(ramRaw) : 4096;
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    const serverPort = port ?? 25565;
+    if (typeof serverPort !== "number" || serverPort < 1024 || serverPort > 65535) {
+      res.status(400).json({ error: "Field 'port' must be between 1024 and 65535." });
+      return;
+    }
+
+    // Port conflict check
+    const existing = loadServers();
+    if (existing.some(s => s.port === serverPort)) {
+      res.status(409).json({ error: `Port ${serverPort} is already in use.` });
+      return;
+    }
+
+    console.log(`[api] Installing modpack: ${slug} (name=${serverName}, ram=${ram}MB, port=${serverPort})`);
+    const config = await installModrinthModpack(slug, serverName, ram, serverPort);
+
+    res.status(201).json({
+      id: config.id,
+      name: config.name,
+      serverType: config.serverType,
+      ram: config.ram,
+      port: config.port,
+      version: config.version,
+      containerId: config.containerId,
+    });
+  } catch (err: any) {
+    console.error("[api] Modpack install error:", err.message);
+    res.status(400).json({ error: err.message || "Failed to install modpack." });
   }
 });
 
