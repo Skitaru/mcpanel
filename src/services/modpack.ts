@@ -182,8 +182,10 @@ function getJavaDockerImage(mcVersion: string): string {
 function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): void {
   const javaImage = getJavaDockerImage(mcVersion);
   const jarName = path.basename(jarPath);
+  // Run as non-root (UID 1000) so files in the bind mount are owned by mc,
+  // avoiding a costly chown on every container restart.
   execSync(
-    `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
+    `docker run --rm -u 1000:1000 -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
     { stdio: "pipe", timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
   );
 }
@@ -341,6 +343,34 @@ export async function runModpackInstall(
       let lines = existing.split("\n").filter(l => !l.trimStart().startsWith("-Xms") && !l.trimStart().startsWith("-Xmx"));
       lines.push(`-Xms${heapMin}M`, `-Xmx${config.ram}M`);
       fs.writeFileSync(javaArgsPath, lines.filter(Boolean).join("\n") + "\n");
+
+      // Ensure run.sh uses `exec java` so SIGTERM reaches the JVM on stop.
+      // Without exec, the shell wrapper absorbs the signal and java keeps
+      // running until Docker force-kills after the grace period.
+      const runShPath = path.join(dataPath, "run.sh");
+      let content = fs.readFileSync(runShPath, "utf-8");
+      const runLines = content.split("\n");
+      let patched = false;
+      for (let i = runLines.length - 1; i >= 0; i--) {
+        const trimmed = runLines[i].trim();
+        if (trimmed === "") continue;
+        if (trimmed.startsWith("#")) continue;
+        // Already uses exec — nothing to do.
+        if (trimmed.startsWith("exec java ")) { patched = true; break; }
+        // Found the java invocation — insert exec.
+        if (trimmed.startsWith("java ")) {
+          const indent = runLines[i].match(/^(\s*)/)?.[1] ?? "";
+          runLines[i] = `${indent}exec ${trimmed}`;
+          patched = true;
+          break;
+        }
+        // Bail at any other non-comment, non-empty line — not a simple launcher.
+        break;
+      }
+      if (patched) {
+        fs.writeFileSync(runShPath, runLines.join("\n"));
+        console.log(`[modpack:${serverId.slice(0, 8)}] Patched run.sh exec java for signal forwarding`);
+      }
     }
 
     emitProgress(serverId, "Mod loader installed.", 40);

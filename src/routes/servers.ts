@@ -515,6 +515,47 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/servers/:id/restart
+// ---------------------------------------------------------------------------
+router.post("/:id/restart", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    if (!server.containerId) { res.status(500).json({ error: "Server has no associated container." }); return; }
+
+    // Stop with grace period, then start.
+    await stopContainer(server.containerId);
+    await startContainer(server.containerId);
+    console.log(`[api] Restarted server "${server.name}"`);
+    res.json({ message: `Server "${server.name}" restarted.` });
+  } catch (err: any) {
+    console.error("[api] POST /api/servers/:id/restart error:", err);
+    res.status(500).json({ error: "Failed to restart server.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/:id/logs — docker logs (container stdout/stderr)
+// ---------------------------------------------------------------------------
+router.get("/:id/logs", async (req: Request, res: Response) => {
+  try {
+    const server = getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    if (!server.containerId) { res.status(400).json({ error: "Server has no associated container." }); return; }
+
+    const tail = Math.min(Math.max(parseInt(req.query.tail as string) || 200, 10), 5000);
+    const { execSync } = await import("node:child_process");
+    const output = execSync(`docker logs --tail ${tail} "${server.containerId}"`, {
+      timeout: 10_000, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"],
+    });
+    res.json({ logs: output, serverId: server.id, tail });
+  } catch (err: any) {
+    console.error("[api] GET /api/servers/:id/logs error:", err);
+    res.status(500).json({ error: "Failed to read container logs.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/servers
 // ---------------------------------------------------------------------------
 router.get("/", async (_req: Request, res: Response) => {

@@ -211,7 +211,7 @@ export async function startContainer(containerId: string): Promise<void> {
 export async function stopContainer(containerId: string): Promise<void> {
   const c = docker.getContainer(containerId);
   try {
-    await c.stop({ t: 30 }); // 30 s grace period for Minecraft to save
+    await c.stop({ t: 60 }); // 60 s grace period — modpack servers need time to save chunks
     console.log(`[docker] Stopped container ${containerId.slice(0, 12)}`);
   } catch (err: any) {
     // Docker returns 304 when the container is already stopped — that's fine.
