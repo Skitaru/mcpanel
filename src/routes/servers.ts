@@ -22,7 +22,7 @@ import {
   listManagedContainerStatuses,
   resolveJavaImage,
 } from "../services/docker";
-import { installModrinthModpack, parseModrinthSlug } from "../services/modrinth";
+import { installCfModpack, searchModpacks, getModpackFiles } from "../services/modpack";
 
 const router = Router();
 
@@ -1045,45 +1045,68 @@ router.put("/:id/schedule", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/servers/modpack — install a Modrinth modpack
+// POST /api/curseforge/search — proxy CF modpack search
+// ---------------------------------------------------------------------------
+router.post("/curseforge/search", async (req: Request, res: Response) => {
+  try {
+    const { apiKey, query } = req.body ?? {};
+    if (!apiKey) { res.status(400).json({ error: "CurseForge API key required." }); return; }
+    const results = await searchModpacks(apiKey, query || "");
+    res.json(results);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/curseforge/files — proxy CF modpack files
+// ---------------------------------------------------------------------------
+router.post("/curseforge/files", async (req: Request, res: Response) => {
+  try {
+    const { apiKey, modpackId } = req.body ?? {};
+    if (!apiKey) { res.status(400).json({ error: "CurseForge API key required." }); return; }
+    if (!modpackId) { res.status(400).json({ error: "modpackId required." }); return; }
+    const files = await getModpackFiles(apiKey, modpackId);
+    res.json(files);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/servers/modpack — install a CurseForge modpack
 // ---------------------------------------------------------------------------
 router.post("/modpack", async (req: Request, res: Response) => {
   try {
-    const { url, name, ram: ramRaw, port } = req.body ?? {};
-    if (!url || typeof url !== "string" || !url.trim()) {
-      res.status(400).json({ error: "Field 'url' (Modrinth URL or slug) is required." });
+    const { apiKey, modpackId, fileId, name, ram: ramRaw, port } = req.body ?? {};
+    if (!apiKey || typeof apiKey !== "string") {
+      res.status(400).json({ error: "CurseForge API key is required." });
+      return;
+    }
+    if (!modpackId || !fileId) {
+      res.status(400).json({ error: "Fields 'modpackId' and 'fileId' are required." });
       return;
     }
 
-    const slug = parseModrinthSlug(url);
-    if (!slug) {
-      res.status(400).json({ error: "Could not parse a valid project slug from the URL." });
-      return;
-    }
-
-    const serverName = name?.trim() || slug;
+    const serverName = name?.trim() || `Modpack-${modpackId}`;
     let ram: number;
-    try {
-      ram = ramRaw ? parseRamToMB(ramRaw) : 4096;
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-      return;
-    }
+    try { ram = ramRaw ? parseRamToMB(ramRaw) : 4096; }
+    catch (err: any) { res.status(400).json({ error: err.message }); return; }
+
     const serverPort = port ?? 25565;
     if (typeof serverPort !== "number" || serverPort < 1024 || serverPort > 65535) {
-      res.status(400).json({ error: "Field 'port' must be between 1024 and 65535." });
+      res.status(400).json({ error: "Port must be between 1024 and 65535." });
       return;
     }
 
-    // Port conflict check
     const existing = loadServers();
     if (existing.some(s => s.port === serverPort)) {
       res.status(409).json({ error: `Port ${serverPort} is already in use.` });
       return;
     }
 
-    console.log(`[api] Installing modpack: ${slug} (name=${serverName}, ram=${ram}MB, port=${serverPort})`);
-    const config = await installModrinthModpack(slug, serverName, ram, serverPort);
+    console.log(`[api] Installing CF modpack ${modpackId} file ${fileId} (name=${serverName})`);
+    const config = await installCfModpack(apiKey, modpackId, fileId, serverName, ram, serverPort);
 
     res.status(201).json({
       id: config.id,
