@@ -103,6 +103,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
       const res = await fetch(`${API_BASE}/api/servers/modpack`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(300_000), // 5 min timeout for large modpacks
         body: JSON.stringify({
           apiKey: apiKey.trim(),
           modpackId: selectedPack.id,
