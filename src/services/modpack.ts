@@ -131,7 +131,7 @@ function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVer
   const jarName = path.basename(jarPath);
   execSync(
     `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
-    { stdio: "pipe", timeout: 600_000 },
+    { stdio: "pipe", timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
   );
 }
 
@@ -181,7 +181,7 @@ export async function runModpackInstall(
 
     // 3. Extract
     emitProgress(serverId, "Extracting modpack…", 20);
-    execSync(`unzip -o "${zipPath}" -d "${dataPath}"`, { stdio: "pipe", timeout: 120_000 });
+    execSync(`unzip -o "${zipPath}" -d "${dataPath}"`, { stdio: "pipe", timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
     fs.unlinkSync(zipPath);
 
     // 4. Parse manifest

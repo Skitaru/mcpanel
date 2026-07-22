@@ -250,14 +250,14 @@ export default function ConsoleTab({
     (async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/logs/latest.log")}`,
+          `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/logs/latest.log")}&raw=true`,
         );
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          if (data.content) {
+        if (res.ok && res.status !== 204 && !cancelled) {
+          const text = await res.text();
+          if (text) {
             // eslint-disable-next-line no-control-regex
-            const text = data.content.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
-            const lines = text.split("\n").filter((l: string) => l.trim());
+            const cleaned = text.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
+            const lines = cleaned.split("\n").filter((l: string) => l.trim());
             setLines(lines.map((text: string) => ({
               type: "stdout" as const,
               text,
