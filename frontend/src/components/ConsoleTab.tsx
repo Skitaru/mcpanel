@@ -95,7 +95,12 @@ export default function ConsoleTab({
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
+  const [cmdHistory, setCmdHistory] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`mcp_cmds_${serverId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [upSeconds, setUpSeconds] = useState(-1);
   const startTimeRef = useRef<number | null>(null);
@@ -152,6 +157,14 @@ export default function ConsoleTab({
       if (uptimeIntervalRef.current) clearInterval(uptimeIntervalRef.current);
     };
   }, [serverStatus]);
+
+  // ---- persist command history to localStorage (capped at 100) ----
+  const MAX_CMD_HISTORY = 100;
+  useEffect(() => {
+    if (cmdHistory.length === 0) return;
+    const capped = cmdHistory.slice(-MAX_CMD_HISTORY);
+    try { localStorage.setItem(`mcp_cmds_${serverId}`, JSON.stringify(capped)); } catch {}
+  }, [cmdHistory, serverId]);
 
   // ---- player polling (15 s) ----
   useEffect(() => {
