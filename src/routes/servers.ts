@@ -1106,6 +1106,9 @@ router.post("/modpack", async (req: Request, res: Response) => {
     }
 
     console.log(`[api] Installing CF modpack ${modpackId} file ${fileId} (name=${serverName})`);
+    // Disable timeout — modpack installation can take 1-2 minutes
+    res.setTimeout(0);
+    req.setTimeout(0);
     const config = await installCfModpack(apiKey, modpackId, fileId, serverName, ram, serverPort);
 
     res.status(201).json({
