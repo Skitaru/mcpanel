@@ -64,8 +64,10 @@ export async function searchModpacks(apiKey: string, query: string): Promise<CfM
   const url = `${CF_BASE}/mods/search?gameId=432&classId=4471&searchFilter=${encodeURIComponent(query)}&pageSize=20&sortField=2&sortOrder=desc`;
   const res = await fetch(url, { headers: cfHeaders(apiKey) });
   if (!res.ok) {
-    if (res.status === 403 || res.status === 401) throw new Error("Invalid CurseForge API key.");
-    throw new Error(`CurseForge API returned ${res.status}`);
+    let detail = "";
+    try { const body = await res.text(); detail = ` — ${body.slice(0, 200)}`; } catch {}
+    if (res.status === 403 || res.status === 401) throw new Error(`Invalid CurseForge API key (HTTP ${res.status}${detail})`);
+    throw new Error(`CurseForge API returned ${res.status}${detail}`);
   }
   const data = (await res.json()) as { data: any[] };
   return (data.data || []).map((m: any) => ({
