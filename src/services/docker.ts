@@ -139,7 +139,10 @@ export async function createContainer(
   // Run as non-root user (mc, UID 1000) for security.
   // su forwards signals, and the inner exec makes java the child so it
   // receives SIGTERM cleanly on docker stop.
-  const startCmd = `exec su mc -c "exec java -Xms512M -Xmx${javaHeap} ${javaArgs} -jar /data/${jarName} ${nogui}"`.trim();
+  // If jarName is a script (run.sh from NeoForge/Forge), execute it directly.
+  const startCmd = jarName === "run.sh"
+    ? `exec su mc -c "cd /data && exec sh run.sh ${nogui}"`.trim()
+    : `exec su mc -c "exec java -Xms512M -Xmx${javaHeap} ${javaArgs} -jar /data/${jarName} ${nogui}"`.trim();
 
   const cmdParts = [`echo "eula=true" > /data/eula.txt`];
   if (opts?.extraCmd) cmdParts.push(...opts.extraCmd);
