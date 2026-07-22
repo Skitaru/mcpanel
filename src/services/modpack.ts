@@ -57,7 +57,7 @@ interface Manifest {
 // ---------------------------------------------------------------------------
 
 function cfHeaders(apiKey: string) {
-  return { "x-api-key": apiKey, Accept: "application/json" };
+  return { "x-api-key": apiKey, Accept: "application/json", "User-Agent": "MCPanel/1.0" };
 }
 
 export async function searchModpacks(apiKey: string, query: string): Promise<CfModpack[]> {
@@ -114,8 +114,24 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   fs.writeFileSync(dest, buf);
 }
 
-function runCmd(bin: string, args: string[], cwd: string): void {
-  execSync(`${bin} ${args.map(a => `"${a}"`).join(" ")}`, { cwd, stdio: "pipe", timeout: 300_000 });
+/** Get the Docker Java image for a given Minecraft version. */
+function getJavaDockerImage(mcVersion: string): string {
+  const minor = parseInt(mcVersion.split(".")[1] || "0") || 0;
+  if (minor >= 21) return "eclipse-temurin:21-jre";
+  if (minor >= 17) return "eclipse-temurin:17-jre";
+  if (minor >= 13) return "eclipse-temurin:11-jre";
+  return "eclipse-temurin:8-jre";
+}
+
+/** Run a Java JAR inside a temporary Docker container (no host Java needed). */
+function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): void {
+  const javaImage = getJavaDockerImage(mcVersion);
+  const jarName = path.basename(jarPath);
+  console.log(`[modpack] Running ${jarName} in Docker (${javaImage})...`);
+  execSync(
+    `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
+    { stdio: "pipe", timeout: 600_000 },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +198,7 @@ export async function installCfModpack(
     const instUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/${instVer}/fabric-installer-${instVer}.jar`;
     const instPath = path.join(dataPath, "fabric-installer.jar");
     await downloadFile(instUrl, instPath);
-    runCmd("java", ["-jar", "fabric-installer.jar", "server", "-mcversion", mcVersion, "-downloadMinecraft"], dataPath);
+    runJavaInDocker(instPath, ["server", "-mcversion", mcVersion, "-downloadMinecraft"], dataPath, mcVersion);
     try { fs.unlinkSync(instPath); } catch {}
     jarName = "fabric-server-launch.jar";
 
@@ -195,7 +211,7 @@ export async function installCfModpack(
     const instPath = path.join(dataPath, "forge-installer.jar");
     await downloadFile(instUrl, instPath);
     console.log(`[modpack] Running Forge installer (this may take a few minutes)...`);
-    runCmd("java", ["-jar", "forge-installer.jar", "--installServer"], dataPath);
+    runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
     try { fs.unlinkSync(instPath); } catch {}
 
     // Find forge universal jar or use run.sh
@@ -215,7 +231,7 @@ export async function installCfModpack(
     const instUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVer}/neoforge-${neoVer}-installer.jar`;
     const instPath = path.join(dataPath, "neoforge-installer.jar");
     await downloadFile(instUrl, instPath);
-    runCmd("java", ["-jar", "neoforge-installer.jar", "--installServer"], dataPath);
+    runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
     try { fs.unlinkSync(instPath); } catch {}
 
     // NeoForge 1.20.5+ uses run.sh style
@@ -234,7 +250,7 @@ export async function installCfModpack(
     const instUrl = `https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/${instVer}/quilt-installer-${instVer}.jar`;
     const instPath = path.join(dataPath, "quilt-installer.jar");
     await downloadFile(instUrl, instPath);
-    runCmd("java", ["-jar", "quilt-installer.jar", "install", "server", mcVersion, "--download-server"], dataPath);
+    runJavaInDocker(instPath, ["install", "server", mcVersion, "--download-server"], dataPath, mcVersion);
     try { fs.unlinkSync(instPath); } catch {}
     jarName = "quilt-server-launch.jar";
 
