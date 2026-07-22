@@ -257,6 +257,13 @@ export async function runModpackInstall(
 
     emitProgress(serverId, "Mod loader installed.", 40);
 
+    // Fix Java version for old Forge (MC < 1.13 needs Java 8)
+    const mcMinor = parseInt(mcVersion.split(".")[1] || "0") || 0;
+    const needsLegacyJava = (loaderId.startsWith("forge-") || loaderId.startsWith("neoforge-")) && mcMinor < 13;
+    const javaImage = needsLegacyJava
+      ? "eclipse-temurin:8-jre-alpine"
+      : resolveJavaImage(mcVersion);
+
     // 6. Download mods
     const modsDir = path.join(dataPath, "mods");
     if (manifest.files?.length > 0) {
@@ -297,7 +304,6 @@ export async function runModpackInstall(
 
     // 8. Docker container
     emitProgress(serverId, "Creating Docker container…", 95);
-    const javaImage = resolveJavaImage(mcVersion);
     const containerId = await createContainer(config, javaImage, { jarName });
 
     // 9. Update config
