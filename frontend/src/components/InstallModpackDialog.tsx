@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Download, Loader2, Search } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -40,6 +40,8 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
   const [results, setResults] = useState<CfModpack[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSearchRef = useRef<string>("");
 
   // ---- Selected modpack + version ----
   const [selectedPack, setSelectedPack] = useState<CfModpack | null>(null);
@@ -76,21 +78,61 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
     return () => clearInterval(poll);
   }, [installServerId, onCreated, onClose]);
 
-  // ---- Search ----
-  const doSearch = useCallback(async () => {
-    if (!apiKey.trim() || !searchQuery.trim()) return;
-    setSearching(true); setSearchError(null); setResults([]); setSelectedPack(null);
+  // ---- Auto-search on open: show popular modpacks ----
+  useEffect(() => {
+    if (!open) return;
+    setSearchQuery("");
+    setResults([]);
+    setSelectedPack(null);
+    setFiles([]);
+    setSelectedFile(null);
+    setSearchError(null);
+    setInstalling(false);
+    setInstallError(null);
+    setInstallServerId(null);
+    setName("");
+    setRam("4G");
+    setPort("25565");
+    lastSearchRef.current = "";
+    // Auto-fetch if API key is set
+    if (apiKey.trim()) {
+      executeSearch("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // ---- Execute search (shared by auto-search and debounced input) ----
+  const executeSearch = useCallback(async (query: string) => {
+    if (!apiKey.trim()) return;
+    // Avoid duplicate searches for the same query
+    if (query === lastSearchRef.current && results.length > 0) return;
+    lastSearchRef.current = query;
+    setSearching(true); setSearchError(null);
+    if (query !== searchQuery) setResults([]);
+    setSelectedPack(null);
     try {
       const res = await fetch(`${API_BASE}/api/servers/curseforge/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim(), query: searchQuery.trim() }),
+        body: JSON.stringify({ apiKey: apiKey.trim(), query }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || `HTTP ${res.status}`); }
       setResults(await res.json());
     } catch (err: unknown) { setSearchError(err instanceof Error ? err.message : "Search failed"); }
     finally { setSearching(false); }
-  }, [apiKey, searchQuery]);
+  }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Debounced live search ----
+  const onSearchInput = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => executeSearch(value.trim()), 300);
+  }, [executeSearch]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   // ---- Select modpack → load versions ----
   const selectPack = useCallback(async (pack: CfModpack) => {
@@ -134,7 +176,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || `HTTP ${res.status}`); }
       const data = await res.json();
-      setInstallServerId(data.id); // start polling progress
+      setInstallServerId(data.id);
       setSearchQuery(""); setResults([]); setSelectedPack(null); setFiles([]); setSelectedFile(null);
     } catch (err: unknown) { setInstallError(err instanceof Error ? err.message : "Installation failed"); setInstalling(false); }
   }, [apiKey, selectedPack, selectedFile, ram, port, name]);
@@ -183,20 +225,15 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
                          placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
           </label>
 
-          {/* Search */}
-          <div className="flex gap-2">
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") doSearch(); }}
-              placeholder="Search modpacks (e.g. RLCraft, All the Mods...)"
+          {/* Search — live with debounce */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 pointer-events-none" />
+            <input type="text" value={searchQuery}
+              onChange={e => onSearchInput(e.target.value)}
+              placeholder={results.length > 0 ? "Filter modpacks…" : "Search modpacks (e.g. RLCraft, All the Mods...)"}
               disabled={!apiKey.trim()}
-              className="flex-1 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm text-white
+              className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10] pl-9 pr-3 py-2 text-sm text-white
                          placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none disabled:opacity-40" />
-            <button onClick={doSearch} disabled={!apiKey.trim() || !searchQuery.trim() || searching}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition
-                         hover:bg-violet-500 disabled:opacity-40 flex items-center gap-1.5">
-              {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              Search
-            </button>
           </div>
 
           {/* Search error */}
@@ -204,23 +241,31 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
 
           {/* Results grid */}
           {results.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-              {results.map(p => (
-                <button key={p.id} onClick={() => selectPack(p)}
-                  className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition ${
-                    selectedPack?.id === p.id ? "border-violet-500/40 bg-violet-500/10" : "border-[#1a1f2e] hover:border-[#252b3b]"
-                  }`}>
-                  {p.logo?.thumbnailUrl ? (
-                    <img src={p.logo.thumbnailUrl} alt="" className="h-10 w-10 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  ) : (
-                    <div className="h-10 w-10 rounded bg-[#0a0c10] shrink-0 flex items-center justify-center text-[10px] text-slate-600 font-bold">{p.name.slice(0, 2).toUpperCase()}</div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium text-white truncate">{p.name}</div>
-                    <div className="text-[10px] text-slate-600 mt-0.5">⬇ {formatCount(p.downloadCount)}</div>
-                  </div>
-                </button>
-              ))}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
+                  {searchQuery ? "Results" : "Popular Modpacks"}
+                </span>
+                <span className="text-[10px] text-slate-700">{results.length} found</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                {results.map(p => (
+                  <button key={p.id} onClick={() => selectPack(p)}
+                    className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition ${
+                      selectedPack?.id === p.id ? "border-violet-500/40 bg-violet-500/10" : "border-[#1a1f2e] hover:border-[#252b3b]"
+                    }`}>
+                    {p.logo?.thumbnailUrl ? (
+                      <img src={p.logo.thumbnailUrl} alt="" className="h-10 w-10 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-[#0a0c10] shrink-0 flex items-center justify-center text-[10px] text-slate-600 font-bold">{p.name.slice(0, 2).toUpperCase()}</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium text-white truncate">{p.name}</div>
+                      <div className="text-[10px] text-slate-600 mt-0.5">⬇ {formatCount(p.downloadCount)}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -228,6 +273,22 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
           {searching && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
+            </div>
+          )}
+
+          {/* Empty state — no API key */}
+          {!searching && results.length === 0 && !searchError && apiKey.trim() && (
+            <div className="flex flex-col items-center justify-center py-10 gap-2">
+              <Search className="h-6 w-6 text-slate-700" />
+              <p className="text-xs text-slate-600">Type to search, or clear to browse popular modpacks</p>
+            </div>
+          )}
+
+          {/* No API key hint */}
+          {!apiKey.trim() && (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+              <Search className="h-6 w-6 text-slate-700" />
+              <p className="text-xs text-slate-600">Enter your CurseForge API key above to browse modpacks</p>
             </div>
           )}
 
