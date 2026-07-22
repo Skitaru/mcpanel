@@ -79,7 +79,7 @@ function cfHeaders(apiKey: string) {
 
 export async function searchModpacks(apiKey: string, query: string): Promise<CfModpack[]> {
   const url = `${CF_BASE}/mods/search?gameId=432&classId=4471&searchFilter=${encodeURIComponent(query)}&pageSize=20&sortField=2&sortOrder=desc`;
-  const res = await fetch(url, { headers: cfHeaders(apiKey) });
+  const res = await fetch(url, { headers: cfHeaders(apiKey), signal: AbortSignal.timeout(15_000) });
   if (!res.ok) {
     let detail = "";
     try { const body = await res.text(); detail = ` — ${body.slice(0, 200)}`; } catch {}
@@ -95,7 +95,7 @@ export async function searchModpacks(apiKey: string, query: string): Promise<CfM
 
 export async function getModpackFiles(apiKey: string, modId: number): Promise<CfFile[]> {
   const url = `${CF_BASE}/mods/${modId}/files?pageSize=30&sortField=1&sortOrder=desc`;
-  const res = await fetch(url, { headers: cfHeaders(apiKey) });
+  const res = await fetch(url, { headers: cfHeaders(apiKey), signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`CurseForge API returned ${res.status}`);
   const data = (await res.json()) as { data: any[] };
   return (data.data || []).map((f: any) => ({
@@ -105,11 +105,15 @@ export async function getModpackFiles(apiKey: string, modId: number): Promise<Cf
   }));
 }
 
-async function getModDownloadUrl(apiKey: string, projectId: number, fileId: number): Promise<string> {
-  const res = await fetch(`${CF_BASE}/mods/${projectId}/files/${fileId}`, { headers: cfHeaders(apiKey) });
-  if (!res.ok) return "";
-  const data = (await res.json()) as { data: { downloadUrl?: string } };
-  return data.data?.downloadUrl || "";
+async function getModFileInfo(apiKey: string, projectId: number, fileId: number): Promise<{ url: string; fileName: string } | null> {
+  const res = await fetch(`${CF_BASE}/mods/${projectId}/files/${fileId}`, {
+    headers: cfHeaders(apiKey),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { data: { downloadUrl?: string; fileName?: string } };
+  if (!data.data?.downloadUrl) return null;
+  return { url: data.data.downloadUrl, fileName: data.data.fileName || `${projectId}-${fileId}.jar` };
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
@@ -255,6 +259,17 @@ export async function runModpackInstall(
       jarName = "quilt-server-launch.jar";
     }
 
+    // Override user_jvm_args.txt with panel RAM for run.sh-based loaders
+    if (jarName === "run.sh") {
+      const heapMin = Math.floor(config.ram / 2);
+      const javaArgsPath = path.join(dataPath, "user_jvm_args.txt");
+      const existing = fs.existsSync(javaArgsPath) ? fs.readFileSync(javaArgsPath, "utf-8") : "";
+      // Replace existing -Xms/-Xmx or append
+      let lines = existing.split("\n").filter(l => !l.trimStart().startsWith("-Xms") && !l.trimStart().startsWith("-Xmx"));
+      lines.push(`-Xms${heapMin}M`, `-Xmx${config.ram}M`);
+      fs.writeFileSync(javaArgsPath, lines.filter(Boolean).join("\n") + "\n");
+    }
+
     emitProgress(serverId, "Mod loader installed.", 40);
 
     // Fix Java version for old Forge (MC < 1.13 needs Java 8)
@@ -276,11 +291,9 @@ export async function runModpackInstall(
         const batch = manifest.files.slice(i, i + batchSize);
         const results = await Promise.all(batch.map(async ({ projectID, fileID }) => {
           try {
-            const url = await getModDownloadUrl(apiKey, projectID, fileID);
-            if (!url) return false;
-            const modInfo = await fetch(`${CF_BASE}/mods/${projectID}/files/${fileID}`, { headers: cfHeaders(apiKey) });
-            const modData = (await modInfo.json()) as { data: { fileName: string } };
-            await downloadFile(url, path.join(modsDir, modData.data.fileName || `${projectID}-${fileID}.jar`));
+            const info = await getModFileInfo(apiKey, projectID, fileID);
+            if (!info) return false;
+            await downloadFile(info.url, path.join(modsDir, info.fileName));
             return true;
           } catch { return false; }
         }));
@@ -324,10 +337,13 @@ export async function runModpackInstall(
     } catch (startErr: any) {
       emitProgress(serverId, "Installed (manual start required)", 100);
       console.error(`[modpack:${serverId.slice(0, 8)}] Auto-start failed: ${startErr.message}`);
+    } finally {
+      setTimeout(() => installProgress.delete(serverId), 60_000); // cleanup
     }
 
   } catch (err: any) {
     installProgress.set(serverId, { step: "Error", percent: 0, error: err.message });
+    setTimeout(() => installProgress.delete(serverId), 60_000);
     console.error(`[modpack:${serverId.slice(0, 8)}] Failed:`, err.message);
   }
 }
