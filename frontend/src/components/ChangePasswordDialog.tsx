@@ -132,10 +132,10 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 autoFocus
                 disabled={submitting}
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                            px-3.5 py-2.5 text-sm text-white
                            placeholder:text-neutral-600
-                           focus:border-sky-500/40 focus:outline-none
+                           focus:border-violet-500/40 focus:outline-none
                            disabled:opacity-50"
               />
             </label>
@@ -149,10 +149,10 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={submitting}
                 placeholder="Min. 4 characters"
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02]
+                className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                            px-3.5 py-2.5 text-sm text-white
                            placeholder:text-neutral-600
-                           focus:border-sky-500/40 focus:outline-none
+                           focus:border-violet-500/40 focus:outline-none
                            disabled:opacity-50"
               />
             </label>
@@ -166,9 +166,9 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
             <button
               type="submit"
               disabled={submitting || !currentPassword || !newPassword}
-              className="flex w-full items-center justify-center gap-2 rounded-xl
-                         bg-sky-600 px-4 py-3 text-sm font-medium text-white
-                         transition hover:bg-sky-500
+              className="flex w-full items-center justify-center gap-2 rounded-lg
+                         bg-violet-600 px-4 py-2.5 text-sm font-medium text-white
+                         transition hover:bg-violet-500
                          disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (

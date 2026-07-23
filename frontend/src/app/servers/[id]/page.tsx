@@ -169,7 +169,7 @@ export default function ServerDetailPage() {
             <>
               {/* ── Header ── */}
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
                   <h1 className="text-lg font-bold tracking-tight text-white truncate">{server.name}</h1>
                   <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{statusLabel(server.status)}</span>
@@ -220,7 +220,7 @@ export default function ServerDetailPage() {
               </div>
 
               {/* ── Tabs ── */}
-              <nav className="mb-6 flex gap-0 border-b border-[#1a1f2e]">
+              <nav className="mb-6 flex gap-0 border-b border-[#1a1f2e] overflow-x-auto">
                 {TABS.map(({ id, label, icon: Icon }) => (
                   <button key={id} onClick={() => setActiveTab(id)}
                     className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition border-b-2 -mb-px whitespace-nowrap ${

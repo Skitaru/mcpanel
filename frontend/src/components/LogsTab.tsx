@@ -59,7 +59,7 @@ export default function LogsTab({ serverId }: Props) {
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#1a1f2e] bg-[#0f1119] px-3 py-2">
         <ScrollText className="h-4 w-4 text-slate-500 shrink-0" />
         <span className="text-xs text-slate-500">logs/latest.log</span>
-        <div className="relative flex-1 min-w-[160px]">
+        <div className="relative flex-1 min-w-[120px]">
           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-600" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
             className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] py-1 pl-7 pr-3 text-[11px] text-slate-200
