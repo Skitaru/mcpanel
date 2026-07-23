@@ -278,7 +278,7 @@ export default function FileManagerTab({ serverId }: Props) {
                       className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-white/[0.03] ${isSelected ? "bg-violet-500/10 text-violet-300" : bin ? "text-slate-700 cursor-default" : "text-slate-300"}`}>
                       {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-slate-700" : "text-slate-500"}`} />}
                       <span className="truncate flex-1">{f.name}</span>
-                      {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0">{formatSize(f.size)}</span>}
+                      {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0 mr-5">{formatSize(f.size)}</span>}
                     </button>
                     {deleteTarget === f.name ? (
                       <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-[#0f1119] border border-[#1a1f2e] px-1.5 py-0.5">
