@@ -64,6 +64,7 @@ export default function ServerDetailPage() {
   const [backingUp, setBackingUp] = useState(false);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [dockerLogs, setDockerLogs] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
+  const [restartTick, setRestartTick] = useState(0);
 
   const fetchServer = useCallback(async () => {
     try {
@@ -98,6 +99,7 @@ export default function ServerDetailPage() {
     try {
       const r = await fetch(`${API_BASE}/api/servers/${serverId}/${action}`, { method: "POST" });
       if (!r.ok) throw new Error(`${action} failed`);
+      if (action === "restart") setRestartTick(t => t + 1);
       await fetchServer();
       toast.success(`Server ${action}ed`);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : `${action} failed`); }
@@ -242,7 +244,7 @@ export default function ServerDetailPage() {
               {/* ── Tab content ── */}
               <section>
                 <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
-                  <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} />
+                  <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} restartTick={restartTick} />
                 </div>
                 <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}><FileManagerTab serverId={serverId} /></div>
                 <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}><LogsTab serverId={serverId} /></div>

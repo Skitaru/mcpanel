@@ -36,6 +36,8 @@ interface Props {
   ram: number; // MB
   serverType: string;
   version: string;
+  /** Incremented by parent on restart — triggers explicit detach + reattach. */
+  restartTick?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +85,7 @@ function typeLabel(t: string) {
 // ---------------------------------------------------------------------------
 
 export default function ConsoleTab({
-  serverId, serverStatus, port, ram, serverType, version,
+  serverId, serverStatus, port, ram, serverType, version, restartTick,
 }: Props) {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -287,6 +289,18 @@ export default function ConsoleTab({
       socketRef.current = null;
     };
   }, [serverId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- explicit restart trigger (from parent) — force detach + flag reattach ----
+  useEffect(() => {
+    if (restartTick === undefined || restartTick === 0) return;
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    addLine("system", "Server is restarting…");
+    socket.emit("console:detach", { serverId });
+    socket.emit("stats:unsubscribe", { serverId });
+    setStats(null);
+    reattachPendingRef.current = true;
+  }, [restartTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- re-attach on status change ----
   const prevStatusRef = useRef(serverStatus);
