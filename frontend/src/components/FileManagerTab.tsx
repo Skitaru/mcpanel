@@ -37,6 +37,7 @@ export default function FileManagerTab({ serverId }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const dragCounter = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true); setError(null);
@@ -68,6 +69,23 @@ export default function FileManagerTab({ serverId }: Props) {
       await fetchFiles();
     } catch (err) { console.error("Upload failed:", err); }
     finally { setUploading(false); }
+  }, [serverId, currentPath, fetchFiles]);
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? []);
+    if (!selected.length) return;
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append("path", currentPath);
+      for (const f of selected) fd.append("files", f);
+      await fetch(`${API_BASE}/api/servers/${serverId}/upload`, { method: "POST", body: fd });
+      await fetchFiles();
+    } catch (err) { console.error("Upload failed:", err); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   }, [serverId, currentPath, fetchFiles]);
 
   const openFile = useCallback(async (name: string) => {
@@ -156,7 +174,7 @@ export default function FileManagerTab({ serverId }: Props) {
       }))];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]"
+    <div className="relative flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]"
       style={{ height: "calc(100vh - 12rem)" }}
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
       onDragEnter={() => { dragCounter.current++; setDragOver(true); }}
@@ -174,6 +192,10 @@ export default function FileManagerTab({ serverId }: Props) {
           <button onClick={() => setShowCreate("folder")}
             className="rounded p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300" title="New Folder">
             <FolderPlus className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={handleUploadClick} disabled={uploading}
+            className="rounded p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-violet-400" title="Upload Files">
+            <Upload className="h-3.5 w-3.5" />
           </button>
           <span className="flex-1" />
           {uploading && <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400 mx-1" />}
@@ -209,10 +231,10 @@ export default function FileManagerTab({ serverId }: Props) {
 
         {/* Drag overlay */}
         {dragOver && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-violet-500/10 pointer-events-none">
-            <div className="rounded-lg border-2 border-dashed border-violet-500/50 px-4 py-2">
-              <p className="text-xs font-medium text-violet-400">Drop files to upload</p>
-            </div>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#0f1119]/90 backdrop-blur-sm pointer-events-none">
+            <Upload className="h-8 w-8 text-violet-400" />
+            <p className="text-sm font-medium text-violet-300">Drop files to upload</p>
+            <p className="text-[11px] text-slate-500">to {currentPath}</p>
           </div>
         )}
 
@@ -311,6 +333,9 @@ export default function FileManagerTab({ serverId }: Props) {
           </div>
         )}
       </div>
+
+      {/* Hidden file input for upload button */}
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
     </div>
   );
 }
