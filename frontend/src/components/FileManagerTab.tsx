@@ -15,6 +15,11 @@ function formatSize(bytes: number) {
   if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(1)} KB`; return `${bytes} B`;
 }
 
+/** File extensions that shouldn't be opened in the text editor (binary junk). */
+function isBinary(filename: string) {
+  return /\.(jar|png|jpg|jpeg|gif|ico|webp|dat|mca|nbt|lock|gz|zip)$/i.test(filename);
+}
+
 interface Props { serverId: string; }
 
 export default function FileManagerTab({ serverId }: Props) {
@@ -261,11 +266,17 @@ export default function FileManagerTab({ serverId }: Props) {
               {files.map(f => {
                 const fp = currentPath === "/" ? `/${f.name}` : `${currentPath}/${f.name}`;
                 const isSelected = selectedFile === fp;
+                const bin = !f.isDirectory && isBinary(f.name);
                 return (
                   <li key={f.name} className="group relative">
-                    <button onClick={() => f.isDirectory ? navigateTo(f.name) : openFile(f.name)}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-white/[0.03] ${isSelected ? "bg-violet-500/10 text-violet-300" : "text-slate-300"}`}>
-                      {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className="h-3.5 w-3.5 shrink-0 text-slate-500" />}
+                    <button onClick={() => {
+                      if (f.isDirectory) { navigateTo(f.name); return; }
+                      if (bin) return; // binary file — don't open in editor
+                      openFile(f.name);
+                    }}
+                      title={bin ? "Binary file — cannot preview" : undefined}
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-white/[0.03] ${isSelected ? "bg-violet-500/10 text-violet-300" : bin ? "text-slate-700 cursor-default" : "text-slate-300"}`}>
+                      {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-slate-700" : "text-slate-500"}`} />}
                       <span className="truncate flex-1">{f.name}</span>
                       {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0">{formatSize(f.size)}</span>}
                     </button>
