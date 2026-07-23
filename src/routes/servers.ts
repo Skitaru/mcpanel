@@ -544,8 +544,8 @@ router.get("/:id/logs", async (req: Request, res: Response) => {
     if (!server.containerId) { res.status(400).json({ error: "Server has no associated container." }); return; }
 
     const tail = Math.min(Math.max(parseInt(req.query.tail as string) || 200, 10), 5000);
-    const { execSync } = await import("node:child_process");
-    const output = execSync(`docker logs --tail ${tail} "${server.containerId}"`, {
+    const { execFileSync } = await import("node:child_process");
+    const output = execFileSync("docker", ["logs", "--tail", String(tail), server.containerId!], {
       timeout: 10_000, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"],
     });
     res.json({ logs: output, serverId: server.id, tail });
@@ -646,10 +646,11 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
     const backupName = `backup-${server.id.slice(0, 8)}-${timestamp}.tar.gz`;
     const backupPath = path.join(server.dataPath, "..", backupName);
 
-    // Use system `tar` (Linux, macOS, Git Bash on Windows).
-    const { execSync } = await import("node:child_process");
+    // Use system `tar` (Linux, macOS, Git Bash on Windows). execFileSync avoids
+    // shell injection by passing args as an array.
+    const { execFileSync } = await import("node:child_process");
     try {
-      execSync(`tar -czf "${backupPath}" -C "${server.dataPath}" .`, {
+      execFileSync("tar", ["-czf", backupPath, "-C", server.dataPath, "."], {
         stdio: "pipe",
         timeout: 120_000,
       });
@@ -710,9 +711,10 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    const { execSync } = await import("node:child_process");
+    const { execFileSync } = await import("node:child_process");
     try {
-      execSync(`tar -xzf "${uploadPath}" -C "${tmpDir}"`, {
+      // --no-absolute-filenames prevents path-traversal via malicious archive
+      execFileSync("tar", ["-xzf", uploadPath, "-C", tmpDir, "--no-absolute-filenames"], {
         stdio: "pipe",
         timeout: 300_000,
       });
@@ -732,7 +734,10 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
 
     try {
       for (const entry of fs.readdirSync(tmpDir)) {
-        fs.renameSync(path.join(tmpDir, entry), path.join(server.dataPath, entry));
+        const src = path.join(tmpDir, entry);
+        const dst = path.join(server.dataPath, entry);
+        fs.cpSync(src, dst, { recursive: true });  // copyFile+unlink resistant to EXDEV
+        fs.rmSync(src, { recursive: true, force: true });
       }
     } catch (err: any) {
       console.error("[api] Restore move failed:", err.message);
@@ -823,13 +828,13 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
     const server = getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
-    const { execSync } = await import("node:child_process");
+    const { execFileSync } = await import("node:child_process");
     const dataPath = server.dataPath;
     if (!fs.existsSync(dataPath)) {
       res.json({ bytes: 0, path: dataPath });
       return;
     }
-    const output = execSync(`du -sb "${dataPath}"`, {
+    const output = execFileSync("du", ["-sb", dataPath], {
       timeout: 10_000,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -1026,8 +1031,9 @@ router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Re
 
     // Resize to 64×64 using sharp if available, else just copy
     const destPath = path.join(server.dataPath, "server-icon.png");
-    const { rename } = await import("node:fs/promises");
-    await rename(req.file.path, destPath);
+    const { copyFile, unlink } = await import("node:fs/promises");
+    await copyFile(req.file.path, destPath);
+    await unlink(req.file.path);
 
     res.json({ message: "Server icon uploaded. Restart the server to apply." });
   } catch (err: any) {

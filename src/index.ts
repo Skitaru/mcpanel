@@ -12,13 +12,22 @@ import {
   changePassword,
 } from "./services/auth";
 import { startScheduler } from "./services/scheduler";
+import rateLimit from "express-rate-limit";
 
 const PORT = process.env.PANEL_PORT ? parseInt(process.env.PANEL_PORT, 10) : 3000;
 
 const app = express();
 
 // ---- middleware ----
-app.use(express.json());
+app.use(express.json({ limit: "100mb" })); // generous limit for modpack manifests etc.
+
+// ---- security headers (defence-in-depth) ----
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
 
 // CORS — allow frontend (any port on the same machine, or your reverse proxy).
 app.use((_req, res, next) => {
@@ -60,7 +69,6 @@ if (API_KEY) {
 
 // ---- Auth routes ----
 // Rate-limit login attempts: max 10 per minute per IP
-import rateLimit from "express-rate-limit";
 app.use("/api/auth/login", rateLimit({
   windowMs: 60_000,
   max: 10,
@@ -102,7 +110,15 @@ app.post("/api/auth/change-password", (req, res) => {
   }
 });
 
-// ---- REST routes ----
+// ---- REST routes (rate-limited) ----
+// 200 req/min per IP — generous for normal use, blocks brute-force / DoS
+app.use("/api/servers", rateLimit({
+  windowMs: 60_000,
+  max: 200,
+  message: { error: "Too many requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 app.use("/api/servers", serversRouter);
 app.use("/api/servers", filesRouter);
 

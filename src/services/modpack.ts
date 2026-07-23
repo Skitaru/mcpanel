@@ -5,7 +5,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { v4 as uuid } from "uuid";
 import { ServerConfig, ServerType } from "../types";
 import { addServer, loadServers } from "./config-store";
@@ -119,8 +119,9 @@ async function getModFileInfo(apiKey: string, projectId: number, fileId: number)
 /** Check if a JAR is client-only by inspecting its mod metadata. */
 function isClientOnlyMod(jarPath: string): boolean {
   try {
-    const tomlData = execSync(`unzip -p "${jarPath}" META-INF/mods.toml 2>/dev/null`, {
+    const tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/mods.toml"], {
       encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     if (tomlData) {
       // Find all side declarations; if all are CLIENT, the JAR is client-only
@@ -130,8 +131,9 @@ function isClientOnlyMod(jarPath: string): boolean {
     }
   } catch { /* not a Forge mod or no mods.toml */ }
   try {
-    const jsonData = execSync(`unzip -p "${jarPath}" fabric.mod.json 2>/dev/null`, {
+    const jsonData = execFileSync("unzip", ["-p", jarPath, "fabric.mod.json"], {
       encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     if (jsonData) {
       const meta = JSON.parse(jsonData);
@@ -260,7 +262,7 @@ export async function runModpackInstall(
 
     // 4. Extract
     emitProgress(serverId, "Extracting modpack…", 20);
-    execSync(`unzip -o "${zipPath}" -d "${dataPath}"`, { stdio: "pipe", timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
+    execFileSync("unzip", ["-o", zipPath, "-d", dataPath], { stdio: "pipe", timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
     fs.unlinkSync(zipPath);
 
     // 5. Parse manifest

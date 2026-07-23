@@ -1,5 +1,7 @@
 // ---- Minecraft Server Panel: Auth service ----
 // Simple JWT-based authentication. Credentials stored in panel-config.json.
+// Uses scrypt (memory-hard KDF) for password hashing — auto-migrates from
+// older HMAC-SHA256 format on first successful login.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -15,14 +17,16 @@ interface PanelConfig {
   username: string;
   salt: string;
   passwordHash: string;
+  /** 0 = legacy HMAC-SHA256, 1 = scrypt. Missing = legacy. */
+  hashVersion?: number;
 }
 
 function loadConfig(): PanelConfig {
   if (!fs.existsSync(CONFIG_PATH)) {
     // First run: create default config
     const salt = crypto.randomBytes(16).toString("hex");
-    const hash = hashPassword(DEFAULT_PASSWORD, salt);
-    const config: PanelConfig = { username: DEFAULT_USERNAME, salt, passwordHash: hash };
+    const hash = hashPasswordScrypt(DEFAULT_PASSWORD, salt);
+    const config: PanelConfig = { username: DEFAULT_USERNAME, salt, passwordHash: hash, hashVersion: 1 };
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
     console.log("[auth] Created default credentials: admin / admin");
     return config;
@@ -34,8 +38,46 @@ function saveConfig(config: PanelConfig): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
-function hashPassword(password: string, salt: string): string {
+// ---- Legacy HMAC-SHA256 (for migration only) ----
+
+function hashPasswordLegacy(password: string, salt: string): string {
   return crypto.createHmac("sha256", salt).update(password).digest("hex");
+}
+
+// ---- scrypt hashing (current) ----
+
+/**
+ * Hash a password with scrypt, returning `salt:hash` (both hex-encoded).
+ * scrypt is memory-hard — resistant to GPU/ASIC brute-force.
+ */
+function hashPasswordScrypt(password: string, salt: string): string {
+  // synchronously derive a 64-byte key; N=16384 (~100ms on modern CPU)
+  return crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString("hex");
+}
+
+/** Verify a password against the stored hash, auto-upgrading legacy hashes. */
+export function verifyCredentials(username: string, password: string): boolean {
+  const config = loadConfig();
+  if (username !== config.username) return false;
+
+  if (config.hashVersion === 1) {
+    // Current scrypt format
+    return hashPasswordScrypt(password, config.salt) === config.passwordHash;
+  }
+
+  // Legacy HMAC-SHA256 — try old hash first
+  if (hashPasswordLegacy(password, config.salt) === config.passwordHash) {
+    // Auto-migrate to scrypt
+    const newSalt = crypto.randomBytes(16).toString("hex");
+    config.salt = newSalt;
+    config.passwordHash = hashPasswordScrypt(password, newSalt);
+    config.hashVersion = 1;
+    saveConfig(config);
+    console.log("[auth] Migrated credentials from HMAC-SHA256 to scrypt.");
+    return true;
+  }
+
+  return false;
 }
 
 /** JWT secret — persisted so tokens survive restarts */
@@ -50,17 +92,12 @@ export function getJwtSecret(): string {
   return _jwtSecret;
 }
 
-/** Verify credentials. Returns true if valid. */
-export function verifyCredentials(username: string, password: string): boolean {
-  const config = loadConfig();
-  if (username !== config.username) return false;
-  return hashPassword(password, config.salt) === config.passwordHash;
-}
-
 /** Change the password. Invalidates all existing tokens. */
 export function changePassword(currentPassword: string, newPassword: string): { success: true } | { error: string } {
   const config = loadConfig();
-  if (hashPassword(currentPassword, config.salt) !== config.passwordHash) {
+
+  // Verify current password (handles both legacy and scrypt)
+  if (!verifyCredentials(config.username, currentPassword)) {
     return { error: "Current password is incorrect." };
   }
   if (newPassword.length < 4) {
@@ -68,7 +105,8 @@ export function changePassword(currentPassword: string, newPassword: string): { 
   }
   const newSalt = crypto.randomBytes(16).toString("hex");
   config.salt = newSalt;
-  config.passwordHash = hashPassword(newPassword, newSalt);
+  config.passwordHash = hashPasswordScrypt(newPassword, newSalt);
+  config.hashVersion = 1;
   saveConfig(config);
   _jwtSecret = null; // invalidate, will be re-derived
   return { success: true };
