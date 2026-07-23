@@ -50,7 +50,8 @@ export default function DashboardPage() {
 
   // ---- Socket.IO ----
   useEffect(() => {
-    const socket = io(API_BASE, { transports: ["polling"] });
+    const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
+    const socket = io(API_BASE, { transports: ["polling"], auth: { token } });
     socketRef.current = socket;
     socket.on("connect", () => { servers.forEach(s => { if (s.status === "running") socket.emit("stats:subscribe", { serverId: s.id }); }); });
     socket.on("stats:data", (p: { serverId: string; cpuPercent: number; memoryUsage: number; memoryLimit: number }) => {

@@ -11,7 +11,7 @@ import {
   resolveJavaImage,
 } from "./docker";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
 import fs from "node:fs";
 
 const CHECK_INTERVAL_MS = 30_000;
@@ -102,9 +102,13 @@ async function performBackup(srv: any): Promise<void> {
   const backupDir = path.resolve(srv.dataPath, "..");
   const backupPath = path.join(backupDir, backupName);
 
-  execFileSync("tar", ["-czf", backupPath, "-C", srv.dataPath, "."], {
-    stdio: "pipe",
-    timeout: 300_000,
+  await new Promise<void>((resolve, reject) => {
+    execFile("tar", ["-czf", backupPath, "-C", srv.dataPath, "."], {
+      timeout: 300_000,
+    }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
   });
 
   const stat = fs.statSync(backupPath);
