@@ -128,19 +128,18 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
   // ---- Auth middleware ----
   const API_KEY = process.env.PANEL_API_KEY;
   io.use((socket, next) => {
-    const token = socket.handshake.auth?.token as string | undefined;
+    // Check auth.token first, then Authorization header (fetch interceptor).
+    let token = socket.handshake.auth?.token as string | undefined;
     if (!token) {
-      return next(new Error("Authentication required. Pass { auth: { token } } in the socket options."));
+      const authHeader = socket.handshake.headers?.authorization;
+      if (authHeader?.startsWith("Bearer ")) token = authHeader.slice(7);
     }
-    // Try JWT first
+    if (!token) return next(new Error("Authentication required."));
     try {
       jwt.verify(token, getJwtSecret());
       return next();
     } catch {
-      // JWT failed — try as raw API key
-      if (API_KEY && token === API_KEY) {
-        return next();
-      }
+      if (API_KEY && token === API_KEY) return next();
       return next(new Error("Invalid authentication token."));
     }
   });
@@ -261,9 +260,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         });
 
         // If the attach stream closes (container stops etc.), clean up
+        let cleaned = false;
         const cleanup = () => {
-          // removeAllListeners() (no args) clears all events including 'close',
-          // so cleanup won't fire twice when close() triggers close events below.
+          if (cleaned) return;
+          cleaned = true;
           streams.demuxed.stdout.removeAllListeners();
           streams.demuxed.stderr.removeAllListeners();
           flushBuffer(serverId);
@@ -277,6 +277,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         streams.demuxed.stdout.on("close", cleanup);
         streams.demuxed.stderr.on("close", cleanup);
+        // PassThrough streams fire 'end' (not always 'close') when the source
+        // ends cleanly (e.g. Docker stop). Listen for both.
+        streams.demuxed.stdout.on("end", () => cleanup());
+        streams.demuxed.stderr.on("end", () => cleanup());
 
         socket.emit("console:attached", { serverId });
         console.log(`[ws] Console attached: ${socket.id} → ${serverId}`);
