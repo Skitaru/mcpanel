@@ -315,10 +315,11 @@ router.post("/:id/upload", upload.array("files"), async (req: Request, res: Resp
       return;
     }
 
-    const { rename } = await import("node:fs/promises");
+    const { copyFile, unlink } = await import("node:fs/promises");
     for (const file of files) {
       const dest = path.join(resolved.absolutePath, file.originalname);
-      await rename(file.path, dest);
+      await copyFile(file.path, dest);
+      await unlink(file.path);
     }
 
     res.json({ message: `${files.length} file(s) uploaded.` });
