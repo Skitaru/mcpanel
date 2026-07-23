@@ -6,7 +6,9 @@
 import { Server as HttpServer } from "node:http";
 import { Readable } from "node:stream";
 import { Server as SocketIOServer, Socket } from "socket.io";
+import jwt from "jsonwebtoken";
 import { getServer } from "./config-store";
+import { getJwtSecret } from "./auth";
 import {
   getStatsStream,
   attachContainer,
@@ -121,6 +123,26 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     // Don't spam pings for a local-panel scenario; keep it relaxed.
     pingInterval: 10_000,
     pingTimeout: 15_000,
+  });
+
+  // ---- Auth middleware ----
+  const API_KEY = process.env.PANEL_API_KEY;
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token as string | undefined;
+    if (!token) {
+      return next(new Error("Authentication required. Pass { auth: { token } } in the socket options."));
+    }
+    // Try JWT first
+    try {
+      jwt.verify(token, getJwtSecret());
+      return next();
+    } catch {
+      // JWT failed — try as raw API key
+      if (API_KEY && token === API_KEY) {
+        return next();
+      }
+      return next(new Error("Invalid authentication token."));
+    }
   });
 
   io.on("connection", (socket: Socket) => {

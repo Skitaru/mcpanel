@@ -384,7 +384,7 @@ router.post("/", async (req: Request, res: Response) => {
         await downloadPaperJar(mcVersion, dataPath);
       }
     } catch (err: any) {
-      try { fs.rmdirSync(dataPath); } catch {}
+      try { fs.rmSync(dataPath, { recursive: true, force: true }); } catch {}
       res.status(400).json({
         error: `Failed to download ${serverType} server JAR.`,
         detail: err.message,
@@ -646,13 +646,18 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
     const backupName = `backup-${server.id.slice(0, 8)}-${timestamp}.tar.gz`;
     const backupPath = path.join(server.dataPath, "..", backupName);
 
-    // Use system `tar` (Linux, macOS, Git Bash on Windows). execFileSync avoids
-    // shell injection by passing args as an array.
-    const { execFileSync } = await import("node:child_process");
+    // Use system `tar` (Linux, macOS, Git Bash on Windows). execFile avoids
+    // shell injection by passing args as an array, and runs async so the
+    // event loop stays responsive for other requests during backup.
+    const { execFile } = await import("node:child_process");
     try {
-      execFileSync("tar", ["-czf", backupPath, "-C", server.dataPath, "."], {
-        stdio: "pipe",
-        timeout: 120_000,
+      await new Promise<void>((resolve, reject) => {
+        execFile("tar", ["-czf", backupPath, "-C", server.dataPath, "."], {
+          timeout: 120_000,
+        }, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
     } catch (err: any) {
       res.status(500).json({
@@ -828,16 +833,20 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
     const server = getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
-    const { execFileSync } = await import("node:child_process");
+    const { execFile } = await import("node:child_process");
     const dataPath = server.dataPath;
     if (!fs.existsSync(dataPath)) {
       res.json({ bytes: 0, path: dataPath });
       return;
     }
-    const output = execFileSync("du", ["-sb", dataPath], {
-      timeout: 10_000,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
+    const { stdout: output } = await new Promise<{ stdout: string }>((resolve, reject) => {
+      execFile("du", ["-sb", dataPath], {
+        timeout: 10_000,
+        encoding: "utf-8",
+      }, (err, stdout) => {
+        if (err) reject(err);
+        else resolve({ stdout });
+      });
     });
     const bytes = parseInt(output.trim().split(/\s+/)[0], 10) || 0;
     res.json({ bytes, path: dataPath });

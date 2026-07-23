@@ -194,7 +194,8 @@ export default function ConsoleTab({
   useEffect(() => {
     let cancelled = false;
 
-    const socket = io(API_BASE, { transports: ["polling"] });
+    const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
+    const socket = io(API_BASE, { transports: ["polling"], auth: { token } });
     socketRef.current = socket;
 
     socket.on("connect", () => {
