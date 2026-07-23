@@ -90,6 +90,8 @@ export default function ConsoleTab({
   const socketRef = useRef<Socket | null>(null);
   const serverStatusRef = useRef(serverStatus);
   serverStatusRef.current = serverStatus;
+  /** Set by console:detached handler; cleared when we successfully re-attach. */
+  const reattachPendingRef = useRef(false);
 
   const [lines, setLines] = useState<ConsoleLine[]>([{
     type: "system", text: "Connecting to server console…", time: Date.now(),
@@ -220,14 +222,8 @@ export default function ConsoleTab({
 
     socket.on("console:detached", (payload: { serverId: string }) => {
       if (cancelled || payload.serverId !== serverId) return;
-      addLine("system", "Console connection lost — reconnecting…");
-      // If the server is still running, re-attach immediately.
-      // (This handles the case where a fast restart completes between polls
-      // and the status never transitions away from "running".)
-      if (serverStatusRef.current === "running") {
-        socket.emit("console:attach", { serverId });
-        socket.emit("stats:subscribe", { serverId });
-      }
+      addLine("system", "Console connection lost — will reconnect when server is ready.");
+      reattachPendingRef.current = true;
     });
 
     socket.on("connect_error", (err: Error) => {
@@ -300,11 +296,15 @@ export default function ConsoleTab({
     const socket = socketRef.current;
     if (!socket?.connected) return;
 
-    if (serverStatus === "running" && prev !== "running") {
-      addLine("system", "Server started.");
-      socket.emit("console:attach", { serverId });
-      socket.emit("stats:subscribe", { serverId });
-    } else if (serverStatus !== "running" && prev === "running") {
+    if (serverStatus === "running") {
+      const shouldAttach = prev !== "running" || reattachPendingRef.current;
+      reattachPendingRef.current = false;
+      if (shouldAttach) {
+        addLine("system", "Server started.");
+        socket.emit("console:attach", { serverId });
+        socket.emit("stats:subscribe", { serverId });
+      }
+    } else if (prev === "running") {
       addLine("system", "Server stopped.");
       socket.emit("console:detach", { serverId });
       socket.emit("stats:unsubscribe", { serverId });
