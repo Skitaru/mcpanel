@@ -324,7 +324,7 @@ export default function ConsoleTab({
       socket.emit("stats:unsubscribe", { serverId });
       setStats(null);
     }
-  }, [serverStatus, serverId, addLine]);
+  }, [serverStatus, serverId, addLine, restartTick]);
 
   // ---- send command ----
   const sendCommand = useCallback(() => {
