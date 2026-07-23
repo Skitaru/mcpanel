@@ -143,7 +143,7 @@ export default function DashboardPage() {
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600 pointer-events-none" />
                     <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter servers…"
-                      className="w-48 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                      className="w-36 sm:w-48 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
                   </div>
                   <button onClick={fetchServers} className="rounded-lg border border-[#1a1f2e] p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
                     <RefreshCw className="h-4 w-4" />

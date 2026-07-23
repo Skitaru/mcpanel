@@ -174,8 +174,7 @@ export default function FileManagerTab({ serverId }: Props) {
       }))];
 
   return (
-    <div className="relative flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119]"
-      style={{ height: "calc(100vh - 12rem)" }}
+    <div className="relative flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]"
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
       onDragEnter={() => { dragCounter.current++; setDragOver(true); }}
       onDragLeave={() => { dragCounter.current--; if (dragCounter.current === 0) setDragOver(false); }}
