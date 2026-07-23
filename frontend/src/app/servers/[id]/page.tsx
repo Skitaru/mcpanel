@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText, Settings2,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, HardDrive, MemoryStick, FileText,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, HardDrive, MemoryStick, FileText, Menu, ArrowLeft,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
@@ -170,6 +170,12 @@ export default function ServerDetailPage() {
               {/* ── Header ── */}
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                  <button onClick={() => router.push("/")} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-white/[0.04] transition" title="Back to dashboard">
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-white/[0.04] transition" title="Open menu">
+                    <Menu className="h-5 w-5" />
+                  </button>
                   <h1 className="text-lg font-bold tracking-tight text-white truncate">{server.name}</h1>
                   <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{statusLabel(server.status)}</span>

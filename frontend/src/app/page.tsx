@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive, Search } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Play, Square, Cpu, MemoryStick, Users, HardDrive, Search, Menu } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
@@ -135,9 +135,14 @@ export default function DashboardPage() {
             <>
               {/* Header */}
               <header className="mb-8 flex items-center justify-between">
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-white">Servers</h1>
-                  <p className="mt-0.5 text-sm text-slate-600">{servers.length} server{servers.length !== 1 ? "s" : ""}{searchQuery ? ` · ${filteredServers.length} match${filteredServers.length !== 1 ? "es" : ""}` : ""}</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-white/[0.04] transition" title="Open menu">
+                    <Menu className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h1 className="text-xl font-bold tracking-tight text-white">Servers</h1>
+                    <p className="mt-0.5 text-sm text-slate-600">{servers.length} server{servers.length !== 1 ? "s" : ""}{searchQuery ? ` · ${filteredServers.length} match${filteredServers.length !== 1 ? "es" : ""}` : ""}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative">
