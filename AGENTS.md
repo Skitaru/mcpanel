@@ -284,4 +284,25 @@
 
 ---
 
-> **Last updated:** 2026-07-23 · Session: Responsive review + fixes
+### 2026-07-23 — Audit Fixes + Console Restart Reconnect
+
+**Critical audit fixes (commit `e6ef6b4`):**
+- `execFileSync` → `execFile` (async) in backup, disk-usage, scheduler — no more event-loop blocking.
+- WebSocket auth: JWT/API-key required for Socket.IO connections + `Authorization` header fallback.
+- `rmdirSync` → `rmSync`.
+- AuthGuard spinner: old `#030303`/sky → `#0a0c10`/violet.
+
+**Console restart reconnect (commits `ab036fa`–`0c9e1e2`):**
+- **Problem:** Fast restarts (<3s) completed between status polls → `running→running`, no transition.
+- **Fix:** `restartTick` prop from parent → explicit detach + `reattachPendingRef` → effect re-triggered via deps → re-attach on running. Also: `end` event listener on Docker PassThroughs, `cleaned` guard, `Authorization` header WS auth fallback.
+
+**File Manager (commits `23a5a85`, `ccb5e5f`):**
+- Binary files (.jar, .png, .dat, .mca, etc.) blocked from text editor — grayed out.
+- File size `mr-5` to prevent delete button overlap.
+
+**Mobile nav buttons (commit `684dd19`):**
+- ☰ hamburger on dashboard + server detail, ← back arrow on server detail.
+
+---
+
+> **Last updated:** 2026-07-23 · Session: Audit, console reconnect, file manager, mobile nav
