@@ -271,4 +271,17 @@
 
 ---
 
-> **Last updated:** 2026-07-22 · Session: Modpack installer, review fixes, UX polish
+### 2026-07-23 — Responsive Review & Fixes
+
+**Review:** Vollständiges Mobile-Responsive-Audit aller Frontend-Komponenten. 7 Fixes (commit `67e7765`):
+- **Server-Detail-Header Overflow:** `flex` → `flex flex-wrap` + `gap-x-3 gap-y-1` — verhindert horizontalen Overflow bei vielen Status-Badges auf schmalen Screens.
+- **Tab-Navigation Overflow:** `overflow-x-auto` — 4 Tabs (Console/Files/Logs/Settings) scrollen jetzt horizontal auf <400px Screens.
+- **Dashboard Search:** `w-48` → `w-36 sm:w-48` — schmaleres Suchfeld auf kleinen Handys.
+- **LogsTab Toolbar:** `min-w-[160px]` → `min-w-[120px]` — verhindert Overflow auf <380px.
+- **ConsoleTab/FileManagerTab Höhe:** `h-[calc(100vh-12rem)]` → `h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]` — mehr Platz für Console/Editor auf Mobile.
+- **CardSkeleton Tokens:** Alte `slate-800/slate-900/rounded-2xl` → `[#1a1f2e]/[#0f1119]/rounded-xl`.
+- **ChangePasswordDialog Tokens:** `sky` → `violet` Accent, `border-white/[0.06]` → `border-[#1a1f2e]`.
+
+---
+
+> **Last updated:** 2026-07-23 · Session: Responsive review + fixes
