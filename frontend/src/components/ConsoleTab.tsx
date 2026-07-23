@@ -88,6 +88,8 @@ export default function ConsoleTab({
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const socketRef = useRef<Socket | null>(null);
+  const serverStatusRef = useRef(serverStatus);
+  serverStatusRef.current = serverStatus;
 
   const [lines, setLines] = useState<ConsoleLine[]>([{
     type: "system", text: "Connecting to server console…", time: Date.now(),
@@ -214,6 +216,18 @@ export default function ConsoleTab({
       if (cancelled) return;
       setConnected(false);
       addLine("system", "Disconnected from server.");
+    });
+
+    socket.on("console:detached", (payload: { serverId: string }) => {
+      if (cancelled || payload.serverId !== serverId) return;
+      addLine("system", "Console connection lost — reconnecting…");
+      // If the server is still running, re-attach immediately.
+      // (This handles the case where a fast restart completes between polls
+      // and the status never transitions away from "running".)
+      if (serverStatusRef.current === "running") {
+        socket.emit("console:attach", { serverId });
+        socket.emit("stats:subscribe", { serverId });
+      }
     });
 
     socket.on("connect_error", (err: Error) => {

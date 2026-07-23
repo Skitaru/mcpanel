@@ -260,13 +260,19 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
           });
         });
 
-        // If the attach stream closes (container dies etc.), clean up
+        // If the attach stream closes (container stops etc.), clean up
         const cleanup = () => {
-          streams.demuxed.stdout.removeAllListeners("data");
-          streams.demuxed.stderr.removeAllListeners("data");
+          // removeAllListeners() (no args) clears all events including 'close',
+          // so cleanup won't fire twice when close() triggers close events below.
+          streams.demuxed.stdout.removeAllListeners();
+          streams.demuxed.stderr.removeAllListeners();
           flushBuffer(serverId);
+          const hadSub = session.consoleSubs.has(serverId);
           session.consoleSubs.delete(serverId);
           streams.close();
+          if (hadSub) {
+            socket.emit("console:detached", { serverId });
+          }
         };
 
         streams.demuxed.stdout.on("close", cleanup);
@@ -286,13 +292,13 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       const { serverId } = payload;
       const streams = session.consoleSubs.get(serverId);
       if (streams) {
-        // Remove listeners first so any buffered data flushed during close()
-        // is not sent to the frontend as corrupted output
-        streams.demuxed.stdout.removeAllListeners("data");
-        streams.demuxed.stderr.removeAllListeners("data");
+        // Remove all listeners (including 'close') so cleanup won't fire
+        // again when streams are destroyed below.
+        streams.demuxed.stdout.removeAllListeners();
+        streams.demuxed.stderr.removeAllListeners();
         flushBuffer(serverId);
-        streams.close();
         session.consoleSubs.delete(serverId);
+        streams.close();
         socket.emit("console:detached", { serverId });
         console.log(`[ws] Console detached: ${socket.id} → ${serverId}`);
       }
