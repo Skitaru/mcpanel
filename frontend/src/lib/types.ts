@@ -12,4 +12,5 @@ export interface ServerStatus {
   status: "running" | "exited" | "created" | "paused" | "unknown";
   containerId: string | null;
   javaArgs?: string | null;
+  maxPlayers?: number;
 }
