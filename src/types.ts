@@ -28,6 +28,8 @@ export interface ServerConfig {
   javaArgs?: string;
   /** Scheduled tasks: { restart?: "HH:MM", backup?: "HH:MM" } */
   schedule?: { restart?: string; backup?: string };
+  /** Max players (default 20) */
+  maxPlayers?: number;
 }
 
 /** Request body for POST /api/servers */
@@ -45,6 +47,8 @@ export interface CreateServerRequest {
   backendServers?: string;
   /** Custom JVM arguments (replaces Aikar GC flags). Defaults to optimized flags. */
   javaArgs?: string;
+  /** Max players (default 20) */
+  maxPlayers?: number;
 }
 
 /** Returned by GET /api/servers */
@@ -57,4 +61,6 @@ export interface ServerStatus {
   version: string;
   status: "running" | "exited" | "created" | "paused" | "unknown";
   containerId: string | null;
+  javaArgs?: string | null;
+  maxPlayers?: number;
 }

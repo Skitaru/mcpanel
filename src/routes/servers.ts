@@ -395,6 +395,9 @@ router.post("/", async (req: Request, res: Response) => {
     // ---- generate RCON credentials and server.properties (not for velocity) ----
     const rconPort = port + 10;
     const rconPassword = uuid().replace(/-/g, "").slice(0, 16);
+    const maxPlayers = typeof body.maxPlayers === "number" && body.maxPlayers >= 1 && body.maxPlayers <= 1000
+      ? body.maxPlayers
+      : 20;
 
     if (serverType !== "velocity") {
       const typeLabel = serverType === "fabric" ? "Fabric" : "PaperMC";
@@ -404,7 +407,7 @@ router.post("/", async (req: Request, res: Response) => {
         `rcon.port=${rconPort}`,
         `rcon.password=${rconPassword}`,
         `motd=${body.name.trim()} | ${typeLabel}`,
-        `max-players=20`,
+        `max-players=${maxPlayers}`,
         `difficulty=normal`,
         `gamemode=survival`,
         `online-mode=true`,
@@ -425,6 +428,7 @@ router.post("/", async (req: Request, res: Response) => {
       containerId: null,
       dataPath,
       javaArgs: body.javaArgs?.trim() || undefined,
+      maxPlayers,
     };
     addServer(config);
 
@@ -455,6 +459,7 @@ router.post("/", async (req: Request, res: Response) => {
       containerId: config.containerId,
       dataPath: config.dataPath,
       javaArgs: config.javaArgs ?? null,
+      maxPlayers: config.maxPlayers ?? 20,
     });
   } catch (err: any) {
     console.error("[api] POST /api/servers error:", err);
@@ -583,6 +588,7 @@ router.get("/", async (_req: Request, res: Response) => {
         status: (st?.status as ServerStatus["status"]) ?? "unknown",
         containerId: s.containerId,
         javaArgs: s.javaArgs ?? null,
+        maxPlayers: s.maxPlayers ?? 20,
       };
     });
 

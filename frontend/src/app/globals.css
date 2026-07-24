@@ -80,3 +80,47 @@ select option {
   transition: opacity 0.15s ease;
 }
 .group:hover .card-actions { opacity: 1; }
+
+/* ── Stagger animation delays ────────────────────────────── */
+.stagger-1  { animation-delay: 0ms; }
+.stagger-2  { animation-delay: 75ms; }
+.stagger-3  { animation-delay: 150ms; }
+.stagger-4  { animation-delay: 225ms; }
+.stagger-5  { animation-delay: 300ms; }
+.stagger-6  { animation-delay: 375ms; }
+.stagger-7  { animation-delay: 450ms; }
+.stagger-8  { animation-delay: 525ms; }
+.stagger-9  { animation-delay: 600ms; }
+.stagger-10 { animation-delay: 675ms; }
+.stagger-11 { animation-delay: 750ms; }
+.stagger-12 { animation-delay: 825ms; }
+
+/* ── Card accent line ─────────────────────────────────────── */
+.card-accent {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.group:hover .card-accent { opacity: 1; }
+
+/* ── Scale on hover ───────────────────────────────────────── */
+.hover-scale {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* ── Action button group ──────────────────────────────────── */
+.btn-group {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.btn-group > *:not(:last-child) {
+  border-right: 1px solid rgba(255,255,255,0.06);
+}

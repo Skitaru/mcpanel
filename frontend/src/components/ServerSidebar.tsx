@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, Plus, KeyRound, Download } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LogOut, Plus, KeyRound, Download, LayoutDashboard, Server } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import type { ServerStatus } from "@/lib/types";
 
@@ -27,6 +28,9 @@ export default function ServerSidebar({
   servers, activeId, collapsed, onToggle, onCreateClick, onInstallModpack,
 }: Props) {
   const [pwDialogOpen, setPwDialogOpen] = useState(false);
+  const pathname = usePathname();
+  const runningCount = servers.filter(s => s.status === "running").length;
+  const isDashboard = pathname === "/";
 
   return (
     <>
@@ -46,31 +50,72 @@ export default function ServerSidebar({
           {!collapsed && <span className="text-sm font-bold tracking-tight text-white">MCPanel</span>}
         </Link>
 
-        {/* Server list */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2">
-          {servers.length === 0 && !collapsed && (
-            <p className="px-3 py-8 text-center text-xs text-slate-700">No servers</p>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2">
+          {/* Navigation section */}
+          {!collapsed && (
+            <div className="mb-1 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-700">
+              Navigation
+            </div>
           )}
-          {servers.map((s) => {
-            const isActive = s.id === activeId;
-            return (
-              <Link
-                key={s.id}
-                href={`/servers/${s.id}`}
-                onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
-                className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition
-                  ${collapsed ? "justify-center" : ""}
-                  ${isActive
-                    ? "bg-violet-500/10 text-violet-300"
-                    : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
-                  }`}
-                title={collapsed ? s.name : undefined}
-              >
-                <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusColor(s.status)} ${s.status === "running" ? "pulse-dot" : ""}`} />
-                {!collapsed && <span className="truncate">{s.name}</span>}
-              </Link>
-            );
-          })}
+          <div className="space-y-0.5 mb-3">
+            <Link
+              href="/"
+              onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
+              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition
+                ${collapsed ? "justify-center" : ""}
+                ${isDashboard
+                  ? "bg-violet-500/10 text-violet-300"
+                  : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
+                }`}
+              title={collapsed ? "Dashboard" : undefined}
+            >
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Dashboard</span>}
+            </Link>
+          </div>
+
+          {/* Servers Quick Access */}
+          {servers.length > 0 && (
+            <>
+              {!collapsed && (
+                <div className="mb-1 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-700">
+                  Quick Access
+                  {runningCount > 0 && (
+                    <span className="ml-1.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-400">
+                      {runningCount}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {servers.map((s) => {
+                  const isActive = s.id === activeId;
+                  return (
+                    <Link
+                      key={s.id}
+                      href={`/servers/${s.id}`}
+                      onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
+                      className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition
+                        ${collapsed ? "justify-center" : ""}
+                        ${isActive
+                          ? "bg-violet-500/10 text-violet-300"
+                          : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
+                        }`}
+                      title={collapsed ? s.name : undefined}
+                    >
+                      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusColor(s.status)} ${s.status === "running" ? "pulse-dot" : ""}`} />
+                      {!collapsed && <span className="truncate text-xs">{s.name}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {servers.length === 0 && !collapsed && (
+            <p className="px-3 py-8 text-center text-xs text-slate-700">No servers yet</p>
+          )}
         </nav>
 
         {/* Footer */}
@@ -78,7 +123,7 @@ export default function ServerSidebar({
           <button
             onClick={onCreateClick}
             className={`flex items-center gap-2 rounded-md bg-violet-600 px-2.5 py-2 text-xs font-medium
-              text-white transition hover:bg-violet-500 w-full ${collapsed ? "justify-center" : ""}`}
+              text-white transition hover:bg-violet-500 hover:scale-[1.02] w-full ${collapsed ? "justify-center" : ""}`}
           >
             <Plus className="h-4 w-4 shrink-0" />
             {!collapsed && "New Server"}
@@ -110,6 +155,13 @@ export default function ServerSidebar({
             <LogOut className="h-4 w-4 shrink-0" />
             {!collapsed && "Logout"}
           </button>
+
+          {/* Version */}
+          {!collapsed && (
+            <p className="pt-1 text-center text-[10px] text-slate-800">
+              MCPanel v1.0.0
+            </p>
+          )}
         </div>
       </aside>
 
