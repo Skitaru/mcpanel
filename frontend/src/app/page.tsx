@@ -50,6 +50,8 @@ export default function DashboardPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const socketRef = useRef<Socket | null>(null);
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
 
   const filteredServers = servers.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -78,10 +80,13 @@ export default function DashboardPage() {
     const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
     const socket = io(API_BASE, { transports: ["polling"], auth: { token } });
     socketRef.current = socket;
-    socket.on("connect", () => { servers.forEach(s => { if (s.status === "running") socket.emit("stats:subscribe", { serverId: s.id }); }); });
+    socket.on("connect", () => { serversRef.current.forEach(s => { if (s.status === "running") socket.emit("stats:subscribe", { serverId: s.id }); }); });
     socket.on("stats:data", (p: { serverId: string; cpuPercent: number; memoryUsage: number; memoryLimit: number }) => {
       if (p.cpuPercent == null) return;
       setLiveStats(prev => ({ ...prev, [p.serverId]: { cpu: p.cpuPercent, mem: p.memoryUsage, memLimit: p.memoryLimit } }));
+    });
+    socket.on("stats:error", (p: { serverId: string; message: string }) => {
+      console.warn(`[dashboard] Stats error for ${p.serverId}: ${p.message}`);
     });
     return () => { socket.disconnect(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

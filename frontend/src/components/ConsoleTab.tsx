@@ -259,6 +259,12 @@ export default function ConsoleTab({
       });
     });
 
+    socket.on("stats:error", (payload: { serverId: string; message: string }) => {
+      if (payload.serverId !== serverId) return;
+      // Stats stream error — will retry on next status transition
+      addLine("system", `Stats stream error: ${payload.message}`);
+    });
+
     // ---- load log history ----
     (async () => {
       try {
