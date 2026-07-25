@@ -131,7 +131,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                    border border-[#1a1f2e] bg-[#0f1119] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Settings className="h-5 w-5 text-violet-400" />
             <h2 className="text-base font-bold text-white">
@@ -153,7 +153,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         <form onSubmit={handleSubmit} className="px-6 py-5">
           {/* Server name */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
               Server Name
             </span>
             <input
@@ -164,7 +164,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               disabled={submitting}
               className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-sm text-white
-                         placeholder:text-neutral-600
+                         placeholder:text-slate-600
                          focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
             />
@@ -172,7 +172,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
 
           {/* RAM */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
               RAM
             </span>
             <div className="relative">
@@ -189,13 +189,13 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                   <option key={opt} value={opt} className="bg-[#0a0a0a] text-white">{opt}</option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
             </div>
           </label>
 
           {/* Port */}
           <label className="mb-4 block">
-            <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
               Port
             </span>
             <input
@@ -215,7 +215,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
 
           {/* Java Args */}
           <details className="mb-4">
-            <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-400 transition">
+            <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-400 transition">
               Advanced: JVM Arguments
             </summary>
             <textarea
@@ -226,17 +226,17 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               disabled={submitting}
               className="mt-2 w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-xs text-white font-mono
-                         placeholder:text-neutral-600
+                         placeholder:text-slate-600
                          focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50 resize-none"
             />
-            <p className="mt-1 text-[10px] text-neutral-600">
+            <p className="mt-1 text-[10px] text-slate-600">
               -Xms512M and -Xmx are auto-set from RAM. Requires container recreation to apply.
             </p>
           </details>
 
           {/* Note */}
-          <p className="mb-4 text-xs text-neutral-600">
+          <p className="mb-4 text-xs text-slate-600">
             RAM and port changes only take effect after restarting the server.
           </p>
 

@@ -187,7 +187,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="w-full max-w-2xl surface p-0 relative max-h-[90vh] flex flex-col animate-slide-up overflow-hidden rounded-xl">
         {/* Close */}
         <button onClick={onClose} disabled={installing}
@@ -196,7 +196,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[#1a1f2e]">
+        <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#1a1f2e]">
           <div className="rounded-lg bg-violet-500/10 p-2">
             <Download className="h-5 w-5 text-violet-400" />
           </div>

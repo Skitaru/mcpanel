@@ -91,7 +91,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                    border border-[#1a1f2e] bg-[#0f1119] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <KeyRound className="h-5 w-5 text-violet-400" />
             <h2 className="text-base font-bold text-white">
@@ -118,12 +118,12 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
               </svg>
             </div>
             <p className="text-sm text-white font-medium">Password changed</p>
-            <p className="text-xs text-neutral-500">All sessions invalidated. Logging out…</p>
+            <p className="text-xs text-slate-500">All sessions invalidated. Logging out…</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="px-6 py-5">
             <label className="mb-4 block">
-              <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              <span className="mb-1.5 block text-sm font-medium text-slate-300">
                 Current Password
               </span>
               <input
@@ -134,13 +134,13 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 disabled={submitting}
                 className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                            px-3.5 py-2.5 text-sm text-white
-                           placeholder:text-neutral-600
+                           placeholder:text-slate-600
                            focus:border-violet-500/40 focus:outline-none
                            disabled:opacity-50"
               />
             </label>
             <label className="mb-4 block">
-              <span className="mb-1.5 block text-sm font-medium text-neutral-300">
+              <span className="mb-1.5 block text-sm font-medium text-slate-300">
                 New Password
               </span>
               <input
@@ -151,7 +151,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 placeholder="Min. 4 characters"
                 className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                            px-3.5 py-2.5 text-sm text-white
-                           placeholder:text-neutral-600
+                           placeholder:text-slate-600
                            focus:border-violet-500/40 focus:outline-none
                            disabled:opacity-50"
               />

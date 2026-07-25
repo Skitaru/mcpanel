@@ -3,7 +3,7 @@
 /** Pulse-animated skeleton placeholder. */
 export function Skeleton({ className = "" }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-lg bg-slate-800 ${className}`} />
+    <div className={`animate-pulse rounded-lg bg-[#1a1f2e] ${className}`} />
   );
 }
 
