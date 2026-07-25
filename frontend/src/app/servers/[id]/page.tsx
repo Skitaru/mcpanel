@@ -259,9 +259,9 @@ export default function ServerDetailPage() {
 
       {/* ── Docker Logs Dialog ── */}
       {dockerLogs.text != null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
           <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#1a1f2e] px-5 py-3">
+            <div className="flex items-center justify-between border-b border-[#1a1f2e] px-6 py-4">
               <h3 className="text-sm font-semibold text-white">Docker Logs — {server?.name}</h3>
               <button onClick={() => setDockerLogs({ loading: false, text: null })} className="rounded-md p-1 text-slate-500 transition hover:text-slate-300">✕</button>
             </div>
