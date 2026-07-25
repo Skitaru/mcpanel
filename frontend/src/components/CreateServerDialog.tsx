@@ -45,6 +45,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [javaArgs, setJavaArgs] = useState("");
   const [port, setPort] = useState(25565);
   const [maxPlayers, setMaxPlayers] = useState(20);
+  const [hardcore, setHardcore] = useState(false);
+  const [difficulty, setDifficulty] = useState("normal");
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -118,6 +120,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setRam("4G");
       setJavaArgs("");
       setMaxPlayers(20);
+      setHardcore(false);
+      setDifficulty("normal");
       setError(null);
       // Auto-suggest next free port
       fetch(`${API_BASE}/api/servers`)
@@ -154,6 +158,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             paperVersion,
             javaArgs: javaArgs.trim() || undefined,
             maxPlayers,
+            ...(serverType !== "velocity" ? { hardcore, difficulty } : {}),
           }),
         });
 
@@ -172,7 +177,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, onCreated, onClose],
+    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, hardcore, difficulty, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -390,6 +395,51 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     />
                   </label>
                 </div>
+
+                {/* Difficulty + Hardcore (non-Velocity only) */}
+                {serverType !== "velocity" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-300">Difficulty</span>
+                      <div className="relative">
+                        <select
+                          value={difficulty}
+                          onChange={(e) => setDifficulty(e.target.value)}
+                          disabled={submitting}
+                          className="w-full appearance-none rounded-lg border
+                                     border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
+                                     text-sm text-white focus:border-violet-500/40
+                                     focus:outline-none disabled:opacity-50"
+                        >
+                          <option value="peaceful" className="bg-[#0a0a0a] text-white">Peaceful</option>
+                          <option value="easy" className="bg-[#0a0a0a] text-white">Easy</option>
+                          <option value="normal" className="bg-[#0a0a0a] text-white">Normal</option>
+                          <option value="hard" className="bg-[#0a0a0a] text-white">Hard</option>
+                        </select>
+                        <ChevronDown
+                          className="pointer-events-none absolute right-3 top-1/2
+                                     h-4 w-4 -translate-y-1/2 text-slate-600"
+                        />
+                      </div>
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-300">Hardcore</span>
+                      <button
+                        type="button"
+                        onClick={() => setHardcore(!hardcore)}
+                        disabled={submitting}
+                        className={`relative mt-0.5 inline-flex h-9 w-full cursor-pointer items-center rounded-lg border px-3 transition
+                                   disabled:opacity-50 disabled:cursor-not-allowed
+                                   ${hardcore
+                                     ? "border-red-500/30 bg-red-500/10 text-red-400"
+                                     : "border-[#1a1f2e] bg-[#0a0c10] text-slate-600 hover:border-white/[0.08]"}`}
+                      >
+                        <span className={`mr-2 h-2 w-2 rounded-full ${hardcore ? "bg-red-500 animate-pulse" : "bg-slate-700"}`} />
+                        <span className="text-sm font-medium">{hardcore ? "Enabled" : "Off"}</span>
+                      </button>
+                    </label>
+                  </div>
+                )}
 
                 {/* RAM */}
                 <label className="block">

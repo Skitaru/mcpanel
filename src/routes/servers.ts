@@ -401,6 +401,9 @@ router.post("/", async (req: Request, res: Response) => {
 
     if (serverType !== "velocity") {
       const typeLabel = serverType === "fabric" ? "Fabric" : "PaperMC";
+      const difficulty = (typeof body.difficulty === "string" && ["peaceful","easy","normal","hard"].includes(body.difficulty))
+        ? body.difficulty : "normal";
+      const hardcore = body.hardcore === true;
       const serverProps = [
         `server-port=${port}`,
         `enable-rcon=true`,
@@ -408,8 +411,9 @@ router.post("/", async (req: Request, res: Response) => {
         `rcon.password=${rconPassword}`,
         `motd=${body.name.trim()} | ${typeLabel}`,
         `max-players=${maxPlayers}`,
-        `difficulty=normal`,
-        `gamemode=survival`,
+        `difficulty=${difficulty}`,
+        `hardcore=${hardcore}`,
+        `gamemode=${hardcore ? "hardcore" : "survival"}`,
         `online-mode=true`,
       ].join("\n");
       fs.writeFileSync(path.join(dataPath, "server.properties"), serverProps + "\n");
