@@ -49,6 +49,10 @@ export interface CreateServerRequest {
   javaArgs?: string;
   /** Max players (default 20) */
   maxPlayers?: number;
+  /** Hardcore mode — defaults to false */
+  hardcore?: boolean;
+  /** Difficulty: peaceful, easy, normal, hard — defaults to "normal" */
+  difficulty?: string;
 }
 
 /** Returned by GET /api/servers */
