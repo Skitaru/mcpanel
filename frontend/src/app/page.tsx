@@ -317,7 +317,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           {/* Action button group */}
-                          <div className="btn-group shrink-0" onClick={e => e.preventDefault()}>
+                          <div className="btn-group shrink-0 relative z-10" onClick={e => e.preventDefault()}>
                             {s.status === "running" ? (
                               <>
                                 {stopConfirmId === s.id ? (
