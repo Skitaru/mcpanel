@@ -176,7 +176,11 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         session.statsSubs.set(serverId, stream);
 
         stream.on("data", (chunk: Buffer) => {
-          const stats = parseStats(chunk);
+          let stats: ParsedStats | null = null;
+          try { stats = parseStats(chunk); } catch (err: any) {
+            console.error(`[ws] Stats parse error (${serverId}):`, err.message);
+            return;
+          }
           if (!stats) return; // skip the first zeroed tick
           socket.emit("stats:data", {
             serverId,
