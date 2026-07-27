@@ -184,10 +184,13 @@ function getJavaDockerImage(mcVersion: string): string {
 function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): void {
   const javaImage = getJavaDockerImage(mcVersion);
   const jarName = path.basename(jarPath);
-  // Run as non-root (UID 1000) so files in the bind mount are owned by mc,
-  // avoiding a costly chown on every container restart.
+  // Run as root — this is a one-shot installer container that needs to write
+  // files (installer logs, libraries, etc.) to the bind-mounted data directory.
+  // The data dir files are owned by root on the host (created by the Node.js
+  // backend), so -u 1000:1000 would get Permission denied.
+  // Ownership is fixed by the main server container's chown on every startup.
   execSync(
-    `docker run --rm -u 1000:1000 -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
+    `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
     { stdio: "pipe", timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
   );
 }
