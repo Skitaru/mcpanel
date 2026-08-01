@@ -118,18 +118,45 @@ async function getModFileInfo(apiKey: string, projectId: number, fileId: number)
 
 /** Check if a JAR is client-only by inspecting its mod metadata. */
 function isClientOnlyMod(jarPath: string): boolean {
+  // ---- Check mods.toml / neoforge.mods.toml for side = "CLIENT" ----
   try {
-    const tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/mods.toml"], {
+    let tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/mods.toml"], {
       encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
+    if (!tomlData) {
+      tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/neoforge.mods.toml"], {
+        encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    }
     if (tomlData) {
-      // Find all side declarations; if all are CLIENT, the JAR is client-only
+      // Find all side declarations in [[mods]] sections
       const sides = [...tomlData.matchAll(/^side\s*=\s*"(\w+)"/gm)].map(m => m[1]);
       if (sides.length > 0 && sides.every(s => s === "CLIENT")) return true;
+
+      // ---- Heuristic: no side declared (defaults to BOTH) but JAR only references client classes ----
+      // Some mods forget to declare side = "CLIENT" yet only reference net/minecraft/client/…
+      // and never net/minecraft/server/ or net/minecraft/world/. These crash the dedicated server
+      // because NeoForge's RuntimeDistCleaner refuses to load client classes on DEDICATED_SERVER.
+      if (sides.length === 0) {
+        try {
+          const raw = execFileSync("unzip", ["-p", jarPath], {
+            maxBuffer: 16 * 1024 * 1024, timeout: 8000,
+            stdio: ["ignore", "pipe", "ignore"],
+          });
+          const text = raw.toString("latin1"); // fast, no UTF-8 decode issues for byte scan
+          const hasClient = text.includes("net/minecraft/client/");
+          const hasServer = text.includes("net/minecraft/server/") || text.includes("net/minecraft/world/");
+          if (hasClient && !hasServer) return true;
+        } catch { /* can't scan — keep the mod */ }
+      }
+
       if (sides.length > 0) return false; // At least one BOTH/SERVER entry
     }
   } catch { /* not a Forge mod or no mods.toml */ }
+
+  // ---- Check fabric.mod.json for environment = "client" ----
   try {
     const jsonData = execFileSync("unzip", ["-p", jarPath, "fabric.mod.json"], {
       encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
