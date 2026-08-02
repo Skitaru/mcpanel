@@ -325,6 +325,19 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
+    // ---- voice port validation (optional UDP port for SimpleVoiceChat) ----
+    const voicePort = body.voicePort ?? undefined;
+    if (voicePort !== undefined) {
+      if (typeof voicePort !== "number" || voicePort < 1024 || voicePort > 65535) {
+        res.status(400).json({ error: "Field 'voicePort' must be between 1024 and 65535." });
+        return;
+      }
+      if (existing.some((s) => s.voicePort === voicePort)) {
+        res.status(409).json({ error: "Voice port " + voicePort + " is already in use by another server." });
+        return;
+      }
+    }
+
     const serverType: ServerType = body.serverType ?? "paper";
     if (!["paper", "fabric", "velocity", "custom"].includes(serverType)) {
       res.status(400).json({ error: "Invalid serverType. Must be paper, fabric, velocity, or custom." });
@@ -433,6 +446,7 @@ router.post("/", async (req: Request, res: Response) => {
       dataPath,
       javaArgs: body.javaArgs?.trim() || undefined,
       maxPlayers,
+      voicePort,
     };
     addServer(config);
 
@@ -464,6 +478,7 @@ router.post("/", async (req: Request, res: Response) => {
       dataPath: config.dataPath,
       javaArgs: config.javaArgs ?? null,
       maxPlayers: config.maxPlayers ?? 20,
+      voicePort: config.voicePort ?? null,
     });
   } catch (err: any) {
     console.error("[api] POST /api/servers error:", err);
@@ -593,6 +608,7 @@ router.get("/", async (_req: Request, res: Response) => {
         containerId: s.containerId,
         javaArgs: s.javaArgs ?? null,
         maxPlayers: s.maxPlayers ?? 20,
+        voicePort: s.voicePort ?? null,
       };
     });
 
@@ -880,7 +896,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, ram: ramStr, port, version, javaArgs } = req.body ?? {};
+    const { name, ram: ramStr, port, version, javaArgs, voicePort } = req.body ?? {};
 
     // Validate name if provided
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
@@ -925,12 +941,26 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
+    // Validate voicePort if provided (optional UDP port, can be null to clear)
+    if (voicePort !== undefined && voicePort !== null) {
+      if (typeof voicePort !== "number" || voicePort < 1024 || voicePort > 65535) {
+        res.status(400).json({ error: "Field 'voicePort' must be between 1024 and 65535." });
+        return;
+      }
+      const existing = loadServers();
+      if (existing.some((s) => s.id !== server.id && s.voicePort === voicePort)) {
+        res.status(409).json({ error: "Voice port " + voicePort + " is already in use by another server." });
+        return;
+      }
+    }
+
     const updated = updateServer(server.id, {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(ram !== undefined ? { ram } : {}),
       ...(port !== undefined ? { port } : {}),
       ...(version !== undefined ? { version: version.trim() } : {}),
       ...(javaArgs !== undefined ? { javaArgs: javaArgs?.trim() || (undefined as any) } : {}),
+      ...(voicePort !== undefined ? { voicePort: voicePort ?? (undefined as any) } : {}),
     });
 
     console.log(`[api] Updated server "${updated?.name}" config`);
@@ -941,6 +971,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       port: updated?.port,
       version: updated?.version,
       javaArgs: updated?.javaArgs ?? null,
+      voicePort: updated?.voicePort ?? null,
     });
   } catch (err: any) {
     console.error("[api] PUT /api/servers/:id error:", err);

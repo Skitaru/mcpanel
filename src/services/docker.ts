@@ -167,7 +167,11 @@ export async function createContainer(
     AttachStderr: true,
     OpenStdin: true,
     StdinOnce: false,
-    ExposedPorts: { [`${MC_PORT}/tcp`]: {}, [`${cfg.rconPort}/tcp`]: {} },
+    ExposedPorts: {
+      [`${MC_PORT}/tcp`]: {},
+      [`${cfg.rconPort}/tcp`]: {},
+      ...(cfg.voicePort ? { [`${cfg.voicePort}/udp`]: {} } : {}),
+    },
     HostConfig: {
       // Docker memory limit (bytes)
       Memory: cfg.ram * 1024 * 1024,
@@ -176,6 +180,7 @@ export async function createContainer(
         // RCON only needs to be reachable from the panel backend (localhost).
         // Binding to 0.0.0.0 exposes it to the internet and attracts brute-force bots.
         [`${cfg.rconPort}/tcp`]: [{ HostIp: "127.0.0.1", HostPort: String(cfg.rconPort) }],
+        ...(cfg.voicePort ? { [`${cfg.voicePort}/udp`]: [{ HostPort: String(cfg.voicePort) }] } : {}),
       },
       // Auto-restart the container if it crashes or Docker restarts.
       RestartPolicy: { Name: "unless-stopped", MaximumRetryCount: 0 },
