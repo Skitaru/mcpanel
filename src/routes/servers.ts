@@ -35,9 +35,10 @@ const DATA_ROOT = path.resolve(process.cwd(), "data");
 
 /** Convert a human RAM string ("4G", "512M") or raw number into megabytes. */
 function parseRamToMB(ram: string | number): number {
+  const MAX_RAM = 262144; // 256 GB
   if (typeof ram === "number") {
-    if (ram < 512 || ram > 65536) {
-      throw new Error("RAM must be between 512 and 65536 (MB).");
+    if (ram < 512 || ram > MAX_RAM) {
+      throw new Error("RAM must be between 512 and " + MAX_RAM + " (MB).");
     }
     return ram;
   }
@@ -48,8 +49,8 @@ function parseRamToMB(ram: string | number): number {
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();
   const mb = unit === "G" ? Math.round(value * 1024) : Math.round(value);
-  if (mb < 512 || mb > 65536) {
-    throw new Error("RAM must be between 512 and 65536 (MB).");
+  if (mb < 512 || mb > MAX_RAM) {
+    throw new Error("RAM must be between 512 and " + MAX_RAM + " (MB).");
   }
   return mb;
 }
@@ -963,7 +964,20 @@ router.put("/:id", async (req: Request, res: Response) => {
       ...(voicePort !== undefined ? { voicePort: voicePort ?? (undefined as any) } : {}),
     });
 
-    console.log(`[api] Updated server "${updated?.name}" config`);
+    console.log("[api] Updated server " + (updated?.name ?? "?") + " config");
+
+    // If RAM was changed and container exists, update Docker memory limit live
+    if (ram !== undefined && server.containerId) {
+      try {
+        const Docker = (await import("dockerode")).default;
+        const docker = new Docker();
+        const c = docker.getContainer(server.containerId);
+        await c.update({ Memory: ram * 1024 * 1024 });
+      } catch (memErr: any) {
+        // Non-fatal — config is saved, just couldn't update live container
+      }
+    }
+
     res.json({
       id: updated?.id,
       name: updated?.name,

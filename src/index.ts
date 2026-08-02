@@ -181,6 +181,12 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// ---- system info (max RAM, etc.) ----
+import os from "node:os";
+app.get("/api/system/info", (_req, res) => {
+  res.json({ totalMemoryMB: Math.floor(os.totalmem() / (1024 * 1024)) });
+});
+
 // ---- Fabric versions proxy ----
 app.get("/api/fabric/versions", async (_req, res) => {
   try {
