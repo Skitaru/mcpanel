@@ -249,11 +249,9 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               value={voicePort ?? ""}
               onChange={(e) => {
                 const v = e.target.value;
-                setVoicePort(v === "" ? null : Math.max(1024, Math.min(65535, parseInt(v) || 24454)));
+                setVoicePort(v === "" ? null : parseInt(v) || null);
               }}
               placeholder="e.g. 24454 (SimpleVoiceChat)"
-              min={1024}
-              max={65535}
               disabled={submitting}
               className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
                          px-3.5 py-2.5 text-sm text-white
