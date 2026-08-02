@@ -18,8 +18,6 @@ import {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const RAM_OPTIONS = ["512M", "1G", "2G", "4G", "6G", "8G", "12G", "16G"];
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -48,6 +46,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [hardcore, setHardcore] = useState(false);
   const [difficulty, setDifficulty] = useState("normal");
   const [voicePort, setVoicePort] = useState<number | null>(null);
+  const [maxRamMB, setMaxRamMB] = useState(16384); // fallback 16 GB
+
+  // RAM quick-select presets — extended up to 64G
+  const RAM_CHIPS = ["512M", "1G", "2G", "4G", "6G", "8G", "12G", "16G", "24G", "32G", "48G", "64G"];
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -125,6 +127,11 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setDifficulty("normal");
       setVoicePort(null);
       setError(null);
+      // Fetch max system RAM
+      fetch(`${API_BASE}/api/system/info`)
+        .then(r => r.json())
+        .then((info: { totalMemoryMB: number }) => setMaxRamMB(info.totalMemoryMB))
+        .catch(() => {});
       // Auto-suggest next free port
       fetch(`${API_BASE}/api/servers`)
         .then(r => r.json())
@@ -473,27 +480,41 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
                 {/* RAM */}
                 <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-300">RAM</span>
-                  <div className="relative">
-                    <select
-                      value={ram}
-                      onChange={(e) => setRam(e.target.value)}
-                      disabled={submitting}
-                      className="w-full appearance-none rounded-lg border
-                                 border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
-                                 text-sm text-white focus:border-violet-500/40
-                                 focus:outline-none disabled:opacity-50"
-                    >
-                      {RAM_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt} className="bg-[#0a0a0a] text-white">
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      className="pointer-events-none absolute right-3 top-1/2
-                                 h-4 w-4 -translate-y-1/2 text-slate-600"
-                    />
+                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    RAM
+                    <span className="ml-1 text-[10px] text-slate-600 font-normal">
+                      (max {(maxRamMB / 1024).toFixed(0)} GB available)
+                    </span>
+                  </span>
+                  <input
+                    type="text"
+                    value={ram}
+                    onChange={(e) => setRam(e.target.value)}
+                    placeholder="e.g. 4G or 4096M"
+                    disabled={submitting}
+                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                               px-3.5 py-2.5 text-sm text-white font-mono
+                               placeholder:text-slate-600
+                               focus:border-violet-500/40 focus:outline-none
+                               disabled:opacity-50"
+                  />
+                  {/* Preset chips */}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {RAM_CHIPS.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setRam(opt)}
+                        disabled={submitting}
+                        className={"rounded-md border px-2.5 py-1 text-[11px] font-medium transition"
+                                  + " disabled:opacity-50"
+                                  + (ram === opt
+                                    ? " border-violet-500/40 bg-violet-500/15 text-violet-300"
+                                    : " border-[#1a1f2e] bg-white/[0.02] text-slate-500 hover:border-white/[0.1] hover:text-slate-400")}
+                      >
+                        {opt}
+                      </button>
+                    ))}
                   </div>
                 </label>
 
