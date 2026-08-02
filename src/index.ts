@@ -213,6 +213,24 @@ app.get("/api/fabric/versions", async (_req, res) => {
   }
 });
 
+// ---- Global error handler (multer file-size errors etc.) ----
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err.code === "LIMIT_FILE_SIZE") {
+    res.status(413).json({ error: "File too large. Max 500 MB per file." });
+    return;
+  }
+  if (err.code === "LIMIT_FILE_COUNT") {
+    res.status(413).json({ error: "Too many files." });
+    return;
+  }
+  if (err.type === "entity.too.large") {
+    res.status(413).json({ error: "Request body too large." });
+    return;
+  }
+  console.error("[panel] Unhandled error:", err);
+  res.status(500).json({ error: "Internal server error." });
+});
+
 // ---- HTTP server (needed so we can attach socket.io) ----
 const httpServer = http.createServer(app);
 
