@@ -214,6 +214,7 @@ export default function ServerDetailPage() {
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
                   <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-md p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-violet-400 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}</button>
+                  <button onClick={() => setEditOpen(true)} className="rounded-md p-1.5 text-slate-500 transition hover:bg-white/[0.04] hover:text-violet-400" title="Edit Server"><Settings2 className="h-4 w-4" /></button>
                   <span className="w-px h-5 bg-[#1a1f2e] mx-1" />
                   {deleteConfirm ? (
                     <div className="flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1">
