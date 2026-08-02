@@ -30,6 +30,8 @@ export interface ServerConfig {
   schedule?: { restart?: string; backup?: string };
   /** Max players (default 20) */
   maxPlayers?: number;
+  /** UDP port for SimpleVoiceChat plugin (default 24454). Not bound if unset. */
+  voicePort?: number;
 }
 
 /** Request body for POST /api/servers */
@@ -49,6 +51,8 @@ export interface CreateServerRequest {
   javaArgs?: string;
   /** Max players (default 20) */
   maxPlayers?: number;
+  /** UDP port for SimpleVoiceChat (default 24454). Not bound if unset. */
+  voicePort?: number;
   /** Hardcore mode — defaults to false */
   hardcore?: boolean;
   /** Difficulty: peaceful, easy, normal, hard — defaults to "normal" */
@@ -67,4 +71,5 @@ export interface ServerStatus {
   containerId: string | null;
   javaArgs?: string | null;
   maxPlayers?: number;
+  voicePort?: number | null;
 }

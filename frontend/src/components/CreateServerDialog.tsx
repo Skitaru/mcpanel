@@ -47,6 +47,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [maxPlayers, setMaxPlayers] = useState(20);
   const [hardcore, setHardcore] = useState(false);
   const [difficulty, setDifficulty] = useState("normal");
+  const [voicePort, setVoicePort] = useState<number | null>(null);
 
   // PaperMC versions
   const [versions, setVersions] = useState<string[]>([]);
@@ -122,6 +123,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setMaxPlayers(20);
       setHardcore(false);
       setDifficulty("normal");
+      setVoicePort(null);
       setError(null);
       // Auto-suggest next free port
       fetch(`${API_BASE}/api/servers`)
@@ -158,6 +160,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             paperVersion,
             javaArgs: javaArgs.trim() || undefined,
             maxPlayers,
+            voicePort: voicePort ?? undefined,
             ...(serverType !== "velocity" ? { hardcore, difficulty } : {}),
           }),
         });
@@ -177,7 +180,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, hardcore, difficulty, onCreated, onClose],
+    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, hardcore, difficulty, voicePort, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -395,6 +398,33 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     />
                   </label>
                 </div>
+
+                {/* Voice Port (UDP — SimpleVoiceChat) */}
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    Voice Port (UDP)
+                  </span>
+                  <input
+                    type="number"
+                    value={voicePort ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setVoicePort(v === "" ? null : Math.max(1024, Math.min(65535, parseInt(v) || 24454)));
+                    }}
+                    placeholder="e.g. 24454 (SimpleVoiceChat)"
+                    min={1024}
+                    max={65535}
+                    disabled={submitting}
+                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                               px-3.5 py-2.5 text-sm text-white
+                               placeholder:text-slate-600
+                               focus:border-violet-500/40 focus:outline-none
+                               disabled:opacity-50"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-600">
+                    Leave empty if you don't need voice chat. Requires container recreation to change later.
+                  </p>
+                </label>
 
                 {/* Difficulty + Hardcore (non-Velocity only) */}
                 {serverType !== "velocity" && (

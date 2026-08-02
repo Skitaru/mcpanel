@@ -47,6 +47,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
   const [ram, setRam] = useState("4G");
   const [port, setPort] = useState(25565);
   const [javaArgs, setJavaArgs] = useState("");
+  const [voicePort, setVoicePort] = useState<number | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       setRam(mbToRamString(server.ram));
       setPort(server.port);
       setJavaArgs(server.javaArgs ?? "");
+      setVoicePort(server.voicePort ?? null);
       setError(null);
     }
   }, [open, server]);
@@ -80,6 +82,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             ram,
             port,
             javaArgs: javaArgs.trim() || undefined,
+            voicePort: voicePort ?? null,
           }),
         });
 
@@ -96,7 +99,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         setSubmitting(false);
       }
     },
-    [server, name, ram, port, javaArgs, onUpdated, onClose],
+    [server, name, ram, port, javaArgs, voicePort, onUpdated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -211,6 +214,33 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                          focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
             />
+          </label>
+
+          {/* Voice Port */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+              Voice Port (UDP)
+            </span>
+            <input
+              type="number"
+              value={voicePort ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setVoicePort(v === "" ? null : Math.max(1024, Math.min(65535, parseInt(v) || 24454)));
+              }}
+              placeholder="e.g. 24454 (SimpleVoiceChat)"
+              min={1024}
+              max={65535}
+              disabled={submitting}
+              className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                         px-3.5 py-2.5 text-sm text-white
+                         placeholder:text-slate-600
+                         focus:border-violet-500/40 focus:outline-none
+                         disabled:opacity-50"
+            />
+            <p className="mt-1 text-[10px] text-slate-600">
+              Requires container recreation to apply. Leave empty to disable.
+            </p>
           </label>
 
           {/* Java Args */}

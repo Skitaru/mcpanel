@@ -13,4 +13,5 @@ export interface ServerStatus {
   containerId: string | null;
   javaArgs?: string | null;
   maxPlayers?: number;
+  voicePort?: number | null;
 }
