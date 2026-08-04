@@ -259,13 +259,13 @@ export async function inspectContainer(
  */
 export async function listManagedContainerStatuses(
   ids: string[],
-): Promise<Map<string, { status: string; running: boolean }>> {
-  const result = new Map<string, { status: string; running: boolean }>();
+): Promise<Map<string, { status: string; running: boolean; startedAt: string | null }>> {
+  const result = new Map<string, { status: string; running: boolean; startedAt: string | null }>();
 
   if (ids.length === 0) return result;
 
   // First mark everyone as "unknown" so missing containers are handled.
-  for (const id of ids) result.set(id, { status: "unknown", running: false });
+  for (const id of ids) result.set(id, { status: "unknown", running: false, startedAt: null });
 
   try {
     const containers = await docker.listContainers({ all: true });
@@ -274,9 +274,24 @@ export async function listManagedContainerStatuses(
         result.set(c.Id, {
           status: c.State,
           running: c.State === "running",
+          startedAt: null, // filled below for running containers
         });
       }
     }
+
+    // For running containers, get StartedAt via inspect
+    const runningIds = ids.filter(id => result.get(id)?.running);
+    await Promise.all(runningIds.map(async (id) => {
+      try {
+        const info = await docker.getContainer(id).inspect();
+        const entry = result.get(id);
+        if (entry && info.State?.StartedAt) {
+          entry.startedAt = info.State.StartedAt;
+        }
+      } catch {
+        // container may have vanished between list and inspect
+      }
+    }));
   } catch (err) {
     console.error("[docker] Failed to list containers:", err);
   }

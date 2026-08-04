@@ -72,4 +72,6 @@ export interface ServerStatus {
   javaArgs?: string | null;
   maxPlayers?: number;
   voicePort?: number | null;
+  /** ISO timestamp when the container was started (null if not running) */
+  startedAt?: string | null;
 }
