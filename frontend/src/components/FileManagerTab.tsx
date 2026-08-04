@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight, Download, File, FilePlus, Folder, FolderPlus,
-  Save, Loader2, Trash2, Upload,
+  Save, Loader2, Trash2, Upload, Search, X, ChevronUp, ChevronDown,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -43,6 +43,12 @@ export default function FileManagerTab({ serverId }: Props) {
   const [uploading, setUploading] = useState(false);
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatchLines, setSearchMatchLines] = useState<number[]>([]);
+  const [searchIndex, setSearchIndex] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true); setError(null);
@@ -134,6 +140,44 @@ export default function FileManagerTab({ serverId }: Props) {
     const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); if (selectedFile && !saving) saveFile(); } };
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
   }, [selectedFile, saving, saveFile]);
+
+  // ---- Search logic ----
+  const runSearch = useCallback((query: string) => {
+    if (!query) { setSearchMatchLines([]); setSearchIndex(0); return; }
+    const lines = fileContent.split("\n");
+    const matches: number[] = [];
+    const lower = query.toLowerCase();
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(lower)) matches.push(i);
+    }
+    setSearchMatchLines(matches);
+    setSearchIndex(matches.length > 0 ? 0 : -1);
+    // Scroll to first match
+    if (matches.length > 0 && textareaRef.current) {
+      const lineH = 1.75 * 12.5; // line-height in px (1.75rem * 12.5px font → ~22px)
+      textareaRef.current.scrollTop = matches[0] * lineH - 60;
+    }
+  }, [fileContent]);
+
+  const navigateSearch = useCallback((dir: 1 | -1) => {
+    if (searchMatchLines.length === 0) return;
+    const next = searchIndex + dir;
+    const clamped = next < 0 ? searchMatchLines.length - 1 : next >= searchMatchLines.length ? 0 : next;
+    setSearchIndex(clamped);
+    if (textareaRef.current) {
+      const lineH = 1.75 * 12.5;
+      textareaRef.current.scrollTop = searchMatchLines[clamped] * lineH - 80;
+    }
+  }, [searchMatchLines, searchIndex]);
+
+  // Clear search when changing files
+  useEffect(() => { setSearchOpen(false); setSearchQuery(""); setSearchMatchLines([]); }, [selectedFile]);
+
+  // Focus search input when opened
+  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
+
+  // Re-run search when content changes
+  useEffect(() => { if (searchQuery) runSearch(searchQuery); }, [fileContent, searchQuery, runSearch]);
 
   const downloadFile = useCallback(async () => {
     if (!selectedFile) return;
@@ -304,13 +348,51 @@ export default function FileManagerTab({ serverId }: Props) {
       {/* ── Right: Editor ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Editor header */}
-        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-3 py-1.5">
-          <span className="truncate font-mono text-[11px] text-slate-500">{selectedFile ?? "No file selected"}</span>
-          <div className="flex items-center gap-1.5">
-            {saveMessage && (
-              <span className={`text-[11px] ${saveMessage.startsWith("Saved") || saveMessage.startsWith("Error") === false ? "text-emerald-400" : "text-red-400"}`}>{saveMessage}</span>
-            )}
-            {selectedFile && (<>
+        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-3 py-1.5 gap-2">
+          <span className="truncate font-mono text-[11px] text-slate-500 min-w-0">{selectedFile ?? "No file selected"}</span>
+          {selectedFile && (
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Search bar */}
+              {searchOpen ? (
+                <div className="flex items-center gap-1 rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-2 py-0.5">
+                  <input ref={searchInputRef} type="text" value={searchQuery}
+                    onChange={e => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); navigateSearch(e.shiftKey ? -1 : 1); } }}
+                    placeholder="Find…"
+                    className="w-28 sm:w-36 bg-transparent text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none" />
+                  {searchMatchLines.length > 0 && (
+                    <span className="text-[10px] text-slate-500 tabular-nums min-w-[2.5rem] text-center">
+                      {searchIndex + 1}/{searchMatchLines.length}
+                    </span>
+                  )}
+                  {searchQuery && searchMatchLines.length === 0 && (
+                    <span className="text-[10px] text-slate-700">0 matches</span>
+                  )}
+                  <button onClick={() => navigateSearch(-1)} disabled={searchMatchLines.length === 0}
+                    className="rounded p-0.5 text-slate-500 hover:text-slate-300 disabled:opacity-30"
+                    title="Previous match (Shift+Enter)">
+                    <ChevronUp className="h-3 w-3" />
+                  </button>
+                  <button onClick={() => navigateSearch(1)} disabled={searchMatchLines.length === 0}
+                    className="rounded p-0.5 text-slate-500 hover:text-slate-300 disabled:opacity-30"
+                    title="Next match (Enter)">
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                  <button onClick={() => { setSearchOpen(false); setSearchQuery(""); setSearchMatchLines([]); }}
+                    className="rounded p-0.5 text-slate-600 hover:text-slate-400" title="Close search">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => setSearchOpen(true)}
+                  className="rounded p-1 text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300"
+                  title="Find in file">
+                  <Search className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {saveMessage && (
+                <span className={`text-[11px] ${saveMessage.startsWith("Saved") || saveMessage.startsWith("Error") === false ? "text-emerald-400" : "text-red-400"}`}>{saveMessage}</span>
+              )}
               <button onClick={downloadFile} className="rounded p-1 text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300" title="Download">
                 <Download className="h-3.5 w-3.5" />
               </button>
@@ -319,8 +401,9 @@ export default function FileManagerTab({ serverId }: Props) {
                 {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                 {saving ? "…" : "Save"}
               </button>
-            </>)}
-          </div>
+            </div>
+          )}
+
         </div>
 
         {/* Editor body */}
@@ -333,8 +416,17 @@ export default function FileManagerTab({ serverId }: Props) {
           <div className="flex flex-1 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-600" /></div>
         ) : (
           <div className="flex flex-1 min-h-0">
-            <div ref={lineNumberRef} className="select-none overflow-hidden bg-[#0a0c10] py-3 pl-3 pr-2 font-mono text-[12.5px] leading-[1.75] text-slate-700 text-right" style={{ minWidth: "2.5rem" }}>
-              {(fileContent || "\n").split("\n").map((_, i) => <div key={i}>{i + 1}</div>)}
+            <div ref={lineNumberRef} className="select-none overflow-hidden bg-[#0a0c10] py-3 pl-3 pr-2 font-mono text-[12.5px] leading-[1.75] text-right" style={{ minWidth: "2.5rem" }}>
+              {(fileContent || "\n").split("\n").map((_, i) => {
+                const isMatch = searchMatchLines.includes(i);
+                const isActive = isMatch && searchMatchLines[searchIndex] === i;
+                return (
+                  <div key={i}
+                    className={`${isActive ? "bg-violet-500/30 text-violet-200" : isMatch ? "bg-violet-500/10 text-violet-400" : "text-slate-700"}`}>
+                    {i + 1}
+                  </div>
+                );
+              })}
             </div>
             <textarea ref={textareaRef} value={fileContent} onChange={e => setFileContent(e.target.value)}
               onScroll={() => { if (textareaRef.current && lineNumberRef.current) lineNumberRef.current.scrollTop = textareaRef.current.scrollTop; }}
