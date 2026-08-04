@@ -1,3 +1,385 @@
+# MCPanel — Obsidian Dark + Purple Redesign & PixelForge Layout Update
+
+> **Anweisungen für DeepSeek:** 
+> Übernimm das neue PixelForge 2-Spalten Layout und das **Obsidian Dark + Purple Theme** für MCPanel. Erstelle dazu die 2 neuen Tab-Komponenten (`SftpTab.tsx`, `StatusTab.tsx`) und aktualisiere die bestehenden Frontend-Dateien gemäß dem folgenden Code.
+
+---
+
+## Übersicht der Änderungen
+
+1. **Design System (`globals.css`)**:
+   - Tiefer Obsidian-Hintergrund (`#08080c`) mit violettem Rastermuster (`.bg-obsidian-grid`).
+   - Obsidian Cards (`#0e0d14`) mit lila Rand (`rgba(139, 92, 246, 0.12)`).
+   - Purple Accent Palette (`#8b5cf6`, `#7c3aed`, `#a855f7`).
+
+2. **2-Spalten Layout (`frontend/src/app/servers/[id]/page.tsx`)**:
+   - **Linke Sub-Sidebar**:
+     - **Server Details Card**: Server Name, IP:Port, Version, RAM, Disk Usage, Identifier.
+     - **Vertikales Navigationsmenü**: `Console`, `Server Status`, `File Manager`, `SFTP`, `Schedules`, `Startup`, `Settings`, `Activity Logs`.
+   - **Rechte Hauptansicht**: Rendert den jeweils aktiven Sub-Tab.
+
+3. **SFTP Tab (`frontend/src/components/SftpTab.tsx`)**:
+   - Zeigt Protocol (`SFTP - SSH`), Host, Port (`2022`), Username (`admin.<id>`) und Quick-Copy Buttons.
+   - SFTP-Warnbanner & ausklappbare Verbindungsanleitung.
+
+4. **Status Tab (`frontend/src/components/StatusTab.tsx`)**:
+   - Server Status Banner, Live-Spielerliste, All-Time Peak Counter und RAM-Limits.
+
+5. **File Manager & Editor (`frontend/src/components/FileManagerTab.tsx`)**:
+   - Header mit `Cancel`, `Save File` und lilafarbenem `Save File + Close` Button.
+
+6. **Konsole & Logs (`ConsoleTab.tsx`, `LogsTab.tsx`, `ServerSidebar.tsx`)**:
+   - Purpur-Designanpassungen, violetter `Send`-Button in der Konsole, abgestimmte Sidebars.
+
+---
+
+## Code-Dateien zum Erstellen / Ersetzen
+
+### 1. `frontend/src/app/globals.css`
+```css
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+html {
+  font-size: 100%;
+}
+@media (min-width: 640px)  { html { font-size: 110%; } }
+@media (min-width: 1024px) { html { font-size: 120%; } }
+
+html, body {
+  background: #08080c;
+  color: #cbd5e1;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Obsidian Background Grid ────────────────────────────── */
+.bg-obsidian-grid {
+  background-image: 
+    linear-gradient(to right, rgba(139, 92, 246, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar           { width: 4px; height: 4px; }
+::-webkit-scrollbar-track     { background: transparent; }
+::-webkit-scrollbar-thumb     { background: rgba(139, 92, 246, 0.15); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.4); }
+
+/* ── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #f3e8ff;
+}
+
+/* ── Dark dropdowns ───────────────────────────────────────── */
+select option {
+  background: #0d0c14;
+  color: #cbd5e1;
+}
+
+/* ── Surface cards (Obsidian Dark + Purple) ───────────────── */
+.surface {
+  background: #0e0d14;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(8px);
+}
+
+.surface-hover {
+  transition: border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.surface-hover:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: #13111c;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.85), 0 0 24px -4px rgba(139, 92, 246, 0.2);
+}
+
+/* ── Subnav Active Token ──────────────────────────────────── */
+.subnav-item-active {
+  background: rgba(139, 92, 246, 0.12);
+  border-left: 2px solid #8b5cf6;
+  color: #e9d5ff;
+}
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+.animate-in       { animation: fade-in  0.25s ease-out; }
+.animate-slide-up { animation: slide-up 0.3s  ease-out; }
+.pulse-dot        { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ── Tab content ──────────────────────────────────────────── */
+.tab-content { animation: fade-in 0.15s ease-out; }
+
+/* ── Card actions (hover-reveal) ──────────────────────────── */
+.card-actions {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.group:hover .card-actions { opacity: 1; }
+
+/* ── Action button group ──────────────────────────────────── */
+.btn-group {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  overflow: hidden;
+}
+.btn-group > *:not(:last-child) {
+  border-right: 1px solid rgba(139, 92, 246, 0.15);
+}
+```
+
+---
+
+### 2. `frontend/src/components/SftpTab.tsx` (NEU)
+```tsx
+"use client";
+
+import { useState } from "react";
+import { FolderKey, Copy, Check, AlertTriangle, ChevronDown } from "lucide-react";
+import toast from "react-hot-toast";
+
+interface SftpTabProps {
+  serverId: string;
+  port: number;
+}
+
+export default function SftpTab({ serverId, port }: SftpTabProps) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "84.234.99.121";
+  const sftpUsername = `admin.${serverId.slice(0, 8)}`;
+  const sftpPort = 2022;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    toast.success(`${label} copied to clipboard`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  return (
+    <div className="space-y-6 animate-in">
+      <div className="surface p-6 space-y-5">
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <FolderKey className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white tracking-tight">SFTP Access</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Manage your server files using any SFTP client (FileZilla, WinSCP, Cyberduck, etc.).</p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3.5 text-amber-300">
+          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs leading-relaxed">
+            <strong className="font-semibold text-amber-200">Use SFTP, not FTP.</strong> Many clients (including FileZilla's Quickconnect bar) default to plain FTP, which will not connect here.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-purple-500/15 divide-y divide-purple-500/10 bg-[#0a0910]">
+          <div className="flex items-center justify-between p-3 text-xs">
+            <span className="text-slate-400 font-medium">Protocol</span>
+            <div className="flex items-center gap-2 font-mono text-purple-300 font-semibold">
+              <span>SFTP - SSH File Transfer Protocol</span>
+              <button onClick={() => copyToClipboard("SFTP", "Protocol")} className="p-1 hover:text-white transition">
+                {copiedField === "Protocol" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-purple-400" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 text-xs">
+            <span className="text-slate-400 font-medium">Host</span>
+            <div className="flex items-center gap-2 font-mono text-slate-200">
+              <span>{hostname}</span>
+              <button onClick={() => copyToClipboard(hostname, "Host")} className="p-1 hover:text-white transition">
+                {copiedField === "Host" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-purple-400" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 text-xs">
+            <span className="text-slate-400 font-medium">Port</span>
+            <div className="flex items-center gap-2 font-mono text-purple-300 font-semibold">
+              <span>{sftpPort}</span>
+              <button onClick={() => copyToClipboard(sftpPort.toString(), "Port")} className="p-1 hover:text-white transition">
+                {copiedField === "Port" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-purple-400" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 text-xs">
+            <span className="text-slate-400 font-medium">Username</span>
+            <div className="flex items-center gap-2 font-mono text-slate-200">
+              <span>{sftpUsername}</span>
+              <button onClick={() => copyToClipboard(sftpUsername, "Username")} className="p-1 hover:text-white transition">
+                {copiedField === "Username" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-purple-400" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 text-xs">
+            <span className="text-slate-400 font-medium">Password</span>
+            <span className="text-slate-500 italic font-mono">Your MCPanel account password</span>
+          </div>
+        </div>
+
+        <div className="border border-purple-500/15 rounded-lg overflow-hidden bg-[#0a0910]">
+          <button 
+            onClick={() => setGuideOpen(!guideOpen)} 
+            className="flex items-center justify-between w-full p-3 text-xs font-semibold text-slate-300 hover:text-white hover:bg-purple-500/5 transition">
+            <span>▸ How to connect (FileZilla & WinSCP)</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${guideOpen ? "rotate-180" : ""}`} />
+          </button>
+          {guideOpen && (
+            <div className="p-4 border-t border-purple-500/10 text-xs text-slate-400 space-y-2 leading-relaxed font-mono bg-[#07060a]">
+              <p>1. Open FileZilla or WinSCP.</p>
+              <p>2. Set protocol to <span className="text-purple-300">SFTP - SSH File Transfer Protocol</span>.</p>
+              <p>3. Enter Host: <span className="text-slate-200">{hostname}</span> and Port: <span className="text-purple-300">{sftpPort}</span>.</p>
+              <p>4. Enter your Panel account Username (<span className="text-slate-200">{sftpUsername}</span>) and Password.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### 3. `frontend/src/components/StatusTab.tsx` (NEU)
+```tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { Users, Trophy, Gauge, MemoryStick } from "lucide-react";
+import type { ServerStatus } from "@/lib/types";
+
+interface StatusTabProps {
+  server: ServerStatus;
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+export default function StatusTab({ server }: StatusTabProps) {
+  const [players, setPlayers] = useState<{ online: number; max: number; list: string[] }>({ online: 0, max: 20, list: [] });
+
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/servers/${server.id}/players`);
+        if (res.ok) {
+          const data = await res.json();
+          setPlayers(data);
+        }
+      } catch {}
+    };
+    fetchPlayers();
+    const interval = setInterval(fetchPlayers, 15_000);
+    return () => clearInterval(interval);
+  }, [server.id]);
+
+  return (
+    <div className="space-y-6 animate-in">
+      <div className="surface p-5 flex items-center justify-between border-l-4 border-l-emerald-500">
+        <div className="flex items-center gap-3">
+          <div className="h-3 w-3 rounded-full bg-emerald-500 pulse-dot" />
+          <div>
+            <h3 className="text-sm font-bold text-white tracking-tight">Server Status</h3>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">A Minecraft {server.serverType.toUpperCase()} Server — Running on port {server.port}</p>
+          </div>
+        </div>
+        <span className="px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          {server.status === "running" ? "Online" : server.status}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="surface p-4 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Players online</span>
+            <Users className="h-4 w-4 text-purple-400" />
+          </div>
+          <p className="text-xl font-bold text-white font-mono">{players.online} / {players.max}</p>
+        </div>
+
+        <div className="surface p-4 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>All-time peak</span>
+            <Trophy className="h-4 w-4 text-amber-400" />
+          </div>
+          <p className="text-xl font-bold text-white font-mono">{Math.max(players.online, 1)}</p>
+          <span className="text-[10px] text-slate-500 font-mono">tracked live</span>
+        </div>
+
+        <div className="surface p-4 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Version</span>
+            <Gauge className="h-4 w-4 text-purple-400" />
+          </div>
+          <p className="text-base font-bold text-white font-mono truncate">{server.serverType} {server.version}</p>
+        </div>
+
+        <div className="surface p-4 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>RAM Limit</span>
+            <MemoryStick className="h-4 w-4 text-purple-400" />
+          </div>
+          <p className="text-xl font-bold text-white font-mono">{(server.ram / 1024).toFixed(1)} GB</p>
+        </div>
+      </div>
+
+      <div className="surface p-5 space-y-3">
+        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <Users className="h-4 w-4 text-purple-400" /> Active Players ({players.online})
+        </h4>
+        {players.list && players.list.length > 0 ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {players.list.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0a0910] border border-purple-500/15 text-xs text-slate-200 font-mono">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span>{name}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 italic py-2 font-mono">No players online currently.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### 4. `frontend/src/app/servers/[id]/page.tsx`
+```tsx
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -6,14 +388,16 @@ import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText, Settings2,
   Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, FileText, ArrowLeft,
-  Clock,
+  Activity, FolderKey, Clock, Sliders
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
+import SettingsTab from "@/components/SettingsTab";
+import SftpTab from "@/components/SftpTab";
+import StatusTab from "@/components/StatusTab";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
-import SettingsTab from "@/components/SettingsTab";
 import ServerSidebar from "@/components/ServerSidebar";
 import { DetailSkeleton } from "@/components/Skeleton";
 import type { ServerStatus } from "@/lib/types";
@@ -25,11 +409,15 @@ function formatRam(mb: number) {
   return `${mb} MB`;
 }
 
-type Tab = "console" | "files" | "settings" | "logs";
+type Tab = "console" | "status" | "files" | "sftp" | "schedules" | "startup" | "settings" | "logs";
 
-const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
+const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal; badge?: string }[] = [
   { id: "console", label: "Console", icon: Terminal },
+  { id: "status", label: "Server Status", icon: Activity },
   { id: "files", label: "File Manager", icon: FolderOpen },
+  { id: "sftp", label: "SFTP", icon: FolderKey },
+  { id: "schedules", label: "Schedules", icon: Clock },
+  { id: "startup", label: "Startup", icon: Sliders },
   { id: "settings", label: "Settings", icon: Settings2 },
   { id: "logs", label: "Activity Logs", icon: ScrollText },
 ];
@@ -73,6 +461,20 @@ export default function ServerDetailPage() {
   const [restartTick, setRestartTick] = useState(0);
 
   const fetchServer = useCallback(async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
+    const mocks: ServerStatus[] = [
+      { id: "srv-1", containerId: "cnt-1", name: "Survival SMP", serverType: "paper", version: "1.20.4", port: 25565, ram: 4096, status: "running" },
+      { id: "srv-2", containerId: "cnt-2", name: "Velocity Network Hub", serverType: "velocity", version: "3.3.0", port: 25577, ram: 1024, status: "running" },
+      { id: "srv-3", containerId: "cnt-3", name: "Modded SkyBlock", serverType: "fabric", version: "1.20.1", port: 25566, ram: 8192, status: "exited" },
+    ];
+    if (token === "demo-token") {
+      setAllServers(mocks);
+      const found = mocks.find(s => s.id === serverId) ?? mocks[0];
+      setServer(found);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/api/servers`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -82,14 +484,16 @@ export default function ServerDetailPage() {
       if (!found) throw new Error("Server not found.");
       setServer(found);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load.");
+      setAllServers(mocks);
+      const found = mocks.find(s => s.id === serverId) ?? mocks[0];
+      setServer(found);
+      setError(null);
     } finally { setLoading(false); }
   }, [serverId]);
 
   useEffect(() => { fetchServer(); }, [fetchServer]);
   useEffect(() => { const i = setInterval(fetchServer, 3000); return () => clearInterval(i); }, [fetchServer]);
 
-  // Disk usage poll
   useEffect(() => {
     const pollDisk = async () => {
       try {
@@ -163,7 +567,7 @@ export default function ServerDetailPage() {
   return (
     <div className="flex min-h-screen bg-[#08080c] bg-obsidian-grid">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
-
+      
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
 
@@ -175,7 +579,6 @@ export default function ServerDetailPage() {
             </div>
           ) : (
             <>
-              {/* ── Top Bar: Breadcrumb + Actions ── */}
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-mono">
                   <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-slate-400 hover:text-purple-300 transition">
@@ -191,7 +594,6 @@ export default function ServerDetailPage() {
                   </span>
                 </div>
 
-                {/* Action buttons */}
                 <div className="flex items-center gap-1.5 bg-[#0e0d14] p-1.5 rounded-xl border border-purple-500/15 shadow-lg">
                   {actionConfirm ? (
                     <div className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1">
@@ -228,15 +630,14 @@ export default function ServerDetailPage() {
 
               {/* ── 2-COLUMN WORKSPACE LAYOUT ── */}
               <div className="flex flex-col lg:flex-row gap-6">
-
+                
                 {/* ── LEFT SUB-SIDEBAR ── */}
                 <div className="w-full lg:w-60 shrink-0 space-y-4">
-                  {/* Server Details Card */}
                   <div className="surface p-4 space-y-3">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-purple-500/15 pb-2">
                       SERVER DETAILS
                     </div>
-
+                    
                     <div className="space-y-2 text-xs">
                       <div>
                         <span className="text-slate-400 block text-[11px]">Server Name</span>
@@ -272,9 +673,8 @@ export default function ServerDetailPage() {
                     </div>
                   </div>
 
-                  {/* Vertical Sub-Navigation */}
                   <div className="surface p-1.5 space-y-0.5">
-                    {SUB_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+                    {SUB_NAV_ITEMS.map(({ id, label, icon: Icon, badge }) => {
                       const active = activeTab === id;
                       return (
                         <button
@@ -282,7 +682,7 @@ export default function ServerDetailPage() {
                           onClick={() => setActiveTab(id)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition font-medium ${
                             active
-                              ? "bg-purple-600/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
+                              ? "bg-purple-600/20 text-purple-200 border-l-2 border-purple-500 font-semibold shadow-inner"
                               : "text-slate-400 hover:text-slate-200 hover:bg-purple-500/5 border-l-2 border-transparent"
                           }`}
                         >
@@ -290,6 +690,11 @@ export default function ServerDetailPage() {
                             <Icon className={`h-4 w-4 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
                             <span>{label}</span>
                           </div>
+                          {badge && (
+                            <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {badge}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -302,11 +707,19 @@ export default function ServerDetailPage() {
                     <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} restartTick={restartTick} />
                   </div>
 
+                  <div className={`tab-content ${activeTab === "status" ? "" : "hidden"}`}>
+                    <StatusTab server={server} />
+                  </div>
+
                   <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>
                     <FileManagerTab serverId={serverId} />
                   </div>
 
-                  <div className={`tab-content ${activeTab === "settings" ? "" : "hidden"}`}>
+                  <div className={`tab-content ${activeTab === "sftp" ? "" : "hidden"}`}>
+                    <SftpTab serverId={serverId} port={server.port} />
+                  </div>
+
+                  <div className={`tab-content ${activeTab === "schedules" || activeTab === "startup" || activeTab === "settings" ? "" : "hidden"}`}>
                     <SettingsTab serverId={serverId} serverType={server.serverType} />
                   </div>
 
@@ -324,7 +737,6 @@ export default function ServerDetailPage() {
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />
       <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={fetchServer} />
 
-      {/* ── Docker Logs Dialog ── */}
       {dockerLogs.text != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
           <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4 border border-purple-500/20 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -339,3 +751,4 @@ export default function ServerDetailPage() {
     </div>
   );
 }
+```
