@@ -23,6 +23,10 @@ Usage: python deploy.py "<command>"   — runs command on server
 import paramiko
 import sys
 import os
+import io
+
+# Fix encoding for Windows Git Bash
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 HOST = "5.231.108.226"
 USER = "root"
