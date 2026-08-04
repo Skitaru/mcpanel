@@ -380,7 +380,7 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#1a1f2e] bg-[#0f1119] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
+    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-purple-500/15 bg-[#0e0d14] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Output area */}
@@ -431,7 +431,7 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2 border-t border-[#1a1f2e] bg-[#0f1119] px-3 py-2"
+          className="flex items-center gap-2 border-t border-purple-500/15 bg-[#0e0d14] px-3 py-2"
         >
           <span className="select-none font-mono text-[13px] text-violet-400 shrink-0">❯</span>
           <input
@@ -457,9 +457,9 @@ export default function ConsoleTab({
       </div>
 
       {/* ── Stats sidebar ── */}
-      <div className="flex-shrink-0 border-t border-[#1a1f2e] lg:border-t-0 lg:border-l lg:w-[232px] bg-white/[0.02] flex flex-col overflow-y-auto">
+      <div className="flex-shrink-0 border-t border-purple-500/15 lg:border-t-0 lg:border-l lg:w-[232px] bg-purple-500/[0.04] flex flex-col overflow-y-auto">
         {/* Status indicator */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
               isOnline ? "bg-emerald-500 pulse-dot" : "bg-amber-500"
@@ -473,7 +473,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Address */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
@@ -505,7 +505,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Players */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="flex items-center gap-1.5 mb-1">
             <Users className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -531,7 +531,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Uptime */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Uptime
           </div>
@@ -541,7 +541,7 @@ export default function ConsoleTab({
         </div>
 
         {/* CPU */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="flex items-center gap-1.5 mb-1">
             <Cpu className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -564,7 +564,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Memory */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="flex items-center gap-1.5 mb-1">
             <MemoryStick className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -594,7 +594,7 @@ export default function ConsoleTab({
         </div>
 
         {/* RAM Limit */}
-        <div className="px-4 py-3 border-b border-[#1a1f2e]">
+        <div className="px-4 py-3 border-b border-purple-500/15">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             RAM Limit
           </div>

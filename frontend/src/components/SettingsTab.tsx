@@ -135,11 +135,11 @@ export default function SettingsTab({ serverId, serverType }: Props) {
           {/* Left: Icon + MOTD */}
           <div className="lg:w-48 shrink-0 space-y-4">
             <div className="flex flex-col items-center gap-2">
-              <div className="h-16 w-16 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] flex items-center justify-center overflow-hidden">
+              <div className="h-16 w-16 rounded-lg border border-purple-500/15 bg-[#0a0c10] flex items-center justify-center overflow-hidden">
                 {iconUrl ? <img src={iconUrl} alt="Server icon" className="h-full w-full object-cover" />
                   : <ImageIcon className="h-6 w-6 text-slate-700" />}
               </div>
-              <label className={`cursor-pointer rounded-md border border-[#1a1f2e] px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#252b3b] hover:text-slate-300 ${iconUploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <label className={`cursor-pointer rounded-md border border-purple-500/15 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#252b3b] hover:text-slate-300 ${iconUploading ? "opacity-50 pointer-events-none" : ""}`}>
                 <Upload className="h-3 w-3 inline mr-1" />{iconUploading ? "…" : "Upload"}
                 <input type="file" accept="image/png" onChange={handleIconUpload} className="hidden" />
               </label>
@@ -148,7 +148,7 @@ export default function SettingsTab({ serverId, serverType }: Props) {
             <div>
               <label className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">MOTD</label>
               <textarea value={motd} onChange={e => setMotd(e.target.value)} rows={2}
-                className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
+                className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
                            placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none resize-none" />
             </div>
           </div>
@@ -172,13 +172,13 @@ export default function SettingsTab({ serverId, serverType }: Props) {
                       <span className="mb-0.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">{label}</span>
                       {type === "select" && options ? (
                         <select value={value} onChange={e => updateProp(key, e.target.value)}
-                          className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white
+                          className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white
                                      focus:border-violet-500/40 focus:outline-none">
-                          {options.map(opt => <option key={opt} value={opt} className="bg-[#0f1119]">{opt}</option>)}
+                          {options.map(opt => <option key={opt} value={opt} className="bg-[#0e0d14]">{opt}</option>)}
                         </select>
                       ) : (
                         <input type="text" value={value} onChange={e => updateProp(key, e.target.value)}
-                          className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white font-mono
+                          className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white font-mono
                                      placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
                       )}
                     </label>
@@ -208,13 +208,13 @@ export default function SettingsTab({ serverId, serverType }: Props) {
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Restart</span>
             <input type="text" value={schedRestart} onChange={e => setSchedRestart(e.target.value)} placeholder="HH:MM (e.g. 04:00)"
-              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
+              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
                          placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
           </label>
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Backup</span>
             <input type="text" value={schedBackup} onChange={e => setSchedBackup(e.target.value)} placeholder="HH:MM (e.g. 03:00)"
-              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
+              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
                          placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
           </label>
         </div>

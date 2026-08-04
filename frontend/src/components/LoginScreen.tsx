@@ -65,7 +65,7 @@ export default function LoginScreen({ onLogin }: Props) {
               placeholder="admin"
               autoFocus
               disabled={loading}
-              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm
+              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm
                          text-white placeholder:text-slate-700
                          focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
@@ -80,7 +80,7 @@ export default function LoginScreen({ onLogin }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="········"
               disabled={loading}
-              className="w-full rounded-md border border-[#1a1f2e] bg-[#0a0c10] px-3 py-2 text-sm
+              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm
                          text-white placeholder:text-slate-700
                          focus:border-violet-500/40 focus:outline-none
                          disabled:opacity-50"
