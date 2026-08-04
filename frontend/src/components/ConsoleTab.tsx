@@ -113,6 +113,7 @@ export default function ConsoleTab({
   const uptimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
+  const [playersExpanded, setPlayersExpanded] = useState(false);
   const [addrCopied, setAddrCopied] = useState(false);
 
   // ---- auto-scroll ----
@@ -514,14 +515,29 @@ export default function ConsoleTab({
             {isOnline ? `${playerCount.online}/${playerCount.max}` : "—"}
           </div>
           {isOnline && playerList.length > 0 && (
-            <div className="mt-2 space-y-0.5 max-h-32 overflow-y-auto">
-              {playerList.map((p) => (
-                <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="truncate">{p.name}</span>
+            <>
+              <button
+                onClick={() => setPlayersExpanded(!playersExpanded)}
+                className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition mt-1.5"
+              >
+                <span className={`transition-transform text-[8px] ${playersExpanded ? "rotate-180" : ""}`}>▼</span>
+                {playersExpanded ? "Hide" : "Show"} names
+              </button>
+              {playersExpanded && (
+                <div className="mt-2 space-y-0.5 max-h-40 overflow-y-auto">
+                  {playerList.map((p) => (
+                    <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                      <img
+                        src={`https://crafatar.com/avatars/${p.id}?size=16&overlay`}
+                        alt="" className="h-3.5 w-3.5 rounded-sm"
+                        loading="lazy"
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
           {isOnline && playerCount.online === 0 && (
             <div className="text-[11px] text-slate-600 mt-1">No players online</div>

@@ -68,7 +68,6 @@ export default function DashboardPage() {
   const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
   const [serverMotds, setServerMotds] = useState<Record<string, string>>({});
   const [tick, setTick] = useState(0);
-  const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set());
   const socketRef = useRef<Socket | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
@@ -467,22 +466,6 @@ export default function DashboardPage() {
                                       <FlashValue value={playerCounts[s.id]?.online ?? 0} />{/*  */}
                                       <span className="font-normal text-slate-600">/{(playerCounts[s.id]?.max ?? (s.port ? 20 : 0))}</span>
                                     </p>
-                                    {(playerCounts[s.id]?.players?.length ?? 0) > 0 && (
-                                      <div className="player-face-stack">
-                                        {playerCounts[s.id]!.players!.slice(0, 5).map(p => (
-                                          <img key={p.id}
-                                            src={`https://crafatar.com/avatars/${p.id}?size=16&overlay`}
-                                            alt={p.name}
-                                            title={p.name}
-                                            className="h-4 w-4 rounded-sm"
-                                            loading="lazy"
-                                          />
-                                        ))}
-                                        {(playerCounts[s.id]!.players!.length > 5) && (
-                                          <span className="text-[9px] text-slate-500 ml-1">+{playerCounts[s.id]!.players!.length - 5}</span>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -505,42 +488,6 @@ export default function DashboardPage() {
                             </div>
                           )}
                         </div>
-
-                        {/* Expandable player list */}
-                        {s.status === "running" && (playerCounts[s.id]?.players?.length ?? 0) > 0 && (
-                          <div className="mt-2 border-t border-purple-500/15 pt-2 relative z-10"
-                               onClick={e => e.preventDefault()}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedPlayers(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(s.id)) next.delete(s.id);
-                                  else next.add(s.id);
-                                  return next;
-                                });
-                              }}
-                              className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition w-full"
-                            >
-                              <span className={`transition-transform ${expandedPlayers.has(s.id) ? "rotate-180" : ""}`}>▼</span>
-                              {expandedPlayers.has(s.id) ? "Hide" : "Show"} players ({playerCounts[s.id]!.players!.length})
-                            </button>
-                            {expandedPlayers.has(s.id) && (
-                              <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 max-h-32 overflow-y-auto">
-                                {playerCounts[s.id]!.players!.map(p => (
-                                  <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                                    <img
-                                      src={`https://crafatar.com/avatars/${p.id}?size=16&overlay`}
-                                      alt="" className="h-3.5 w-3.5 rounded-sm"
-                                      loading="lazy"
-                                    />
-                                    <span className="truncate">{p.name}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                       </div>
 
