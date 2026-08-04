@@ -528,7 +528,7 @@ export default function ConsoleTab({
                   {playerList.map((p) => (
                     <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
                       <img
-                        src={`https://crafatar.com/avatars/${p.id}?size=16&overlay`}
+                        src={`https://mc-heads.net/avatar/${p.id}/16`}
                         alt="" className="h-3.5 w-3.5 rounded-sm"
                         loading="lazy"
                       />

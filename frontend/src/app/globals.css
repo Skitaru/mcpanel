@@ -165,24 +165,6 @@ select option {
 }
 
 /* ── Player face stack ─────────────────────────────────────── */
-.player-face-stack {
-  display: flex;
-  margin-left: 4px;
-}
-.player-face-stack > * {
-  margin-left: -6px;
-  transition: transform 0.15s ease;
-}
-.player-face-stack > *:first-child {
-  margin-left: 0;
-}
-.player-face-stack:hover > * {
-  transform: translateX(2px);
-}
-.player-face-stack:hover > *:first-child {
-  transform: none;
-}
-
 /* ── Empty state ghost ──────────────────────────────────────── */
 .empty-ghost {
   opacity: 0.15;
