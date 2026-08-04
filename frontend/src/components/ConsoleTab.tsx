@@ -391,11 +391,9 @@ export default function ConsoleTab({
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <div className="rounded-full bg-slate-800/50 p-3">
-                <TerminalSquare className="h-6 w-6 text-slate-600" />
-              </div>
-              <p className="text-sm font-medium text-slate-400">Server is offline</p>
-              <p className="text-xs text-slate-600">Start the server to view the live console.</p>
+              <TerminalSquare className="h-12 w-12 empty-ghost" />
+              <p className="text-sm font-medium text-slate-500">Server is offline</p>
+              <p className="text-xs text-slate-700">Start the server to view the live console.</p>
             </div>
           ) : (
             lines.map((line, i) => (

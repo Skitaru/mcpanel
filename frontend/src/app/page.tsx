@@ -45,6 +45,12 @@ function formatUptime(startedAt: string | null | undefined) {
   return `${h}h ${m}m`;
 }
 
+/** Brief flash animation when a value changes. */
+function FlashValue({ value }: { value: string | number }) {
+  const key = `${value}`;
+  return <span key={key} className="value-flash inline-block">{value}</span>;
+}
+
 export default function DashboardPage() {
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,7 +358,7 @@ export default function DashboardPage() {
 
                     return (
                     <div key={s.id}
-                      className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${STAGGER[i] || ""}`}>
+                      className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${STAGGER[i] || ""} ${s.status === "running" ? "card-tint-running" : "card-tint-stopped"}`}>
 
                       {/* Status accent line */}
                       <div className={`card-accent bg-gradient-to-r from-transparent ${statusAccent(s.status)} to-transparent`} />
@@ -453,19 +459,37 @@ export default function DashboardPage() {
                             <>
                               <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                                 <Users className="h-3 w-3 shrink-0 text-emerald-400" />
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Players</p>
-                                  <p className="text-xs font-medium text-white">
-                                    {playerCounts[s.id]?.online ?? 0}
-                                    <span className="font-normal text-slate-600">/{(playerCounts[s.id]?.max ?? (s.port ? 20 : 0))}</span>
-                                  </p>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-medium text-white tabular-nums">
+                                      <FlashValue value={playerCounts[s.id]?.online ?? 0} />{/*  */}
+                                      <span className="font-normal text-slate-600">/{(playerCounts[s.id]?.max ?? (s.port ? 20 : 0))}</span>
+                                    </p>
+                                    {(playerCounts[s.id]?.players?.length ?? 0) > 0 && (
+                                      <div className="player-face-stack">
+                                        {playerCounts[s.id]!.players!.slice(0, 5).map(p => (
+                                          <img key={p.id}
+                                            src={`https://crafatar.com/avatars/${p.id}?size=16&overlay`}
+                                            alt={p.name}
+                                            title={p.name}
+                                            className="h-4 w-4 rounded-sm"
+                                            loading="lazy"
+                                          />
+                                        ))}
+                                        {(playerCounts[s.id]!.players!.length > 5) && (
+                                          <span className="text-[9px] text-slate-500 ml-1">+{playerCounts[s.id]!.players!.length - 5}</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                                 <Zap className={`h-3 w-3 shrink-0 ${(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 80 ? "text-red-400" : (liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 50 ? "text-amber-400" : "text-emerald-400"}`} />
                                 <div className="min-w-0">
                                   <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">CPU</p>
-                                  <p className="text-xs font-mono font-medium text-white tabular-nums">{(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0).toFixed(1)}%</p>
+                                  <p className="text-xs font-mono font-medium text-white tabular-nums"><FlashValue value={(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0).toFixed(1)} />%</p>
                                 </div>
                               </div>
                             </>
