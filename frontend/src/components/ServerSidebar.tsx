@@ -40,11 +40,11 @@ export default function ServerSidebar({
       )}
 
       <aside className={`fixed left-0 top-0 z-50 flex h-full flex-col
-        border-r border-[#1a1f2e] bg-[#0a0c10] transition-all duration-200
+        border-r border-purple-500/12 bg-[#08080c] transition-all duration-200
         ${collapsed ? "-translate-x-full lg:translate-x-0 lg:w-13" : "w-52"}`}>
 
         {/* Brand */}
-        <Link href="/" className={`flex items-center border-b border-[#1a1f2e] px-4 py-3.5
+        <Link href="/" className={`flex items-center border-b border-purple-500/12 px-4 py-3.5
           ${collapsed ? "justify-center" : "gap-2.5"}`}>
           <div className="h-2.5 w-2.5 rounded-full bg-violet-500 shrink-0" />
           {!collapsed && <span className="text-sm font-bold tracking-tight text-white">MCPanel</span>}
@@ -119,7 +119,7 @@ export default function ServerSidebar({
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-[#1a1f2e] p-2 space-y-1">
+        <div className="border-t border-purple-500/12 p-2 space-y-1">
           <button
             onClick={onCreateClick}
             className={`flex items-center gap-2 rounded-md bg-violet-600 px-2.5 py-2 text-xs font-medium
