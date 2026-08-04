@@ -390,7 +390,7 @@ export default function DashboardPage() {
                                   <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Players</p>
                                   <p className="text-xs font-medium text-white">
                                     {playerCounts[s.id]?.online ?? 0}
-                                    <span className="font-normal text-slate-600">/{playerCounts[s.id]?.max ?? s.port ? 20 : 0}</span>
+                                    <span className="font-normal text-slate-600">/{(playerCounts[s.id]?.max ?? (s.port ? 20 : 0))}</span>
                                   </p>
                                 </div>
                               </div>
