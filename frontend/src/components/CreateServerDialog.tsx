@@ -225,10 +225,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-2xl overflow-hidden rounded-xl
-                   border border-[#1a1f2e] bg-[#0f1119] shadow-2xl"
+                   border border-purple-500/15 bg-[#0e0d14] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1a1f2e] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-purple-500/15 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
               <Server className="h-5 w-5 text-violet-400" />
@@ -244,7 +244,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             onClick={onClose}
             disabled={submitting}
             className="rounded-md p-1.5 text-slate-600 transition
-                       hover:bg-white/[0.04] hover:text-slate-400
+                       hover:bg-purple-500/5 hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -279,7 +279,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     placeholder="e.g. Survival World"
                     required
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                px-3.5 py-2.5 text-sm text-white
                                placeholder:text-slate-600
                                focus:border-violet-500/40 focus:outline-none
@@ -298,7 +298,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity")}
                       disabled={submitting}
                       className="w-full appearance-none rounded-lg border
-                                 border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
+                                 border-purple-500/15 bg-[#0a0c10] px-3.5 py-2.5
                                  text-sm text-white focus:border-violet-500/40
                                  focus:outline-none disabled:opacity-50"
                     >
@@ -319,7 +319,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     {serverType === "velocity" ? "Velocity Version" : "Minecraft Version"}
                   </span>
                   {versionsLoading ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3.5 py-2.5">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                       <span className="text-sm text-slate-500">
                         Loading versions…
@@ -339,7 +339,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                         onChange={(e) => setPaperVersion(e.target.value)}
                         disabled={submitting}
                         className="w-full appearance-none rounded-lg border
-                                   border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
+                                   border-purple-500/15 bg-[#0a0c10] px-3.5 py-2.5
                                    text-sm text-white focus:border-violet-500/40
                                    focus:outline-none disabled:opacity-50"
                       >
@@ -383,7 +383,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       min={1024}
                       max={65535}
                       disabled={submitting}
-                      className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                      className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                  px-3.5 py-2.5 text-sm text-white
                                  focus:border-violet-500/40 focus:outline-none
                                  disabled:opacity-50"
@@ -398,7 +398,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       min={1}
                       max={1000}
                       disabled={submitting}
-                      className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                      className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                  px-3.5 py-2.5 text-sm text-white
                                  focus:border-violet-500/40 focus:outline-none
                                  disabled:opacity-50"
@@ -420,7 +420,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     }}
                     placeholder="e.g. 24454 (SimpleVoiceChat)"
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                px-3.5 py-2.5 text-sm text-white
                                placeholder:text-slate-600
                                focus:border-violet-500/40 focus:outline-none
@@ -442,7 +442,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                           onChange={(e) => setDifficulty(e.target.value)}
                           disabled={submitting}
                           className="w-full appearance-none rounded-lg border
-                                     border-[#1a1f2e] bg-[#0a0c10] px-3.5 py-2.5
+                                     border-purple-500/15 bg-[#0a0c10] px-3.5 py-2.5
                                      text-sm text-white focus:border-violet-500/40
                                      focus:outline-none disabled:opacity-50"
                         >
@@ -467,7 +467,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                                    disabled:opacity-50 disabled:cursor-not-allowed
                                    ${hardcore
                                      ? "border-red-500/30 bg-red-500/10 text-red-400"
-                                     : "border-[#1a1f2e] bg-[#0a0c10] text-slate-600 hover:border-white/[0.08]"}`}
+                                     : "border-purple-500/15 bg-[#0a0c10] text-slate-600 hover:border-white/[0.08]"}`}
                       >
                         <span className={`mr-2 h-2 w-2 rounded-full ${hardcore ? "bg-red-500 animate-pulse" : "bg-slate-700"}`} />
                         <span className="text-sm font-medium">{hardcore ? "Enabled" : "Off"}</span>
@@ -490,7 +490,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     onChange={(e) => setRam(e.target.value)}
                     placeholder="e.g. 4G or 4096M"
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                px-3.5 py-2.5 text-sm text-white font-mono
                                placeholder:text-slate-600
                                focus:border-violet-500/40 focus:outline-none
@@ -508,7 +508,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                                   + " disabled:opacity-50"
                                   + (ram === opt
                                     ? " border-violet-500/40 bg-violet-500/15 text-violet-300"
-                                    : " border-[#1a1f2e] bg-white/[0.02] text-slate-500 hover:border-white/[0.1] hover:text-slate-400")}
+                                    : " border-purple-500/15 bg-purple-500/[0.04] text-slate-500 hover:border-white/[0.1] hover:text-slate-400")}
                       >
                         {opt}
                       </button>
@@ -527,7 +527,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     placeholder="Custom JVM flags (replaces Aikar GC defaults)&#10;e.g. -XX:+UseZGC -XX:+ZGenerational"
                     rows={3}
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#1a1f2e] bg-[#0a0c10]
+                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
                                px-3.5 py-2.5 text-xs text-white font-mono
                                placeholder:text-slate-600
                                focus:border-violet-500/40 focus:outline-none

@@ -66,7 +66,7 @@ export default function ServerSidebar({
                 ${collapsed ? "justify-center" : ""}
                 ${isDashboard
                   ? "bg-violet-500/10 text-violet-300"
-                  : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
+                  : "text-slate-500 hover:bg-purple-500/5 hover:text-slate-300"
                 }`}
               title={collapsed ? "Dashboard" : undefined}
             >
@@ -100,7 +100,7 @@ export default function ServerSidebar({
                         ${collapsed ? "justify-center" : ""}
                         ${isActive
                           ? "bg-violet-500/10 text-violet-300"
-                          : "text-slate-500 hover:bg-white/[0.03] hover:text-slate-300"
+                          : "text-slate-500 hover:bg-purple-500/5 hover:text-slate-300"
                         }`}
                       title={collapsed ? s.name : undefined}
                     >
@@ -131,7 +131,7 @@ export default function ServerSidebar({
           <button
             onClick={onInstallModpack}
             className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium
-              text-slate-600 transition hover:bg-white/[0.03] hover:text-slate-400 w-full
+              text-slate-600 transition hover:bg-purple-500/5 hover:text-slate-400 w-full
               ${collapsed ? "justify-center" : ""}`}
           >
             <Download className="h-4 w-4 shrink-0" />
@@ -140,7 +140,7 @@ export default function ServerSidebar({
           <button
             onClick={() => setPwDialogOpen(true)}
             className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium
-              text-slate-600 transition hover:bg-white/[0.03] hover:text-slate-400 w-full
+              text-slate-600 transition hover:bg-purple-500/5 hover:text-slate-400 w-full
               ${collapsed ? "justify-center" : ""}`}
           >
             <KeyRound className="h-4 w-4 shrink-0" />

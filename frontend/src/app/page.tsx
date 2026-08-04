@@ -169,7 +169,7 @@ export default function DashboardPage() {
               {/* ── Header ── */}
               <header className="mb-8 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-white/[0.04] transition" title="Open menu">
+                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-purple-500/5 transition" title="Open menu">
                     <Menu className="h-5 w-5" />
                   </button>
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10 shadow-lg">
@@ -188,9 +188,9 @@ export default function DashboardPage() {
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600 pointer-events-none" />
                     <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter servers…"
-                      className="w-36 sm:w-48 rounded-lg border border-[#1a1f2e] bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                      className="w-36 sm:w-48 rounded-lg border border-purple-500/15 bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
                   </div>
-                  <button onClick={fetchServers} className="rounded-lg border border-[#1a1f2e] p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
+                  <button onClick={fetchServers} className="rounded-lg border border-purple-500/15 p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
                     <RefreshCw className="h-4 w-4" />
                   </button>
                   <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 shadow-lg">
@@ -280,7 +280,7 @@ export default function DashboardPage() {
 
               {/* ── Server Cards ── */}
               {servers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#1a1f2e] py-20">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-purple-500/15 py-20">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10">
                     <Server className="h-7 w-7 text-violet-400" />
                   </div>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
               ) : filteredServers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#1a1f2e] py-20">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-purple-500/15 py-20">
                   <Search className="h-8 w-8 text-slate-700 mb-3" />
                   <p className="text-sm font-medium text-slate-500">No servers match &quot;{searchQuery}&quot;</p>
                 </div>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                                   </div>
                                 ) : (
                                   <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setRestartConfirmId(s.id); }}
-                                    className="flex h-7 w-7 items-center justify-center text-slate-500 transition hover:bg-white/[0.04] hover:text-amber-400 disabled:opacity-50" title="Restart">
+                                    className="flex h-7 w-7 items-center justify-center text-slate-500 transition hover:bg-purple-500/5 hover:text-amber-400 disabled:opacity-50" title="Restart">
                                     <RotateCw className="h-3 w-3" />
                                   </button>
                                 )}
@@ -368,14 +368,14 @@ export default function DashboardPage() {
 
                         {/* Stats grid */}
                         <div className="grid grid-cols-2 gap-2 mt-auto">
-                          <div className="flex items-center gap-1.5 rounded-md bg-white/[0.02] px-2.5 py-2">
+                          <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                             <Wifi className="h-3 w-3 shrink-0 text-slate-600" />
                             <div className="min-w-0">
                               <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Port</p>
                               <p className="text-xs font-mono font-medium text-white">:{s.port}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 rounded-md bg-white/[0.02] px-2.5 py-2">
+                          <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                             <MemoryStick className="h-3 w-3 shrink-0 text-slate-600" />
                             <div className="min-w-0">
                               <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">RAM</p>
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                           </div>
                           {s.status === "running" && (
                             <>
-                              <div className="flex items-center gap-1.5 rounded-md bg-white/[0.02] px-2.5 py-2">
+                              <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                                 <Users className="h-3 w-3 shrink-0 text-emerald-400" />
                                 <div className="min-w-0">
                                   <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Players</p>
@@ -394,7 +394,7 @@ export default function DashboardPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 rounded-md bg-white/[0.02] px-2.5 py-2">
+                              <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                                 <Zap className={`h-3 w-3 shrink-0 ${(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 80 ? "text-red-400" : (liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 50 ? "text-amber-400" : "text-emerald-400"}`} />
                                 <div className="min-w-0">
                                   <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">CPU</p>
@@ -404,7 +404,7 @@ export default function DashboardPage() {
                             </>
                           )}
                           {s.status !== "running" && diskUsage[s.id] != null && diskUsage[s.id] >= 0 && (
-                            <div className="flex items-center gap-1.5 rounded-md bg-white/[0.02] px-2.5 py-2">
+                            <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
                               <HardDrive className="h-3 w-3 shrink-0 text-slate-600" />
                               <div className="min-w-0">
                                 <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Disk</p>
