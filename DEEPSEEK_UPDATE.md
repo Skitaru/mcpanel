@@ -1,5 +1,13 @@
 # MCPanel — Obsidian Dark + Purple Redesign & PixelForge Layout Update
 
+> ⚠️ **KRITISCH — PRODUKTIONSSERVER MIT AKTIVEN SPIELERN**
+>
+> Auf dem Panel läuft **"Zentrum"** (Paper 1.21, Port 25565, 32 GB RAM) — ein LIVE-Server mit aktiven Spielern.
+>
+> **Niemals:** `docker rm/stop/kill`, Daten in `/opt/mcpanel/data/` löschen, Server über API löschen, `servers.json` ohne Backup ändern.
+>
+> **Immer:** Vor Eingriffen Backup erstellen. Keine destruktiven Aktionen ohne explizite Bestätigung.
+
 > **Anweisungen für DeepSeek:** 
 > Übernimm das neue PixelForge 2-Spalten Layout und das **Obsidian Dark + Purple Theme** für MCPanel. Erstelle dazu die 2 neuen Tab-Komponenten (`SftpTab.tsx`, `StatusTab.tsx`) und aktualisiere die bestehenden Frontend-Dateien gemäß dem folgenden Code.
 

@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""SSH helper for MCPanel server at 5.231.108.226.
+"""
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️  KRITISCH — PRODUKTIONSSERVER MIT AKTIVEN SPIELERN  ⚠️  ║
+║                                                              ║
+║  Server "Zentrum" (Paper 1.21, Port 25565) ist LIVE.        ║
+║  KEINE destruktiven Aktionen:                                ║
+║   - Kein docker rm / docker stop / docker kill               ║
+║   - Kein Löschen von /opt/mcpanel/data/                      ║
+║   - Kein systemctl stop (außer für kontrollierte Neustarts)  ║
+║   - Kein Löschen des Servers über die API                    ║
+║   - Kein Ändern von servers.json ohne Backup                 ║
+║  Vor jedem Eingriff: Backup erstellen!                       ║
+╚══════════════════════════════════════════════════════════════╝
+
+SSH helper for MCPanel server at 5.231.108.226.
 Usage: python deploy.py "<command>"   — runs command on server
        python deploy.py scp <local> <remote>  — uploads a file
        python deploy.py rebuild-frontend
