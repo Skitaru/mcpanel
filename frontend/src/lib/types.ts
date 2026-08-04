@@ -14,4 +14,5 @@ export interface ServerStatus {
   javaArgs?: string | null;
   maxPlayers?: number;
   voicePort?: number | null;
+  startedAt?: string | null;
 }

@@ -627,6 +627,7 @@ router.get("/", async (_req: Request, res: Response) => {
         javaArgs: s.javaArgs ?? null,
         maxPlayers: s.maxPlayers ?? 20,
         voicePort: s.voicePort ?? null,
+        startedAt: st?.startedAt ?? null,
       };
     });
 

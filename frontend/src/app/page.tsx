@@ -34,7 +34,10 @@ function formatDisk(bytes: number | undefined) {
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
   return `${(bytes / 1e3).toFixed(1)} KB`;
 }
-function formatUptime(seconds: number) {
+function formatUptime(startedAt: string | null | undefined) {
+  if (!startedAt) return null;
+  const seconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+  if (seconds < 0) return null;
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   const h = Math.floor(seconds / 3600);
@@ -58,8 +61,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
   const [serverMotds, setServerMotds] = useState<Record<string, string>>({});
-  const [onlineSince, setOnlineSince] = useState<Record<string, number>>({});
-  const [uptimeNow, setUptimeNow] = useState(Date.now());
+  const [tick, setTick] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
@@ -156,28 +158,9 @@ export default function DashboardPage() {
     }
   }, [servers]);
 
-  // ---- Uptime tracking ----
-  const prevStatusRef = useRef<Record<string, ServerStatus["status"]>>({});
+  // Tick every 30s for live uptime display
   useEffect(() => {
-    for (const s of servers) {
-      const prev = prevStatusRef.current[s.id];
-      prevStatusRef.current[s.id] = s.status;
-      if (s.status === "running" && prev !== "running") {
-        setOnlineSince(prev2 => ({ ...prev2, [s.id]: Date.now() }));
-      }
-      if (s.status !== "running") {
-        setOnlineSince(prev2 => {
-          const next = { ...prev2 };
-          delete next[s.id];
-          return next;
-        });
-      }
-    }
-  }, [servers]);
-
-  // Tick uptime display every 30s
-  useEffect(() => {
-    const i = setInterval(() => setUptimeNow(Date.now()), 30_000);
+    const i = setInterval(() => setTick(t => t + 1), 30_000);
     return () => clearInterval(i);
   }, []);
 
@@ -365,8 +348,7 @@ export default function DashboardPage() {
                   {filteredServers.map((s, i) => {
                     const iconUrl = serverIcons[s.id];
                     const motd = serverMotds[s.id];
-                    const since = onlineSince[s.id];
-                    const uptimeSec = since ? Math.floor((uptimeNow - since) / 1000) : 0;
+                    const uptime = formatUptime(s.startedAt);
 
                     return (
                     <div key={s.id}
@@ -439,10 +421,10 @@ export default function DashboardPage() {
                           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusBadgeColor(s.status)}`}>
                             {statusLabel(s.status)}
                           </span>
-                          {s.status === "running" && since && (
+                          {s.status === "running" && uptime && (
                             <span className="flex items-center gap-1 text-[10px] text-slate-500">
                               <Clock className="h-3 w-3" />
-                              {formatUptime(uptimeSec)}
+                              {uptime}
                             </span>
                           )}
                           <span className="text-[11px] text-slate-600">{s.version}</span>
