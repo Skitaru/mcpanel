@@ -116,7 +116,19 @@ function pingMinecraftServer(host: string, port: number, timeoutMs = 3000): Prom
 
         const payload = buf.subarray(pos, pos + length);
         if (payload[0] !== 0x00) return; // not a status response
-        const jsonStr = payload.subarray(1).toString("utf8");
+
+        // Read VarInt string length prefix from the response body
+        let strPos = 1;
+        let strLen = 0;
+        let strShift = 0;
+        while (strPos < payload.length) {
+          const sb = payload[strPos++];
+          strLen |= (sb & 0x7f) << strShift;
+          if (!(sb & 0x80)) break;
+          strShift += 7;
+        }
+
+        const jsonStr = payload.subarray(strPos, strPos + strLen).toString("utf8");
         const data = JSON.parse(jsonStr);
         if (data.players) {
           done({
