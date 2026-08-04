@@ -176,7 +176,7 @@ export default function ServerDetailPage() {
           ) : (
             <>
               {/* ── Top Bar: Breadcrumb + Actions ── */}
-              <div className="mb-5 flex items-center justify-between">
+              <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs font-mono">
                   <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-slate-400 hover:text-purple-300 transition">
                     <ArrowLeft className="h-3.5 w-3.5" /> Back to servers
@@ -192,7 +192,7 @@ export default function ServerDetailPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-1.5 bg-[#0e0d14] p-1.5 rounded-xl border border-purple-500/15 shadow-lg">
+                <div className="flex items-center gap-1.5 bg-[#0e0d14] p-1.5 rounded-xl border border-purple-500/15 shadow-lg overflow-x-auto max-w-full">
                   {actionConfirm ? (
                     <div className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1">
                       <span className="text-[11px] font-medium text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
