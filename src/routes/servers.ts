@@ -581,9 +581,14 @@ router.get("/:id/logs", async (req: Request, res: Response) => {
     if (!server.containerId) { res.status(400).json({ error: "Server has no associated container." }); return; }
 
     const tail = Math.min(Math.max(parseInt(req.query.tail as string) || 200, 10), 5000);
-    const { execFileSync } = await import("node:child_process");
-    const output = execFileSync("docker", ["logs", "--tail", String(tail), server.containerId!], {
-      timeout: 10_000, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"],
+    const { execFile } = await import("node:child_process");
+    const output = await new Promise<string>((resolve, reject) => {
+      execFile("docker", ["logs", "--tail", String(tail), server.containerId!], {
+        timeout: 10_000, encoding: "utf-8",
+      }, (err: Error | null, stdout: string) => {
+        if (err) reject(err);
+        else resolve(stdout);
+      });
     });
     res.json({ logs: output, serverId: server.id, tail });
   } catch (err: any) {
@@ -755,12 +760,16 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    const { execFileSync } = await import("node:child_process");
+    const { execFile } = await import("node:child_process");
     try {
       // --no-absolute-filenames prevents path-traversal via malicious archive
-      execFileSync("tar", ["-xzf", uploadPath, "-C", tmpDir, "--no-absolute-filenames"], {
-        stdio: "pipe",
-        timeout: 300_000,
+      await new Promise<void>((resolve, reject) => {
+        execFile("tar", ["-xzf", uploadPath, "-C", tmpDir, "--no-absolute-filenames"], {
+          timeout: 300_000,
+        }, (err: Error | null) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
     } catch (err: any) {
       try { fs.unlinkSync(uploadPath); } catch {}

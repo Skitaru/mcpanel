@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Play, Square, RotateCw, Cpu, MemoryStick, Users, HardDrive, Search, Menu, Server, Wifi, Zap, CheckCircle, XCircle } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Play, Square, RotateCw, Cpu, MemoryStick, Users, HardDrive, Search, Menu, Server, Wifi, Zap, CheckCircle, XCircle, Clock } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
@@ -34,6 +34,13 @@ function formatDisk(bytes: number | undefined) {
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
   return `${(bytes / 1e3).toFixed(1)} KB`;
 }
+function formatUptime(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
 
 export default function DashboardPage() {
   const [servers, setServers] = useState<ServerStatus[]>([]);
@@ -49,6 +56,10 @@ export default function DashboardPage() {
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
+  const [serverMotds, setServerMotds] = useState<Record<string, string>>({});
+  const [onlineSince, setOnlineSince] = useState<Record<string, number>>({});
+  const [uptimeNow, setUptimeNow] = useState(Date.now());
   const socketRef = useRef<Socket | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
@@ -124,6 +135,62 @@ export default function DashboardPage() {
     const i = setInterval(pollDisk, 60_000); return () => clearInterval(i);
   }, [servers]);
 
+  // ---- Server icons + MOTD (fetch once on server list change) ----
+  const fetchedMetaRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const s of servers) {
+      if (fetchedMetaRef.current.has(s.id)) continue;
+      fetchedMetaRef.current.add(s.id);
+
+      // Fetch server icon
+      fetch(`${API_BASE}/api/servers/${s.id}/file?path=${encodeURIComponent("/server-icon.png")}&raw=true`)
+        .then(async r => { if (r.ok && r.status !== 204) return r.blob(); return null; })
+        .then(blob => { if (blob) setServerIcons(prev => ({ ...prev, [s.id]: URL.createObjectURL(blob) })); })
+        .catch(() => {});
+
+      // Fetch MOTD
+      fetch(`${API_BASE}/api/servers/${s.id}/properties`)
+        .then(async r => { if (r.ok) return r.json(); return null; })
+        .then(data => { if (data?.motd) setServerMotds(prev => ({ ...prev, [s.id]: data.motd })); })
+        .catch(() => {});
+    }
+  }, [servers]);
+
+  // ---- Uptime tracking ----
+  const prevStatusRef = useRef<Record<string, ServerStatus["status"]>>({});
+  useEffect(() => {
+    for (const s of servers) {
+      const prev = prevStatusRef.current[s.id];
+      prevStatusRef.current[s.id] = s.status;
+      if (s.status === "running" && prev !== "running") {
+        setOnlineSince(prev2 => ({ ...prev2, [s.id]: Date.now() }));
+      }
+      if (s.status !== "running") {
+        setOnlineSince(prev2 => {
+          const next = { ...prev2 };
+          delete next[s.id];
+          return next;
+        });
+      }
+    }
+  }, [servers]);
+
+  // Tick uptime display every 30s
+  useEffect(() => {
+    const i = setInterval(() => setUptimeNow(Date.now()), 30_000);
+    return () => clearInterval(i);
+  }, []);
+
+  // Cleanup blob URLs
+  useEffect(() => {
+    return () => {
+      Object.values(serverIcons).forEach(url => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchServers = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/servers`);
@@ -162,12 +229,12 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertTriangle className="h-10 w-10 text-amber-500" />
               <p className="text-sm text-slate-500">{error}</p>
-              <button onClick={() => { setLoading(true); setError(null); fetchServers(); }} className="rounded-lg bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/[0.06]">Retry</button>
+              <button onClick={() => { setLoading(true); setError(null); fetchServers(); }} className="rounded-lg bg-purple-500/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-purple-500/10">Retry</button>
             </div>
           ) : (
             <>
-              {/* ── Header ── */}
-              <header className="mb-8 flex items-center justify-between">
+              {/* Header */}
+              <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-purple-500/5 transition" title="Open menu">
                     <Menu className="h-5 w-5" />
@@ -184,25 +251,24 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:flex-initial">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600 pointer-events-none" />
-                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter servers…"
-                      className="w-36 sm:w-48 rounded-lg border border-purple-500/15 bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter…"
+                      className="w-full sm:w-36 rounded-lg border border-purple-500/15 bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
                   </div>
-                  <button onClick={fetchServers} className="rounded-lg border border-purple-500/15 p-2 text-slate-600 transition hover:border-[#252b3b] hover:text-slate-400" title="Refresh">
+                  <button onClick={fetchServers} className="rounded-lg border border-purple-500/15 p-2 text-slate-600 transition hover:border-purple-500/30 hover:text-slate-400 shrink-0" title="Refresh">
                     <RefreshCw className="h-4 w-4" />
                   </button>
-                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 shadow-lg">
-                    <Plus className="h-4 w-4" /> New Server
+                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 shadow-lg shrink-0">
+                    <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Server</span>
                   </button>
                 </div>
               </header>
 
-              {/* ── Stats Bar ── */}
+              {/* Stats Bar */}
               {servers.length > 0 && (
                 <div className="mb-6 space-y-4">
-                  {/* Summary cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="surface flex items-center gap-3 p-4 animate-slide-up stagger-1">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
@@ -242,7 +308,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Quick stats row */}
                   {stats.running > 0 && (
                     <div className="surface flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 animate-slide-up stagger-2">
                       <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -278,7 +343,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* ── Server Cards ── */}
+              {/* Server Cards */}
               {servers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-purple-500/15 py-20">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10">
@@ -297,7 +362,13 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredServers.map((s, i) => (
+                  {filteredServers.map((s, i) => {
+                    const iconUrl = serverIcons[s.id];
+                    const motd = serverMotds[s.id];
+                    const since = onlineSince[s.id];
+                    const uptimeSec = since ? Math.floor((uptimeNow - since) / 1000) : 0;
+
+                    return (
                     <div key={s.id}
                       className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${STAGGER[i] || ""}`}>
 
@@ -306,14 +377,22 @@ export default function DashboardPage() {
 
                       {/* Card body */}
                       <div className="p-4 flex flex-col flex-1">
-                        {/* Top row: dot + name + type badge + actions */}
+                        {/* Top row: icon + name + type badge + actions */}
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-violet-500/10">
-                              <Server className="h-4 w-4 text-violet-400" />
+                            {/* Server icon */}
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg overflow-hidden bg-gradient-to-br from-violet-500/20 to-violet-500/10 border border-purple-500/15">
+                              {iconUrl ? (
+                                <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Server className="h-5 w-5 text-violet-400" />
+                              )}
                             </div>
                             <div className="min-w-0">
                               <h2 className="truncate text-sm font-semibold text-white group-hover:text-violet-400 transition">{s.name}</h2>
+                              {s.status === "running" && motd && (
+                                <p className="truncate text-[11px] text-slate-500 mt-0.5">{motd}</p>
+                              )}
                             </div>
                           </div>
                           {/* Action button group */}
@@ -360,6 +439,12 @@ export default function DashboardPage() {
                           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusBadgeColor(s.status)}`}>
                             {statusLabel(s.status)}
                           </span>
+                          {s.status === "running" && since && (
+                            <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                              <Clock className="h-3 w-3" />
+                              {formatUptime(uptimeSec)}
+                            </span>
+                          )}
                           <span className="text-[11px] text-slate-600">{s.version}</span>
                           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${typeBadgeColor(s.serverType)}`}>
                             {typeLabel(s.serverType)}
@@ -418,7 +503,8 @@ export default function DashboardPage() {
                       {/* Click overlay */}
                       <Link href={`/servers/${s.id}`} className="absolute inset-0 z-10" />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
