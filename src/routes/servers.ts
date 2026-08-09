@@ -614,6 +614,44 @@ router.post("/:id/restart", async (req: Request, res: Response) => {
     await startContainer(server.containerId);
     console.log(`[api] Restarted server "${server.name}"`);
     res.json({ message: `Server "${server.name}" restarted.` });
+
+    // Re-init Discord after restart
+    if (server.discordWebhook) {
+      stopStatusEmbedUpdater(server.id);
+      if ((server as any)._discordStatsStream) { (server as any)._discordStatsStream.destroy(); }
+      initLiveStats(server.id, server.ram * 1e6);
+      import("../services/docker").then(({ getStatsStream }) => {
+        getStatsStream(server.containerId!).then(stream => {
+          stream.on("data", (chunk: Buffer) => {
+            try {
+              const raw = JSON.parse(chunk.toString());
+              const cpuDelta = raw.cpu_stats.cpu_usage.total_usage - raw.precpu_stats.cpu_usage.total_usage;
+              const sysDelta = raw.cpu_stats.system_cpu_usage - raw.precpu_stats.system_cpu_usage;
+              if (cpuDelta > 0 && sysDelta > 0) {
+                const cpu = (cpuDelta / sysDelta) * raw.cpu_stats.online_cpus * 100;
+                setLiveStats(server.id, { cpuPercent: Math.round(cpu * 100) / 100, memoryUsage: raw.memory_stats?.usage ?? 0 });
+              }
+            } catch {}
+          });
+          stream.on("error", () => stream.destroy());
+          (server as any)._discordStatsStream = stream;
+        }).catch(() => {});
+      });
+      const embed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "online");
+      if (server.discordMessageId) {
+        editDiscordEmbed(server.discordWebhook, server.discordMessageId, embed);
+        startStatusEmbedUpdater(server.discordWebhook, server.discordMessageId, server.id,
+          server.name, server.serverType, server.version, server.port);
+      } else {
+        sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
+          if (msgId) {
+            updateServer(server.id, { discordMessageId: msgId } as any);
+            startStatusEmbedUpdater(server.discordWebhook!, msgId, server.id,
+              server.name, server.serverType, server.version, server.port);
+          }
+        });
+      }
+    }
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/restart error:", err);
     res.status(500).json({ error: "Failed to restart server.", detail: err.message });
