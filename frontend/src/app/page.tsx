@@ -233,7 +233,7 @@ export default function DashboardPage() {
                   <div className="surface p-4 animate-slide-up stagger-3">
                     <div className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider mb-2">RAM</div>
                     <div className="text-2xl font-bold text-white tabular-nums">
-                      {stats.totalRam >= 1e9 ? `${(stats.totalRam / 1e9).toFixed(1)}` : stats.totalRam}
+                      {stats.totalRam >= 1024 ? `${(stats.totalRam / 1024).toFixed(1)}` : stats.totalRam}
                       <span className="text-base font-medium text-[#6b6480]"> GB</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px]">

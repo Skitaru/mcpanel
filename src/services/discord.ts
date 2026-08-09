@@ -47,24 +47,41 @@ export function clearLiveStats(serverId: string): void { liveStore.delete(server
 
 export async function sendDiscordEmbed(webhookUrl: string, embed: DiscordEmbed): Promise<string | null> {
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl + "?wait=true", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] }), signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
-    const data = await res.json() as { id: string };
-    return data.id ?? null;
-  } catch { return null; }
+    if (!res.ok) {
+      console.error(`[discord] Send failed: ${res.status}`);
+      try { console.error("[discord] Body:", await res.text()); } catch {}
+      return null;
+    }
+    let data: { id?: string } = {}; try { const text = await res.text(); if (text) data = JSON.parse(text); } catch {}
+    const msgId = data.id ?? null;
+    console.log(`[discord] Embed sent, messageId: ${msgId}`);
+    return msgId;
+  } catch (err) {
+    console.error("[discord] Send error:", err);
+    return null;
+  }
 }
 
 export async function editDiscordEmbed(webhookUrl: string, messageId: string, embed: DiscordEmbed): Promise<boolean> {
   try {
-    const res = await fetch(`${webhookUrl}/messages/${messageId}`, {
+    const url = `${webhookUrl}/messages/${messageId}`;
+    const res = await fetch(url, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] }), signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
     });
+    if (!res.ok) {
+      console.error(`[discord] Edit failed: ${res.status} — ${url.slice(0, 80)}...`);
+      try { console.error("[discord] Body:", await res.text()); } catch {}
+    }
     return res.ok;
-  } catch { return false; }
+  } catch (err) {
+    console.error("[discord] Edit error:", err);
+    return false;
+  }
 }
 
 // ── Embed builders ──
@@ -121,6 +138,7 @@ export function startStatusEmbedUpdater(
   stopStatusEmbedUpdater(serverId);
   const interval = setInterval(() => {
     const embed = buildStatusEmbed(serverId, name, serverType, version, port, "online");
+    console.log(`[discord] Updating embed for ${serverId} — CPU: ${embed.fields[3].value}, TPS: ${embed.fields[5].value}`);
     editDiscordEmbed(webhookUrl, messageId, embed);
   }, 10_000);
   updaters.set(serverId, interval);
