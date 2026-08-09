@@ -70,10 +70,10 @@ export async function editDiscordEmbed(webhookUrl: string, messageId: string, em
 // ── Embed builders ──
 
 export function buildStatusEmbed(
-  name: string, serverType: string, version: string, port: number,
+  serverId: string, name: string, serverType: string, version: string, port: number,
   status: "online" | "offline",
 ): DiscordEmbed {
-  const stats = status === "online" ? getLiveStats(name) : undefined;
+  const stats = status === "online" ? getLiveStats(serverId) : undefined;
 
   if (status === "offline") {
     return {
@@ -120,7 +120,7 @@ export function startStatusEmbedUpdater(
 ): void {
   stopStatusEmbedUpdater(serverId);
   const interval = setInterval(() => {
-    const embed = buildStatusEmbed(name, serverType, version, port, "online");
+    const embed = buildStatusEmbed(serverId, name, serverType, version, port, "online");
     editDiscordEmbed(webhookUrl, messageId, embed);
   }, 10_000);
   updaters.set(serverId, interval);

@@ -524,7 +524,7 @@ router.post("/:id/start", async (req: Request, res: Response) => {
       // Init stats store so embed has memory limit from the start
       initLiveStats(server.id, server.ram * 1e6);
       // Send ONE embed — will be edited live every 10s
-      const embed = buildStatusEmbed(server.name, server.serverType, server.version, server.port, "online");
+      const embed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "online");
       sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
         if (msgId) {
           updateServer(server.id, { discordMessageId: msgId } as any);
@@ -563,7 +563,7 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
       stopStatusEmbedUpdater(server.id);
       clearLiveStats(server.id);
       if (server.discordMessageId) {
-        const offlineEmbed = buildStatusEmbed(server.name, server.serverType, server.version, server.port, "offline");
+        const offlineEmbed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "offline");
         editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
         updateServer(server.id, { discordMessageId: undefined as any });
       }
