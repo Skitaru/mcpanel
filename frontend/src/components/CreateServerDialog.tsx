@@ -97,7 +97,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         if (cancelled) return;
         const list: string[] = data.versions ?? [];
         setVersions(list);
-        if (list.length > 0) setPaperVersion(list[0]);
+        if (list.length > 0 && !paperVersion) setPaperVersion(list[0]);
       } catch (err: unknown) {
         if (!cancelled) {
           setVersionsError(
@@ -122,6 +122,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setName("");
       setRam("4G");
       setJavaArgs("");
+      setPaperVersion("");
       setMaxPlayers(20);
       setHardcore(false);
       setDifficulty("normal");

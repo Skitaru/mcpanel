@@ -64,13 +64,13 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       setVoicePort(server.voicePort ?? null);
       setDiscordWebhook(server.discordWebhook ?? "");
       setError(null);
-      // Fetch max system RAM
       fetch(`${API_BASE}/api/system/info`)
         .then(r => r.json())
         .then((info: { totalMemoryMB: number }) => setMaxRamMB(info.totalMemoryMB))
         .catch(() => {});
     }
-  }, [open, server]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // ---- submit ----
   const handleSubmit = useCallback(
