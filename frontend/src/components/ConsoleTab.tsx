@@ -247,7 +247,8 @@ export default function ConsoleTab({
         // Strip ESC, normalize newlines, split (matches Modpack_Server approach)
         // eslint-disable-next-line no-control-regex
         const text = payload.data.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
-        const lines = text.split("\n").filter((l: string) => l.trim());
+        const lines = text.split("\n")
+          .filter((l: string) => l.trim() && !l.includes("Thread RCON Client"));
         for (const line of lines) {
           addLine(payload.stream, line);
         }
@@ -291,7 +292,8 @@ export default function ConsoleTab({
           if (text) {
             // eslint-disable-next-line no-control-regex
             const cleaned = text.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
-            const lines = cleaned.split("\n").filter((l: string) => l.trim());
+            const lines = cleaned.split("\n")
+              .filter((l: string) => l.trim() && !l.includes("Thread RCON Client"));
             setLines(lines.map((text: string) => ({
               type: "stdout" as const,
               text,
