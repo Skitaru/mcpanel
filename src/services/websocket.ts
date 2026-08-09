@@ -45,7 +45,7 @@ function cleanAnsi(serverId: string, raw: string): string {
     .replace(/\n> /g, "\n")
     .replace(/^> /, "")
     .replace(/\n  +/g, "\n")                               // collapse leading spaces
-    .replace(/\n?\[.*INFO\]: Thread RCON Client .*\n?/g, "\n")  // filter RCON connect/disconnect
+    .replace(/\n?\[.*?\]\s?\[.*RCON.*\/INFO\]: .*\n?/g, "\n")   // filter RCON connect/disconnect noise
     .replace(/\n{2,}/g, "\n");                             // collapse blank lines
 
   // Buffer dangling ESC for the next chunk

@@ -27,7 +27,10 @@ export default function LogsTab({ serverId }: Props) {
       setLogContent(data.content
         .replace(/\x1b/g, "")
         .replace(/\r\n/g, "\n")
-        .replace(/\r/g, ""));
+        .replace(/\r/g, "")
+        .split("\n")
+        .filter((line: string) => !/\[.*RCON.*\/INFO\]/.test(line))
+        .join("\n"));
       setError(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load logs.");
