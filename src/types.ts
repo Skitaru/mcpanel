@@ -34,6 +34,8 @@ export interface ServerConfig {
   voicePort?: number;
   /** Discord webhook URL for start/stop/crash notifications */
   discordWebhook?: string;
+  /** Discord message ID for the live status embed (auto-managed) */
+  discordMessageId?: string;
 }
 
 /** Request body for POST /api/servers */

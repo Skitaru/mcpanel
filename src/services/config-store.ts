@@ -56,7 +56,7 @@ export function removeServer(id: string): boolean {
 /** Update an existing server config by id. Returns the updated config or null. */
 export function updateServer(
   id: string,
-  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs" | "containerId" | "schedule" | "maxPlayers" | "voicePort" | "discordWebhook">>,
+  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs" | "containerId" | "schedule" | "maxPlayers" | "voicePort" | "discordWebhook" | "discordMessageId">>,
 ): ServerConfig | null {
   const servers = loadServers();
   const s = servers.find((s) => s.id === id);
@@ -71,6 +71,7 @@ export function updateServer(
   if (patch.maxPlayers !== undefined) s.maxPlayers = patch.maxPlayers;
   if ("voicePort" in patch) s.voicePort = patch.voicePort;
   if ("discordWebhook" in patch) s.discordWebhook = patch.discordWebhook;
+  if ("discordMessageId" in patch) (s as any).discordMessageId = patch.discordMessageId;
   saveServers(servers);
   return s;
 }

@@ -10,6 +10,7 @@ import jwt from "jsonwebtoken";
 import { getServer } from "./config-store";
 import { getJwtSecret } from "./auth";
 import { sendRcon } from "./rcon";
+import { setLiveStats as updateLiveStats } from "./live-stats";
 import {
   getStatsStream,
   attachContainer,
@@ -195,6 +196,8 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
             memoryLimit: stats.memoryLimit,
             timestamp: Date.now(),
           });
+          // Update shared live-stats store for Discord embed
+          updateLiveStats(serverId, { cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsage, memoryLimit: stats.memoryLimit });
         });
 
         stream.on("error", (err: Error) => {
@@ -263,6 +266,8 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
                 tps5m: parseFloat(match[3]),
                 timestamp: Date.now(),
               });
+              // Update shared live-stats for Discord embed
+              updateLiveStats(serverId, { tps5s: parseFloat(match[1]) });
             }
           })
           .catch(() => {
