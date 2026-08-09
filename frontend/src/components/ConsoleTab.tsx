@@ -100,8 +100,6 @@ export default function ConsoleTab({
   }]);
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [tps, setTps] = useState<{ tps5s: number; tps1m: number; tps5m: number } | null>(null);
-  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
-  const [ramHistory, setRamHistory] = useState<number[]>([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cmdHistory, setCmdHistory] = useState<string[]>(() => {
@@ -263,10 +261,6 @@ export default function ConsoleTab({
         memoryUsage: payload.memoryUsage,
         memoryLimit: payload.memoryLimit,
       });
-      // Sparkline buffering (keep last 60 data points)
-      setCpuHistory(prev => [...prev.slice(-59), Math.min(100, payload.cpuPercent)]);
-      setRamHistory(prev => [...prev.slice(-59), payload.memoryLimit > 0
-        ? (payload.memoryUsage / payload.memoryLimit) * 100 : 0]);
     });
 
     socket.on("stats:error", (payload: { serverId: string; message: string }) => {
@@ -406,6 +400,34 @@ export default function ConsoleTab({
     <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#28223D] bg-[#151221] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
+        {/* ── Stats Bar ── */}
+        {isOnline && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 border-b border-[#28223D] bg-[#0B0914] font-mono text-[11px]">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Cpu className="h-3 w-3" />
+              <span className="text-[#F8F7FF] tabular-nums">{stats?.cpuPercent != null ? Math.min(100, stats.cpuPercent).toFixed(1) : "—"}%</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <MemoryStick className="h-3 w-3" />
+              <span className="text-[#F8F7FF] tabular-nums">{stats ? formatBytes(stats.memoryUsage) : "—"}</span>
+              <span className="text-[#6b6480]">/ {formatRam(ram)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="text-[#6b6480]">TPS</span>
+              <span className="tabular-nums">{tps ? (
+                <><span className={tps.tps5s >= 19 ? "text-[#00F5D4]" : tps.tps5s >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps5s.toFixed(1)}</span>
+                <span className="text-[#6b6480]">/</span>
+                <span className={tps.tps1m >= 19 ? "text-[#00F5D4]" : tps.tps1m >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps1m.toFixed(1)}</span>
+                <span className="text-[#6b6480]">/</span>
+                <span className={tps.tps5m >= 19 ? "text-[#00F5D4]" : tps.tps5m >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps5m.toFixed(1)}</span></>
+              ) : "—"}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Users className="h-3 w-3" />
+              <span className="text-[#F8F7FF] tabular-nums">{playerCount.online}/{playerCount.max}</span>
+            </div>
+          </div>
+        )}
         {/* Output area */}
         <div
           ref={outputRef}
@@ -566,31 +588,6 @@ export default function ConsoleTab({
           )}
         </div>
 
-        {/* TPS */}
-        {isOnline && (
-          <div className="px-4 py-3 border-b border-[#28223D]">
-            <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">TPS</div>
-            {tps ? (
-              <div className="flex gap-2">
-                {[
-                  { label: "5s", val: tps.tps5s },
-                  { label: "1m", val: tps.tps1m },
-                  { label: "5m", val: tps.tps5m },
-                ].map(({ label, val }) => (
-                  <div key={label} className="flex-1 text-center">
-                    <div className={`text-sm font-mono font-bold tabular-nums ${
-                      val >= 19 ? "text-[#00F5D4]" : val >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"
-                    }`}>{val.toFixed(1)}</div>
-                    <div className="text-[9px] text-slate-600">{label}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm font-medium text-slate-200 tabular-nums">—</div>
-            )}
-          </div>
-        )}
-
         {/* Uptime */}
         <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
@@ -613,22 +610,14 @@ export default function ConsoleTab({
             {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
           </div>
           {stats?.cpuPercent != null && (
-            <>
-              <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
-                  }`}
-                  style={{ width: `${Math.min(100, stats.cpuPercent)}%` }}
-                />
-              </div>
-              {cpuHistory.length > 2 && (
-                <svg className="mt-1.5 w-full h-6" viewBox={`0 0 ${cpuHistory.length} 20`} preserveAspectRatio="none">
-                  <polyline fill="none" stroke="#9D4EDD" strokeWidth="1"
-                    points={cpuHistory.map((v, i) => `${i},${20 - (v / 100) * 18 - 1}`).join(" ")} />
-                </svg>
-              )}
-            </>
+            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
+                }`}
+                style={{ width: `${Math.min(100, stats.cpuPercent)}%` }}
+              />
+            </div>
           )}
         </div>
 
@@ -647,26 +636,18 @@ export default function ConsoleTab({
             of {formatRam(ram)}
           </div>
           {stats && (
-            <>
-              <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    stats.memoryUsage / stats.memoryLimit > 0.9
-                      ? "bg-red-500"
-                      : stats.memoryUsage / stats.memoryLimit > 0.75
-                        ? "bg-amber-500"
-                        : "bg-violet-500"
-                  }`}
-                  style={{ width: `${Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100)}%` }}
-                />
-              </div>
-              {ramHistory.length > 2 && (
-                <svg className="mt-1.5 w-full h-6" viewBox={`0 0 ${ramHistory.length} 20`} preserveAspectRatio="none">
-                  <polyline fill="none" stroke="#00F5D4" strokeWidth="1"
-                    points={ramHistory.map((v, i) => `${i},${20 - (v / 100) * 18 - 1}`).join(" ")} />
-                </svg>
-              )}
-            </>
+            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  stats.memoryUsage / stats.memoryLimit > 0.9
+                    ? "bg-red-500"
+                    : stats.memoryUsage / stats.memoryLimit > 0.75
+                      ? "bg-amber-500"
+                      : "bg-violet-500"
+                }`}
+                style={{ width: `${Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100)}%` }}
+              />
+            </div>
           )}
         </div>
 
