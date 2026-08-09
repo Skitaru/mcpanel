@@ -23,3 +23,18 @@ panel-config.json
 .DS_Store
 Thumbs.db
 scripts/
+
+# Internal dev files — not for public repo
+AGENTS.md
+DEEPSEEK_UPDATE.md
+deploy.sh
+deploy.py
+deploy_second_server.py
+deploy.ps1
+update.ps1
+deploy.*.mjs
+deploy.*.cjs
+ssh-helper.*
+frontend/AGENTS.md
+frontend/CLAUDE.md
+frontend/README.md
