@@ -9,6 +9,7 @@ import { Server as SocketIOServer, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { getServer } from "./config-store";
 import { getJwtSecret } from "./auth";
+import { sendRcon } from "./rcon";
 import {
   getStatsStream,
   attachContainer,
@@ -69,6 +70,8 @@ interface SocketSession {
   statsSubs: Map<string, Readable>;
   /** serverId → console streams */
   consoleSubs: Map<string, ContainerStreams>;
+  /** serverId → TPS polling interval */
+  tpsIntervals: Map<string, ReturnType<typeof setInterval>>;
 }
 
 const sessions = new Map<string, SocketSession>();
@@ -148,6 +151,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     const session: SocketSession = {
       statsSubs: new Map(),
       consoleSubs: new Map(),
+      tpsIntervals: new Map(),
     };
     sessions.set(socket.id, session);
     console.log(`[ws] Client connected: ${socket.id}`);
@@ -217,6 +221,65 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         stream.destroy();
         session.statsSubs.delete(serverId);
         console.log(`[ws] Stats unsubscription: ${socket.id} → ${serverId}`);
+      }
+      // Also stop TPS polling
+      const tpsInterval = session.tpsIntervals.get(serverId);
+      if (tpsInterval) {
+        clearInterval(tpsInterval);
+        session.tpsIntervals.delete(serverId);
+      }
+    });
+
+    // ==================================================================
+    // TPS (via RCON polling)
+    // ==================================================================
+
+    socket.on("tps:subscribe", async (payload: { serverId: string }) => {
+      const { serverId } = payload;
+      if (session.tpsIntervals.has(serverId)) return;
+
+      const server = getServer(serverId);
+      if (!server?.containerId) {
+        socket.emit("tps:error", { serverId, message: "Server not found." });
+        return;
+      }
+
+      const pollTps = () => {
+        sendRcon("127.0.0.1", server.rconPort, server.rconPassword, "tps", 3000)
+          .then((raw) => {
+            // Parse Minecraft TPS output:
+            // "TPS from last 5s, 1m, 5m, 15m: §a20.0§r, §a19.8§r, §a19.5§r"
+            // Strip color codes and extract numbers
+            // eslint-disable-next-line no-control-regex
+            const clean = raw.replace(/§[0-9a-fk-or]/gi, "");
+            const match = clean.match(/:\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/);
+            if (match) {
+              socket.emit("tps:data", {
+                serverId,
+                tps5s: parseFloat(match[1]),
+                tps1m: parseFloat(match[2]),
+                tps5m: parseFloat(match[3]),
+                timestamp: Date.now(),
+              });
+            }
+          })
+          .catch(() => {
+            // RCON not reachable or server not ready — silent fail
+          });
+      };
+
+      pollTps(); // immediate first poll
+      const interval = setInterval(pollTps, 5000);
+      session.tpsIntervals.set(serverId, interval);
+      console.log(`[ws] TPS subscription: ${socket.id} → ${serverId}`);
+    });
+
+    socket.on("tps:unsubscribe", (payload: { serverId: string }) => {
+      const { serverId } = payload;
+      const interval = session.tpsIntervals.get(serverId);
+      if (interval) {
+        clearInterval(interval);
+        session.tpsIntervals.delete(serverId);
       }
     });
 
@@ -337,6 +400,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     socket.on("disconnect", () => {
       for (const stream of session.statsSubs.values()) stream.destroy();
       for (const streams of session.consoleSubs.values()) streams.close();
+      for (const interval of session.tpsIntervals.values()) clearInterval(interval);
       sessions.delete(socket.id);
       console.log(`[ws] Client disconnected: ${socket.id}`);
     });

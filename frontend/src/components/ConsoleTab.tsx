@@ -99,6 +99,9 @@ export default function ConsoleTab({
     type: "system", text: "Connecting to server console…", time: Date.now(),
   }]);
   const [stats, setStats] = useState<StatsPayload | null>(null);
+  const [tps, setTps] = useState<{ tps5s: number; tps1m: number; tps5m: number } | null>(null);
+  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
+  const [ramHistory, setRamHistory] = useState<number[]>([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cmdHistory, setCmdHistory] = useState<string[]>(() => {
@@ -215,6 +218,7 @@ export default function ConsoleTab({
       });
       socket.emit("console:attach", { serverId });
       socket.emit("stats:subscribe", { serverId });
+      socket.emit("tps:subscribe", { serverId });
     });
 
     socket.on("disconnect", () => {
@@ -258,12 +262,22 @@ export default function ConsoleTab({
         memoryUsage: payload.memoryUsage,
         memoryLimit: payload.memoryLimit,
       });
+      // Sparkline buffering (keep last 60 data points)
+      setCpuHistory(prev => [...prev.slice(-59), Math.min(100, payload.cpuPercent)]);
+      setRamHistory(prev => [...prev.slice(-59), payload.memoryLimit > 0
+        ? (payload.memoryUsage / payload.memoryLimit) * 100 : 0]);
     });
 
     socket.on("stats:error", (payload: { serverId: string; message: string }) => {
       if (payload.serverId !== serverId) return;
       // Stats stream error — will retry on next status transition
       addLine("system", `Stats stream error: ${payload.message}`);
+    });
+
+    // ---- tps ----
+    socket.on("tps:data", (payload: { serverId: string; tps5s: number; tps1m: number; tps5m: number }) => {
+      if (payload.serverId !== serverId) return;
+      setTps({ tps5s: payload.tps5s, tps1m: payload.tps1m, tps5m: payload.tps5m });
     });
 
     // ---- load log history ----
@@ -292,6 +306,7 @@ export default function ConsoleTab({
       cancelled = true;
       socket.emit("console:detach", { serverId });
       socket.emit("stats:unsubscribe", { serverId });
+      socket.emit("tps:unsubscribe", { serverId });
       socket.disconnect();
       socketRef.current = null;
     };
@@ -305,7 +320,9 @@ export default function ConsoleTab({
     addLine("system", "Server is restarting…");
     socket.emit("console:detach", { serverId });
     socket.emit("stats:unsubscribe", { serverId });
+    socket.emit("tps:unsubscribe", { serverId });
     setStats(null);
+    setTps(null);
     reattachPendingRef.current = true;
   }, [restartTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -324,12 +341,15 @@ export default function ConsoleTab({
         addLine("system", "Server started.");
         socket.emit("console:attach", { serverId });
         socket.emit("stats:subscribe", { serverId });
+        socket.emit("tps:subscribe", { serverId });
       }
     } else if (prev === "running") {
       addLine("system", "Server stopped.");
       socket.emit("console:detach", { serverId });
       socket.emit("stats:unsubscribe", { serverId });
+      socket.emit("tps:unsubscribe", { serverId });
       setStats(null);
+      setTps(null);
     }
   }, [serverStatus, serverId, addLine, restartTick]);
 
@@ -544,6 +564,31 @@ export default function ConsoleTab({
           )}
         </div>
 
+        {/* TPS */}
+        {isOnline && (
+          <div className="px-4 py-3 border-b border-[#28223D]">
+            <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">TPS</div>
+            {tps ? (
+              <div className="flex gap-2">
+                {[
+                  { label: "5s", val: tps.tps5s },
+                  { label: "1m", val: tps.tps1m },
+                  { label: "5m", val: tps.tps5m },
+                ].map(({ label, val }) => (
+                  <div key={label} className="flex-1 text-center">
+                    <div className={`text-sm font-mono font-bold tabular-nums ${
+                      val >= 19 ? "text-[#00F5D4]" : val >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"
+                    }`}>{val.toFixed(1)}</div>
+                    <div className="text-[9px] text-slate-600">{label}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm font-medium text-slate-200 tabular-nums">—</div>
+            )}
+          </div>
+        )}
+
         {/* Uptime */}
         <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
@@ -566,14 +611,22 @@ export default function ConsoleTab({
             {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
           </div>
           {stats?.cpuPercent != null && (
-            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
-                }`}
-                style={{ width: `${Math.min(100, stats.cpuPercent)}%` }}
-              />
-            </div>
+            <>
+              <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
+                  }`}
+                  style={{ width: `${Math.min(100, stats.cpuPercent)}%` }}
+                />
+              </div>
+              {cpuHistory.length > 2 && (
+                <svg className="mt-1.5 w-full h-6" viewBox={`0 0 ${cpuHistory.length} 20`} preserveAspectRatio="none">
+                  <polyline fill="none" stroke="#9D4EDD" strokeWidth="1"
+                    points={cpuHistory.map((v, i) => `${i},${20 - (v / 100) * 18 - 1}`).join(" ")} />
+                </svg>
+              )}
+            </>
           )}
         </div>
 
@@ -592,18 +645,26 @@ export default function ConsoleTab({
             of {formatRam(ram)}
           </div>
           {stats && (
-            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  stats.memoryUsage / stats.memoryLimit > 0.9
-                    ? "bg-red-500"
-                    : stats.memoryUsage / stats.memoryLimit > 0.75
-                      ? "bg-amber-500"
-                      : "bg-violet-500"
-                }`}
-                style={{ width: `${Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100)}%` }}
-              />
-            </div>
+            <>
+              <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    stats.memoryUsage / stats.memoryLimit > 0.9
+                      ? "bg-red-500"
+                      : stats.memoryUsage / stats.memoryLimit > 0.75
+                        ? "bg-amber-500"
+                        : "bg-violet-500"
+                  }`}
+                  style={{ width: `${Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100)}%` }}
+                />
+              </div>
+              {ramHistory.length > 2 && (
+                <svg className="mt-1.5 w-full h-6" viewBox={`0 0 ${ramHistory.length} 20`} preserveAspectRatio="none">
+                  <polyline fill="none" stroke="#00F5D4" strokeWidth="1"
+                    points={ramHistory.map((v, i) => `${i},${20 - (v / 100) * 18 - 1}`).join(" ")} />
+                </svg>
+              )}
+            </>
           )}
         </div>
 
