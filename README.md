@@ -1,96 +1,68 @@
-# MCPanel — Minecraft Server Panel
+# Obsidian Panel — Minecraft Server Dashboard
 
-A lightweight, modern web panel for managing Minecraft servers via Docker.
+A lightweight, modern web panel for managing Minecraft servers via Docker. Dark, clean, and fast.
 
-**Paper · Fabric · Velocity** — all in one panel. No bloat, no monthly fees.
+**Paper · Fabric · Velocity · Forge · NeoForge · Quilt** — all in one panel.
 
 ---
 
 ## ⚡ One-Line Install (Debian 12/13)
 
 ```bash
-# curl (Ubuntu):
-curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash
-
 # wget (Debian — preinstalled):
 wget -qO- https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash
+
+# curl:
+curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash
 ```
 
-> Requires **Debian 11/12/13** or **Ubuntu 22.04/24.04** · Root access · Port 3001 open
+> Requires **Debian 12/13** or **Ubuntu 22.04/24.04** · Root access · Port 3001 open
 
-The installer handles everything:
-- Docker
-- Node.js 22
-- Builds frontend + backend
-- Creates systemd services
-- Auto-starts on boot
+The installer handles Docker, Node.js 22, builds frontend + backend, creates systemd services, and enables auto-start.
 
 ### Custom options
 
 ```bash
-# curl:
 curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash -s -- --port 3000 --fe-port 3001 --api-key YOUR_KEY
-# wget:
-wget -qO- https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash -s -- --port 3000 --fe-port 3001 --api-key YOUR_KEY
 ```
 
 ---
 
-## 🖥 What you get
+## 🖥 Features
 
-| Category | Features |
-|----------|----------|
-| **Server Types** | PaperMC · Fabric (modded) · Velocity (proxy) |
-| **Live Console** | Real-time terminal via WebSocket · Command history · Offline persistence |
-| **File Manager** | Browse · Edit with line numbers · Upload (drag & drop) · Download · Create · Delete |
-| **Backups** | One-click create + download · Restore from upload |
-| **Resource Monitor** | Live CPU + RAM on dashboard · Per-server stats |
-| **Player Info** | Online player count on dashboard cards |
-| **Container** | Docker isolation · Auto Java version · Aikar's JVM flags · RCON |
-| **UX** | Collapsible sidebar · Skeleton loading · Dark modern UI · Mobile responsive |
+| Category | Details |
+|----------|---------|
+| **Server Types** | PaperMC · Fabric · Velocity · Forge · NeoForge · Quilt |
+| **Live Console** | Real-time terminal via WebSocket · Command history (persisted) · ANSI cleaning |
+| **File Manager** | Browse, edit with line numbers, upload (drag & drop), download, create, delete · Binary file detection |
+| **TPS Monitor** | Live TPS polling via RCON — color-coded display (5s / 1m / 5m) |
+| **Resource Monitor** | Live CPU + RAM with animated progress bars · Per-server stats on dashboard |
+| **Discord Webhook** | Start/stop/crash notifications as rich embeds |
+| **Modpack Installer** | One-click install from CurseForge — Forge, NeoForge, Fabric, Quilt support |
+| **Backups** | Create + download · Restore from upload · Auto-backup scheduling |
+| **Scheduler** | Auto-restart + auto-backup at configurable times |
+| **Player Info** | Online count + player list with avatars (mc-heads.net) |
+| **Security** | Isolated Docker containers · JWT auth · RCON bound to 127.0.0.1 · Non-root containers |
+| **UX** | Dark violet theme · Collapsible sidebar · Skeleton loading · Mobile responsive |
 
 ---
 
 ## 📋 Access
 
-After installation:
-
 | URL | What |
 |-----|------|
 | `http://YOUR-IP:3001` | Panel (frontend) |
 
-**Default login:** `admin` / `admin` — change the password via the login screen.
-
-The panel uses JWT-based authentication. An API-key fallback is available via `PANEL_API_KEY` in `/opt/mcpanel/.env`.
+**Default login:** `admin` / `admin` — change via sidebar → Password.
 
 ---
 
 ## 🔧 Service Management
 
 ```bash
-# Restart
 systemctl restart mcpanel-backend mcpanel-frontend
-
-# View logs
 journalctl -u mcpanel-backend -f
 journalctl -u mcpanel-frontend -f
-
-# Stop
-systemctl stop mcpanel-backend mcpanel-frontend
-```
-
----
-
-## 🚀 Quick Update
-
-From your local dev machine:
-
-```powershell
-# Full update (rebuilds everything)
-.\update.ps1 -Server "root@YOUR_IP"
-
-# Quick update (skip npm install)
-.\update.ps1 -Server "root@YOUR_IP" -Quick
 ```
 
 ---
@@ -99,37 +71,26 @@ From your local dev machine:
 
 ```
 mcpanel/
-├── src/                  # Backend (Express + TypeScript)
-│   ├── index.ts          # Entry point
-│   ├── types.ts          # Shared types
+├── src/                    # Backend (Express + TypeScript)
+│   ├── index.ts            # Entry point
+│   ├── types.ts            # Shared types
 │   ├── routes/
-│   │   ├── servers.ts    # Server CRUD, backup, restore, RCON
-│   │   └── files.ts      # File browser + editor + upload
+│   │   ├── servers.ts      # Server CRUD, backup, restore, RCON
+│   │   └── files.ts        # File browser + editor + upload
 │   └── services/
-│       ├── docker.ts     # Dockerode wrapper
-│       ├── websocket.ts  # Socket.IO (stats + console)
-│       ├── rcon.ts       # RCON client
-│       └── config-store.ts  # servers.json CRUD
-├── frontend/             # Next.js App Router + Tailwind CSS
+│       ├── docker.ts       # Docker container management
+│       ├── websocket.ts    # Socket.IO (stats + console + TPS)
+│       ├── rcon.ts         # RCON client
+│       ├── discord.ts      # Discord webhook sender
+│       ├── modpack.ts      # CurseForge modpack installer
+│       ├── scheduler.ts    # Scheduled tasks
+│       └── config-store.ts # servers.json CRUD
+├── frontend/               # Next.js 15 + React 19 + Tailwind 4
 │   └── src/
-│       ├── app/          # Pages (dashboard, server detail)
-│       └── components/   # UI components
-├── install.sh            # One-line installer
-├── update.ps1            # Fast update script
-├── deploy.sh             # Manual deploy script
-└── deploy.ps1            # First-time deploy script
+│       ├── app/            # Pages (dashboard, server detail)
+│       └── components/     # Console, FileManager, Settings, Dialogs
+└── install.sh              # One-line installer
 ```
-
----
-
-## 🔒 Security
-
-- All servers run in isolated Docker containers
-- JWT-based authentication (change default password on first login)
-- API-key fallback authentication
-- RCON bound to localhost only — not exposed to the internet
-- Path-traversal protection on all file operations
-- 10 MB file read limit, 500 MB upload limit
 
 ---
 
@@ -141,7 +102,19 @@ mcpanel/
 | Frontend | Next.js 15 · React 19 · Tailwind CSS 4 |
 | Real-time | Socket.IO |
 | Containers | Docker (dockerode) |
-| Terminal | xterm.js |
+| Fonts | Outfit · JetBrains Mono |
+
+---
+
+## 🔒 Security
+
+- All servers run in isolated Docker containers
+- JWT-based authentication (7-day expiry)
+- API-key fallback authentication
+- RCON bound to `127.0.0.1` only — not exposed to the internet
+- Containers run as non-root `mc` user
+- Path-traversal protection on all file operations
+- Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
 
 ---
 
