@@ -576,22 +576,18 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
     }
 
     await stopContainer(server.containerId);
-    res.json({ message: `Server "${server.name}" is stopping.` });
-    // Discord: stop live updater + stats stream + edit embed to offline
+    // Discord: stop updater + edit embed immediately (before HTTP response)
     if (server.discordWebhook) {
       stopStatusEmbedUpdater(server.id);
       clearLiveStats(server.id);
-      // Destroy the stats stream if active
-      if ((server as any)._discordStatsStream) {
-        (server as any)._discordStatsStream.destroy();
-        (server as any)._discordStatsStream = undefined;
-      }
+      if ((server as any)._discordStatsStream) { (server as any)._discordStatsStream.destroy(); }
       if (server.discordMessageId) {
         const offlineEmbed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "offline");
-        editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
+        await editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
         updateServer(server.id, { discordMessageId: undefined as any });
       }
     }
+    res.json({ message: `Server "${server.name}" is stopping.` });
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/stop error:", err);
     res

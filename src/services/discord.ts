@@ -130,13 +130,17 @@ export function buildStatusEmbed(
 // ── Live updater ──
 
 const updaters = new Map<string, ReturnType<typeof setInterval>>();
+const updaterGenerations = new Map<string, number>();
 
 export function startStatusEmbedUpdater(
   webhookUrl: string, messageId: string, serverId: string,
   name: string, serverType: string, version: string, port: number,
 ): void {
   stopStatusEmbedUpdater(serverId);
+  const gen = (updaterGenerations.get(serverId) ?? 0) + 1;
+  updaterGenerations.set(serverId, gen);
   const interval = setInterval(() => {
+    if (updaterGenerations.get(serverId) !== gen) return;
     const embed = buildStatusEmbed(serverId, name, serverType, version, port, "online");
     console.log(`[discord] Updating embed for ${serverId} — CPU: ${embed.fields[3].value}, TPS: ${embed.fields[5].value}`);
     editDiscordEmbed(webhookUrl, messageId, embed);
@@ -147,6 +151,7 @@ export function startStatusEmbedUpdater(
 export function stopStatusEmbedUpdater(serverId: string): void {
   const i = updaters.get(serverId);
   if (i) { clearInterval(i); updaters.delete(serverId); }
+  updaterGenerations.set(serverId, (updaterGenerations.get(serverId) ?? 0) + 1);
 }
 
 // ── Helpers ──
