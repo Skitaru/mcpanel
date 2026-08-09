@@ -23,6 +23,7 @@ import {
   resolveJavaImage,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
+import { sendDiscordNotification, buildServerEmbed } from "../services/discord";
 
 const router = Router();
 
@@ -518,6 +519,11 @@ router.post("/:id/start", async (req: Request, res: Response) => {
 
     await startContainer(server.containerId);
     res.json({ message: `Server "${server.name}" is starting.` });
+    // Fire-and-forget Discord notification
+    if (server.discordWebhook) {
+      sendDiscordNotification(server.discordWebhook,
+        buildServerEmbed(server.name, server.serverType, server.version, server.port, "started"));
+    }
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/start error:", err);
     res
@@ -543,6 +549,11 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
 
     await stopContainer(server.containerId);
     res.json({ message: `Server "${server.name}" is stopping.` });
+    // Fire-and-forget Discord notification
+    if (server.discordWebhook) {
+      sendDiscordNotification(server.discordWebhook,
+        buildServerEmbed(server.name, server.serverType, server.version, server.port, "stopped"));
+    }
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/stop error:", err);
     res
@@ -627,6 +638,7 @@ router.get("/", async (_req: Request, res: Response) => {
         javaArgs: s.javaArgs ?? null,
         maxPlayers: s.maxPlayers ?? 20,
         voicePort: s.voicePort ?? null,
+        discordWebhook: s.discordWebhook ?? null,
         startedAt: st?.startedAt ?? null,
       };
     });
@@ -919,7 +931,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, ram: ramStr, port, version, javaArgs, voicePort } = req.body ?? {};
+    const { name, ram: ramStr, port, version, javaArgs, voicePort, discordWebhook } = req.body ?? {};
 
     // Validate name if provided
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
@@ -984,6 +996,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       ...(version !== undefined ? { version: version.trim() } : {}),
       ...(javaArgs !== undefined ? { javaArgs: javaArgs?.trim() || (undefined as any) } : {}),
       ...(voicePort !== undefined ? { voicePort: voicePort ?? (undefined as any) } : {}),
+      ...(discordWebhook !== undefined ? { discordWebhook: discordWebhook || undefined } : {}),
     });
 
     console.log("[api] Updated server " + (updated?.name ?? "?") + " config");

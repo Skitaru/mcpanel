@@ -14,5 +14,6 @@ export interface ServerStatus {
   javaArgs?: string | null;
   maxPlayers?: number;
   voicePort?: number | null;
+  discordWebhook?: string | null;
   startedAt?: string | null;
 }

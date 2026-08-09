@@ -48,6 +48,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
   const [port, setPort] = useState(25565);
   const [javaArgs, setJavaArgs] = useState("");
   const [voicePort, setVoicePort] = useState<number | null>(null);
+  const [discordWebhook, setDiscordWebhook] = useState("");
   const [maxRamMB, setMaxRamMB] = useState(16384);
 
   const [submitting, setSubmitting] = useState(false);
@@ -61,6 +62,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       setPort(server.port);
       setJavaArgs(server.javaArgs ?? "");
       setVoicePort(server.voicePort ?? null);
+      setDiscordWebhook(server.discordWebhook ?? "");
       setError(null);
       // Fetch max system RAM
       fetch(`${API_BASE}/api/system/info`)
@@ -89,6 +91,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             port,
             javaArgs: javaArgs.trim() || undefined,
             voicePort: voicePort ?? null,
+            discordWebhook: discordWebhook.trim() || null,
           }),
         });
 
@@ -105,7 +108,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         setSubmitting(false);
       }
     },
-    [server, name, ram, port, javaArgs, voicePort, onUpdated, onClose],
+    [server, name, ram, port, javaArgs, voicePort, discordWebhook, onUpdated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -261,6 +264,28 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             />
             <p className="mt-1 text-[10px] text-slate-600">
               Requires container recreation to apply. Leave empty to disable.
+            </p>
+          </label>
+
+          {/* Discord Webhook */}
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+              Discord Webhook URL
+            </span>
+            <input
+              type="text"
+              value={discordWebhook}
+              onChange={(e) => setDiscordWebhook(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/..."
+              disabled={submitting}
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                         px-3.5 py-2.5 text-sm text-white
+                         placeholder:text-slate-600
+                         focus:border-[#9D4EDD]/40 focus:outline-none
+                         disabled:opacity-50"
+            />
+            <p className="mt-1 text-[10px] text-slate-600">
+              Sends start/stop/crash notifications to a Discord channel.
             </p>
           </label>
 

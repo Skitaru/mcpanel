@@ -32,6 +32,8 @@ export interface ServerConfig {
   maxPlayers?: number;
   /** UDP port for SimpleVoiceChat plugin (default 24454). Not bound if unset. */
   voicePort?: number;
+  /** Discord webhook URL for start/stop/crash notifications */
+  discordWebhook?: string;
 }
 
 /** Request body for POST /api/servers */
@@ -72,6 +74,7 @@ export interface ServerStatus {
   javaArgs?: string | null;
   maxPlayers?: number;
   voicePort?: number | null;
+  discordWebhook?: string | null;
   /** ISO timestamp when the container was started (null if not running) */
   startedAt?: string | null;
 }
