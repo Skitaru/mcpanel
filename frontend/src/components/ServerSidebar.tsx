@@ -65,7 +65,7 @@ export default function ServerSidebar({
               className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition
                 ${collapsed ? "justify-center" : ""}
                 ${isDashboard
-                  ? "bg-[#9D4EDD]/10 text-violet-300"
+                  ? "bg-[#9D4EDD]/10 text-violet-300 relative before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-5 before:bg-[#9D4EDD] before:rounded-r before:shadow-[0_0_8px_#9D4EDD]"
                   : "text-slate-500 hover:bg-[#9D4EDD]/5 hover:text-slate-300"
                 }`}
               title={collapsed ? "Dashboard" : undefined}
@@ -99,7 +99,7 @@ export default function ServerSidebar({
                       className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition
                         ${collapsed ? "justify-center" : ""}
                         ${isActive
-                          ? "bg-[#9D4EDD]/10 text-violet-300"
+                          ? "bg-[#9D4EDD]/10 text-violet-300 relative before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-5 before:bg-[#9D4EDD] before:rounded-r before:shadow-[0_0_8px_#9D4EDD]"
                           : "text-slate-500 hover:bg-[#9D4EDD]/5 hover:text-slate-300"
                         }`}
                       title={collapsed ? s.name : undefined}

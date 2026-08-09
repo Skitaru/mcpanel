@@ -176,13 +176,13 @@ export default function ServerDetailPage() {
           ) : (
             <>
               {/* ── Top Bar: Breadcrumb + Actions ── */}
-              <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-slate-400 hover:text-purple-300 transition">
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back to servers
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-[#6b6480] hover:text-purple-300 transition text-xs">
+                    <ArrowLeft className="h-3.5 w-3.5" /> Back
                   </button>
-                  <span className="text-slate-600">/</span>
-                  <span className="text-white font-bold text-sm tracking-tight">{server.name}</span>
+                  <span className="text-[#28223D]">/</span>
+                  <h1 className="font-display font-bold text-xl text-white tracking-tight">{server.name}</h1>
                   <span className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                     server.status === "running" ? "bg-[#00F5D4]/10 text-emerald-400 border border-[#00F5D4]/20" : "bg-[#FEE440]/10 text-amber-400 border border-[#FEE440]/20"
                   }`}>
@@ -192,11 +192,11 @@ export default function ServerDetailPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-1.5 bg-[#151221] p-1.5 rounded-xl border border-[#28223D] shadow-lg overflow-x-auto max-w-full">
+                <div className="flex items-center gap-1 bg-[#151221] p-1 rounded-xl border border-[#28223D] overflow-x-auto max-w-full">
                   {actionConfirm ? (
                     <div className="flex items-center gap-1 rounded-lg border border-[#FEE440]/30 bg-[#FEE440]/10 px-2 py-1">
                       <span className="text-[11px] font-medium text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
-                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-[#FEE440] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#FEE440]/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-[#FEE440] px-2 py-0.5 text-[11px] font-medium text-black hover:bg-[#FEE440]/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
                       <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
                     </div>
                   ) : server.status === "running" ? (<>
@@ -205,15 +205,15 @@ export default function ServerDetailPage() {
                   </>) : (
                     <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2 text-emerald-400 transition hover:bg-[#00F5D4]/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
                   )}
-                  <span className="w-px h-4 bg-[#28223D] mx-0.5" />
-                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <label className={`rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
+                  <span className="w-px h-5 bg-[#28223D] mx-0.5" />
+                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <label className={`rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
                     <Upload className="h-4 w-4" strokeWidth={1.75} />
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
-                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
-                  <span className="w-px h-4 bg-[#28223D] mx-0.5" />
+                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <span className="w-px h-5 bg-[#28223D] mx-0.5" />
                   {deleteConfirm ? (
                     <div className="flex items-center gap-1 rounded-lg border border-[#F15BB5]/30 bg-[#F15BB5]/10 px-2 py-1">
                       <span className="text-[11px] text-rose-400">Delete?</span>
@@ -221,7 +221,7 @@ export default function ServerDetailPage() {
                       <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2 text-slate-500 transition hover:bg-[#F15BB5]/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#F15BB5]/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
                   )}
                 </div>
               </div>
