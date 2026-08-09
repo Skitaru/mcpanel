@@ -23,8 +23,7 @@ import {
   resolveJavaImage,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
-import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, buildEventEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater } from "../services/discord";
-import { initLiveStats, getLiveStats, clearLiveStats } from "../services/live-stats";
+import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats } from "../services/discord";
 
 const router = Router();
 
@@ -522,19 +521,15 @@ router.post("/:id/start", async (req: Request, res: Response) => {
     res.json({ message: `Server "${server.name}" is starting.` });
     // Discord: send initial status embed + start live updater
     if (server.discordWebhook) {
-      // Initialize shared stats store
+      // Init stats store so embed has memory limit from the start
       initLiveStats(server.id, server.ram * 1e6);
-      // Send one-shot event notification
-      sendDiscordEmbed(server.discordWebhook,
-        buildEventEmbed(server.name, server.serverType, server.version, server.port, "started"));
-      // Send persistent status embed — will be updated live every 10s
-      const embed = buildStatusEmbed(server.name, server.serverType, server.version, server.port, "online", getLiveStats(server.id));
+      // Send ONE embed — will be edited live every 10s
+      const embed = buildStatusEmbed(server.name, server.serverType, server.version, server.port, "online");
       sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
         if (msgId) {
           updateServer(server.id, { discordMessageId: msgId } as any);
           startStatusEmbedUpdater(server.discordWebhook!, msgId, server.id,
-            server.name, server.serverType, server.version, server.port,
-            () => getLiveStats(server.id));
+            server.name, server.serverType, server.version, server.port);
         }
       });
     }
@@ -572,9 +567,6 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
         editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
         updateServer(server.id, { discordMessageId: undefined as any });
       }
-      // Also send one-shot stop notification
-      sendDiscordEmbed(server.discordWebhook,
-        buildEventEmbed(server.name, server.serverType, server.version, server.port, "stopped"));
     }
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/stop error:", err);

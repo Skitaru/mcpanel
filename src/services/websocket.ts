@@ -10,7 +10,7 @@ import jwt from "jsonwebtoken";
 import { getServer } from "./config-store";
 import { getJwtSecret } from "./auth";
 import { sendRcon } from "./rcon";
-import { setLiveStats as updateLiveStats } from "./live-stats";
+import { setLiveStats as updateLiveStats } from "./discord";
 import {
   getStatsStream,
   attachContainer,
