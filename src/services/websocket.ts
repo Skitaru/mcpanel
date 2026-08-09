@@ -40,11 +40,13 @@ function cleanAnsi(serverId: string, raw: string): string {
     return lastCR >= 0 ? line.slice(lastCR + 1) : line;
   }).join("\n");
 
-  // Strip JLine prompt and leading spaces
+  // Strip JLine prompt and leading spaces, RCON noise
   text = text
     .replace(/\n> /g, "\n")
     .replace(/^> /, "")
-    .replace(/\n  +/g, "\n");                               // collapse leading spaces
+    .replace(/\n  +/g, "\n")                               // collapse leading spaces
+    .replace(/\n?\[.*INFO\]: Thread RCON Client .*\n?/g, "\n")  // filter RCON connect/disconnect
+    .replace(/\n{2,}/g, "\n");                             // collapse blank lines
 
   // Buffer dangling ESC for the next chunk
   const escIdx = text.lastIndexOf("\x1b");
