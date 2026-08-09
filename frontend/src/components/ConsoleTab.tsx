@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  Cpu, MemoryStick, TerminalSquare, Server, Users, Copy, Check,
+  Cpu, MemoryStick, TerminalSquare, Server, Users, Copy, Check, Activity,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -400,31 +400,74 @@ export default function ConsoleTab({
     <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#28223D] bg-[#151221] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
-        {/* ── Stats Bar ── */}
+        {/* ── Live Stats Bar ── */}
         {isOnline && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 border-b border-[#28223D] bg-[#0B0914] font-mono text-[11px]">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Cpu className="h-3 w-3" />
-              <span className="text-[#F8F7FF] tabular-nums">{stats?.cpuPercent != null ? Math.min(100, stats.cpuPercent).toFixed(1) : "—"}%</span>
+          <div className="grid grid-cols-4 gap-0 border-b border-[#28223D] bg-[#0B0914]">
+            {/* CPU */}
+            <div className="relative px-4 py-3 border-r border-[#28223D]">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Cpu className="h-3 w-3 text-[#9D4EDD]" />
+                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">CPU</span>
+              </div>
+              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none mb-2">
+                {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
+              </div>
+              <div className="h-1 rounded-full bg-[#28223D] overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ease-out ${
+                  (stats?.cpuPercent ?? 0) > 90 ? "bg-[#F15BB5]" : (stats?.cpuPercent ?? 0) > 70 ? "bg-[#FEE440]" : "bg-[#00F5D4]"
+                }`}
+                  style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <MemoryStick className="h-3 w-3" />
-              <span className="text-[#F8F7FF] tabular-nums">{stats ? formatBytes(stats.memoryUsage) : "—"}</span>
-              <span className="text-[#6b6480]">/ {formatRam(ram)}</span>
+            {/* RAM */}
+            <div className="relative px-4 py-3 border-r border-[#28223D]">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <MemoryStick className="h-3 w-3 text-[#00F5D4]" />
+                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">RAM</span>
+              </div>
+              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none mb-2">
+                {stats ? formatBytes(stats.memoryUsage) : "—"}
+              </div>
+              <div className="h-1 rounded-full bg-[#28223D] overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ease-out ${
+                  stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-[#F15BB5]"
+                  : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-[#FEE440]" : "bg-[#9D4EDD]"
+                }`}
+                  style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
+              </div>
+              <div className="text-[10px] text-[#6b6480] mt-1">{formatRam(ram)} total</div>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="text-[#6b6480]">TPS</span>
-              <span className="tabular-nums">{tps ? (
-                <><span className={tps.tps5s >= 19 ? "text-[#00F5D4]" : tps.tps5s >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps5s.toFixed(1)}</span>
-                <span className="text-[#6b6480]">/</span>
-                <span className={tps.tps1m >= 19 ? "text-[#00F5D4]" : tps.tps1m >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps1m.toFixed(1)}</span>
-                <span className="text-[#6b6480]">/</span>
-                <span className={tps.tps5m >= 19 ? "text-[#00F5D4]" : tps.tps5m >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}>{tps.tps5m.toFixed(1)}</span></>
-              ) : "—"}</span>
+            {/* TPS */}
+            <div className="relative px-4 py-3 border-r border-[#28223D]">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Activity className="h-3 w-3 text-[#FEE440]" />
+                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">TPS</span>
+              </div>
+              <div className="flex items-baseline gap-2">
+                {tps ? (
+                  <>
+                    <span className={`text-lg font-bold tabular-nums leading-none ${tps.tps5s >= 19 ? "text-[#00F5D4]" : tps.tps5s >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}`}>{tps.tps5s.toFixed(1)}</span>
+                    <span className={`text-sm font-medium tabular-nums ${tps.tps1m >= 19 ? "text-[#00F5D4]/70" : tps.tps1m >= 15 ? "text-[#FEE440]/70" : "text-[#F15BB5]/70"}`}>{tps.tps1m.toFixed(1)}</span>
+                    <span className="text-xs text-[#6b6480] tabular-nums">{tps.tps5m.toFixed(1)}</span>
+                  </>
+                ) : (
+                  <span className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none">—</span>
+                )}
+              </div>
+              <div className="flex gap-3 mt-1.5 text-[9px] text-[#6b6480]">
+                <span>5s</span><span>1m</span><span>5m</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Users className="h-3 w-3" />
-              <span className="text-[#F8F7FF] tabular-nums">{playerCount.online}/{playerCount.max}</span>
+            {/* Players */}
+            <div className="relative px-4 py-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Users className="h-3 w-3 text-[#00F5D4]" />
+                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">Players</span>
+              </div>
+              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none">
+                {playerCount.online}<span className="text-[#6b6480] text-sm font-medium">/{playerCount.max}</span>
+              </div>
+              <div className="text-[10px] text-[#6b6480] mt-1">{playerCount.online > 0 ? `${playerList.length} connected` : "Empty"}</div>
             </div>
           </div>
         )}
