@@ -161,7 +161,7 @@ export default function ServerDetailPage() {
   const hostname = typeof window !== "undefined" ? window.location.hostname : "5.231.108.226";
 
   return (
-    <div className="flex min-h-screen bg-[#0B0914] bg-obsidian-grid">
+    <div className="flex min-h-screen bg-[#0B0914]">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
 
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
