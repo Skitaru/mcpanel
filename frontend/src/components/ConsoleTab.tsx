@@ -103,7 +103,7 @@ export default function ConsoleTab({
   const [error, setError] = useState<string | null>(null);
   const [cmdHistory, setCmdHistory] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(`mcp_cmds_${serverId}`);
+      const saved = localStorage.getItem(`obsidian_cmds_${serverId}`);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
@@ -170,7 +170,7 @@ export default function ConsoleTab({
   useEffect(() => {
     if (cmdHistory.length === 0) return;
     const capped = cmdHistory.slice(-MAX_CMD_HISTORY);
-    try { localStorage.setItem(`mcp_cmds_${serverId}`, JSON.stringify(capped)); } catch {}
+    try { localStorage.setItem(`obsidian_cmds_${serverId}`, JSON.stringify(capped)); } catch {}
   }, [cmdHistory, serverId]);
 
   // ---- player polling (15 s) ----
@@ -201,7 +201,7 @@ export default function ConsoleTab({
   useEffect(() => {
     let cancelled = false;
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("obsidian-token") : null;
     const socket = io(API_BASE, { transports: ["polling"], auth: { token } });
     socketRef.current = socket;
 
@@ -381,20 +381,20 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-purple-500/15 bg-[#0e0d14] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
+    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#28223D] bg-[#151221] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Output area */}
         <div
           ref={outputRef}
           onScroll={handleOutputScroll}
-          className="flex-1 overflow-y-auto bg-[#0a0c10] p-4 font-mono text-[12.5px] leading-[1.75]"
+          className="flex-1 overflow-y-auto bg-[#0B0914] p-4 font-mono text-[12.5px] leading-[1.75]"
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <TerminalSquare className="h-12 w-12 empty-ghost" />
               <p className="text-sm font-medium text-slate-500">Server is offline</p>
-              <p className="text-xs text-slate-700">Start the server to view the live console.</p>
+              <p className="text-xs text-[#6b6480]">Start the server to view the live console.</p>
             </div>
           ) : (
             lines.map((line, i) => (
@@ -408,7 +408,7 @@ export default function ConsoleTab({
                       : "text-slate-300"
                 }`}
               >
-                <span className="select-none text-slate-700 mr-3">
+                <span className="select-none text-[#6b6480] mr-3">
                   [{formatTime(line.time)}]
                 </span>
                 {line.text}
@@ -419,7 +419,7 @@ export default function ConsoleTab({
 
         {/* Offline banner */}
         {!isOnline && hasOutput && (
-          <div className="flex items-center gap-2 border-t border-amber-500/20 bg-amber-500/5 px-4 py-2">
+          <div className="flex items-center gap-2 border-t border-[#FEE440]/20 bg-[#FEE440]/5 px-4 py-2">
             <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-amber-400" />
             <p className="text-xs text-amber-400/80">
               Server stopped — console is read-only. Start the server to send commands.
@@ -430,7 +430,7 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2 border-t border-purple-500/15 bg-[#0e0d14] px-3 py-2"
+          className="flex items-center gap-2 border-t border-[#28223D] bg-[#151221] px-3 py-2"
         >
           <span className="select-none font-mono text-[13px] text-violet-400 shrink-0">❯</span>
           <input
@@ -446,8 +446,8 @@ export default function ConsoleTab({
           <button
             type="submit"
             disabled={!connected}
-            className="shrink-0 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-medium
-                       text-white transition hover:bg-violet-500
+            className="shrink-0 rounded-md bg-[#9D4EDD] px-2.5 py-1 text-[11px] font-medium
+                       text-white transition hover:bg-[#B100E8]
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             Send
@@ -456,9 +456,9 @@ export default function ConsoleTab({
       </div>
 
       {/* ── Stats sidebar ── */}
-      <div className="flex-shrink-0 border-t border-purple-500/15 lg:border-t-0 lg:border-l lg:w-[232px] bg-purple-500/[0.04] flex flex-col overflow-y-auto">
+      <div className="flex-shrink-0 border-t border-[#28223D] lg:border-t-0 lg:border-l lg:w-[232px] bg-[#9D4EDD]/[0.04] flex flex-col overflow-y-auto">
         {/* Status indicator */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
               isOnline ? "bg-emerald-500 pulse-dot" : "bg-amber-500"
@@ -472,7 +472,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Address */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
@@ -504,7 +504,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Players */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="flex items-center gap-1.5 mb-1">
             <Users className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -545,7 +545,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Uptime */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Uptime
           </div>
@@ -555,7 +555,7 @@ export default function ConsoleTab({
         </div>
 
         {/* CPU */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="flex items-center gap-1.5 mb-1">
             <Cpu className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -566,7 +566,7 @@ export default function ConsoleTab({
             {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
           </div>
           {stats?.cpuPercent != null && (
-            <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
@@ -578,7 +578,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Memory */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="flex items-center gap-1.5 mb-1">
             <MemoryStick className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -592,7 +592,7 @@ export default function ConsoleTab({
             of {formatRam(ram)}
           </div>
           {stats && (
-            <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   stats.memoryUsage / stats.memoryLimit > 0.9
@@ -608,7 +608,7 @@ export default function ConsoleTab({
         </div>
 
         {/* RAM Limit */}
-        <div className="px-4 py-3 border-b border-purple-500/15">
+        <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             RAM Limit
           </div>

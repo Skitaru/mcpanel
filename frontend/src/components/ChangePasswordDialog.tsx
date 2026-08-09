@@ -51,7 +51,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
       setSubmitting(true);
       setError(null);
       try {
-        const token = localStorage.getItem("mcpanel-token");
+        const token = localStorage.getItem("obsidian-token");
         const res = await fetch(`${API_BASE}/api/auth/change-password`, {
           method: "POST",
           headers: {
@@ -65,7 +65,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
         setSuccess(true);
         // After 2s, log out so user re-authenticates with new password
         setTimeout(() => {
-          localStorage.removeItem("mcpanel-token");
+          localStorage.removeItem("obsidian-token");
           window.location.reload();
         }, 2000);
       } catch (err: unknown) {
@@ -88,10 +88,10 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-sm overflow-hidden rounded-xl
-                   border border-purple-500/15 bg-[#0e0d14] shadow-2xl"
+                   border border-[#28223D] bg-[#151221] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-purple-500/15 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#28223D] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <KeyRound className="h-5 w-5 text-violet-400" />
             <h2 className="text-base font-bold text-white">
@@ -102,7 +102,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
             onClick={onClose}
             disabled={submitting}
             className="rounded-md p-1.5 text-slate-600 transition
-                       hover:bg-purple-500/5 hover:text-slate-400
+                       hover:bg-[#9D4EDD]/5 hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -112,7 +112,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
         {/* Body */}
         {success ? (
           <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
-            <div className="rounded-full bg-emerald-500/10 p-3">
+            <div className="rounded-full bg-[#00F5D4]/10 p-3">
               <svg className="h-6 w-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -132,10 +132,10 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 autoFocus
                 disabled={submitting}
-                className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+                className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                            px-3.5 py-2.5 text-sm text-white
                            placeholder:text-slate-600
-                           focus:border-violet-500/40 focus:outline-none
+                           focus:border-[#9D4EDD]/40 focus:outline-none
                            disabled:opacity-50"
               />
             </label>
@@ -149,16 +149,16 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={submitting}
                 placeholder="Min. 4 characters"
-                className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+                className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                            px-3.5 py-2.5 text-sm text-white
                            placeholder:text-slate-600
-                           focus:border-violet-500/40 focus:outline-none
+                           focus:border-[#9D4EDD]/40 focus:outline-none
                            disabled:opacity-50"
               />
             </label>
 
             {error && (
-              <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              <div className="mb-4 rounded-lg border border-[#F15BB5]/20 bg-[#F15BB5]/5 px-3 py-2 text-xs text-red-400">
                 {error}
               </div>
             )}
@@ -167,8 +167,8 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
               type="submit"
               disabled={submitting || !currentPassword || !newPassword}
               className="flex w-full items-center justify-center gap-2 rounded-lg
-                         bg-violet-600 px-4 py-2.5 text-sm font-medium text-white
-                         transition hover:bg-violet-500
+                         bg-[#9D4EDD] px-4 py-2.5 text-sm font-medium text-white
+                         transition hover:bg-[#B100E8]
                          disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (

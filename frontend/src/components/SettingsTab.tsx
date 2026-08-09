@@ -135,11 +135,11 @@ export default function SettingsTab({ serverId, serverType }: Props) {
           {/* Left: Icon + MOTD */}
           <div className="lg:w-48 shrink-0 space-y-4">
             <div className="flex flex-col items-center gap-2">
-              <div className="h-16 w-16 rounded-lg border border-purple-500/15 bg-[#0a0c10] flex items-center justify-center overflow-hidden">
+              <div className="h-16 w-16 rounded-lg border border-[#28223D] bg-[#0B0914] flex items-center justify-center overflow-hidden">
                 {iconUrl ? <img src={iconUrl} alt="Server icon" className="h-full w-full object-cover" />
-                  : <ImageIcon className="h-6 w-6 text-slate-700" />}
+                  : <ImageIcon className="h-6 w-6 text-[#6b6480]" />}
               </div>
-              <label className={`cursor-pointer rounded-md border border-purple-500/15 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#252b3b] hover:text-slate-300 ${iconUploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <label className={`cursor-pointer rounded-md border border-[#28223D] px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#9D4EDD]/40 hover:text-slate-300 ${iconUploading ? "opacity-50 pointer-events-none" : ""}`}>
                 <Upload className="h-3 w-3 inline mr-1" />{iconUploading ? "…" : "Upload"}
                 <input type="file" accept="image/png" onChange={handleIconUpload} className="hidden" />
               </label>
@@ -148,8 +148,8 @@ export default function SettingsTab({ serverId, serverType }: Props) {
             <div>
               <label className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">MOTD</label>
               <textarea value={motd} onChange={e => setMotd(e.target.value)} rows={2}
-                className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
-                           placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none resize-none" />
+                className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white font-mono
+                           placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none resize-none" />
             </div>
           </div>
 
@@ -172,14 +172,14 @@ export default function SettingsTab({ serverId, serverType }: Props) {
                       <span className="mb-0.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">{label}</span>
                       {type === "select" && options ? (
                         <select value={value} onChange={e => updateProp(key, e.target.value)}
-                          className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white
-                                     focus:border-violet-500/40 focus:outline-none">
-                          {options.map(opt => <option key={opt} value={opt} className="bg-[#0e0d14]">{opt}</option>)}
+                          className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-2.5 py-1.5 text-sm text-white
+                                     focus:border-[#9D4EDD]/40 focus:outline-none">
+                          {options.map(opt => <option key={opt} value={opt} className="bg-[#151221]">{opt}</option>)}
                         </select>
                       ) : (
                         <input type="text" value={value} onChange={e => updateProp(key, e.target.value)}
-                          className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-2.5 py-1.5 text-sm text-white font-mono
-                                     placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                          className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-2.5 py-1.5 text-sm text-white font-mono
+                                     placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
                       )}
                     </label>
                   );
@@ -188,7 +188,7 @@ export default function SettingsTab({ serverId, serverType }: Props) {
             )}
             <div className="mt-4 flex items-center gap-3">
               <button onClick={handleSave} disabled={saving || loading}
-                className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-50">
+                className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#B100E8] disabled:opacity-50">
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                 {saving ? "Saving…" : "Save Settings"}
               </button>
@@ -208,19 +208,19 @@ export default function SettingsTab({ serverId, serverType }: Props) {
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Restart</span>
             <input type="text" value={schedRestart} onChange={e => setSchedRestart(e.target.value)} placeholder="HH:MM (e.g. 04:00)"
-              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
-                         placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white font-mono
+                         placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
           </label>
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Backup</span>
             <input type="text" value={schedBackup} onChange={e => setSchedBackup(e.target.value)} placeholder="HH:MM (e.g. 03:00)"
-              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
-                         placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white font-mono
+                         placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
           </label>
         </div>
         <div className="mt-3 flex items-center gap-2">
           <button onClick={handleSaveSchedule} disabled={schedSaving}
-            className="flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-50">
+            className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#B100E8] disabled:opacity-50">
             {schedSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save Schedule"}
           </button>
           {schedMsg && <span className={`text-[11px] ${schedMsg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>{schedMsg}</span>}

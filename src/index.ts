@@ -1,4 +1,4 @@
-// ---- Minecraft Server Panel: Express entry point ----
+// ---- Obsidian Panel: Express entry point ----
 
 import http from "node:http";
 import express from "express";

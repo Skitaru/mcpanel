@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Outfit, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import AuthGuard from "@/components/AuthGuard";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "MCPanel — Minecraft Server Dashboard",
+  title: "Obsidian Panel — Minecraft Server Dashboard",
   description: "Lightweight Minecraft server management panel",
 };
 
@@ -25,21 +26,21 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans text-slate-300 bg-[#08080c]">
+      <body className="min-h-full font-sans text-[#F8F7FF] bg-[#0B0914]">
         <Toaster
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "#0e0d14",
-              color: "#cbd5e1",
-              border: "1px solid rgba(139,92,246,0.15)",
+              background: "#151221",
+              color: "#F8F7FF",
+              border: "1px solid #28223D",
               fontSize: "13px",
               borderRadius: "8px",
             },
-            error:   { iconTheme: { primary: "#f87171", secondary: "#0e0d14" } },
-            success: { iconTheme: { primary: "#34d399", secondary: "#0e0d14" } },
+            error:   { iconTheme: { primary: "#F15BB5", secondary: "#151221" } },
+            success: { iconTheme: { primary: "#00F5D4", secondary: "#151221" } },
           }}
         />
         <AuthGuard>{children}</AuthGuard>

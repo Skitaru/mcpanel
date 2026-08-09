@@ -32,7 +32,7 @@ interface Props {
 export default function InstallModpackDialog({ open, onClose, onCreated }: Props) {
   // ---- CF API key ----
   const [apiKey, setApiKey] = useState(() => {
-    try { return localStorage.getItem("mcp_cf_key") || ""; } catch { return ""; }
+    try { return localStorage.getItem("obsidian_cf_key") || ""; } catch { return ""; }
   });
 
   // ---- Search ----
@@ -154,7 +154,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
 
   // ---- Save API key on change ----
   useEffect(() => {
-    if (apiKey) { try { localStorage.setItem("mcp_cf_key", apiKey); } catch {} }
+    if (apiKey) { try { localStorage.setItem("obsidian_cf_key", apiKey); } catch {} }
   }, [apiKey]);
 
   // ---- Install ----
@@ -196,8 +196,8 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-2.5 px-6 py-4 border-b border-purple-500/15">
-          <div className="rounded-lg bg-violet-500/10 p-2">
+        <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#28223D]">
+          <div className="rounded-lg bg-[#9D4EDD]/10 p-2">
             <Download className="h-5 w-5 text-violet-400" />
           </div>
           <div>
@@ -221,8 +221,8 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
             </div>
             <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
               placeholder="$2a$10$... — from console.curseforge.com"
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
-                         placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white font-mono
+                         placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
           </label>
 
           {/* Search — live with debounce */}
@@ -232,12 +232,12 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
               onChange={e => onSearchInput(e.target.value)}
               placeholder={results.length > 0 ? "Filter modpacks…" : "Search modpacks (e.g. RLCraft, All the Mods...)"}
               disabled={!apiKey.trim()}
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] pl-9 pr-3 py-2 text-sm text-white
-                         placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none disabled:opacity-40" />
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] pl-9 pr-3 py-2 text-sm text-white
+                         placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none disabled:opacity-40" />
           </div>
 
           {/* Search error */}
-          {searchError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5"><p className="text-xs text-red-400">{searchError}</p></div>}
+          {searchError && <div className="rounded-lg border border-[#F15BB5]/20 bg-[#F15BB5]/5 px-3 py-2.5"><p className="text-xs text-red-400">{searchError}</p></div>}
 
           {/* Results grid */}
           {results.length > 0 && (
@@ -246,18 +246,18 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
                 <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
                   {searchQuery ? "Results" : "Popular Modpacks"}
                 </span>
-                <span className="text-[10px] text-slate-700">{results.length} found</span>
+                <span className="text-[10px] text-[#6b6480]">{results.length} found</span>
               </div>
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                 {results.map(p => (
                   <button key={p.id} onClick={() => selectPack(p)}
                     className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition ${
-                      selectedPack?.id === p.id ? "border-violet-500/40 bg-violet-500/10" : "border-purple-500/15 hover:border-[#252b3b]"
+                      selectedPack?.id === p.id ? "border-violet-500/40 bg-[#9D4EDD]/10" : "border-[#28223D] hover:border-[#9D4EDD]/40"
                     }`}>
                     {p.logo?.thumbnailUrl ? (
                       <img src={p.logo.thumbnailUrl} alt="" className="h-10 w-10 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     ) : (
-                      <div className="h-10 w-10 rounded bg-[#0a0c10] shrink-0 flex items-center justify-center text-[10px] text-slate-600 font-bold">{p.name.slice(0, 2).toUpperCase()}</div>
+                      <div className="h-10 w-10 rounded bg-[#0B0914] shrink-0 flex items-center justify-center text-[10px] text-slate-600 font-bold">{p.name.slice(0, 2).toUpperCase()}</div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium text-white truncate">{p.name}</div>
@@ -279,7 +279,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
           {/* Empty state — no API key */}
           {!searching && results.length === 0 && !searchError && apiKey.trim() && (
             <div className="flex flex-col items-center justify-center py-10 gap-2">
-              <Search className="h-6 w-6 text-slate-700" />
+              <Search className="h-6 w-6 text-[#6b6480]" />
               <p className="text-xs text-slate-600">Type to search, or clear to browse popular modpacks</p>
             </div>
           )}
@@ -287,7 +287,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
           {/* No API key hint */}
           {!apiKey.trim() && (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
-              <Search className="h-6 w-6 text-slate-700" />
+              <Search className="h-6 w-6 text-[#6b6480]" />
               <p className="text-xs text-slate-600">Enter your CurseForge API key above to browse modpacks</p>
             </div>
           )}
@@ -295,11 +295,11 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
           {/* Version selector */}
           {selectedPack && (
             <div className="space-y-3">
-              <div className="rounded-lg border border-purple-500/15 bg-[#0a0c10] p-3 flex items-center gap-3">
+              <div className="rounded-lg border border-[#28223D] bg-[#0B0914] p-3 flex items-center gap-3">
                 {selectedPack.logo?.thumbnailUrl ? (
                   <img src={selectedPack.logo.thumbnailUrl} alt="" className="h-10 w-10 rounded shrink-0" />
                 ) : (
-                  <div className="h-10 w-10 rounded bg-[#0e0d14] shrink-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">{selectedPack.name.slice(0, 2).toUpperCase()}</div>
+                  <div className="h-10 w-10 rounded bg-[#151221] shrink-0 flex items-center justify-center text-[10px] text-slate-500 font-bold">{selectedPack.name.slice(0, 2).toUpperCase()}</div>
                 )}
                 <div>
                   <div className="text-sm font-medium text-white">{selectedPack.name}</div>
@@ -318,10 +318,10 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
                     const found = files.find(f => f.id === Number(e.target.value));
                     if (found) setSelectedFile(found);
                   }}
-                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3 py-2.5 text-sm text-white
-                               focus:border-violet-500/40 focus:outline-none appearance-none">
+                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] px-3 py-2.5 text-sm text-white
+                               focus:border-[#9D4EDD]/40 focus:outline-none appearance-none">
                     {files.map(f => (
-                      <option key={f.id} value={f.id} className="bg-[#0e0d14]">
+                      <option key={f.id} value={f.id} className="bg-[#151221]">
                         {f.displayName} — {formatSize(f.fileLength)}
                       </option>
                     ))}
@@ -336,25 +336,25 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
             <div className="space-y-3">
               <div className="w-px-full h-px bg-[#1a1f2e]" />
               <label className="block">
-                <span className="mb-1.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Server Name <span className="text-slate-700">(optional)</span></span>
+                <span className="mb-1.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Server Name <span className="text-[#6b6480]">(optional)</span></span>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={selectedPack.name}
-                  className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white
-                             placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                  className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white
+                             placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">RAM</span>
                   <select value={ram} onChange={e => setRam(e.target.value)}
-                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white
-                               focus:border-violet-500/40 focus:outline-none appearance-none">
-                    {RAM_OPTIONS.map(o => <option key={o} value={o} className="bg-[#0e0d14]">{o}</option>)}
+                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white
+                               focus:border-[#9D4EDD]/40 focus:outline-none appearance-none">
+                    {RAM_OPTIONS.map(o => <option key={o} value={o} className="bg-[#151221]">{o}</option>)}
                   </select>
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Port</span>
                   <input type="text" value={port} onChange={e => setPort(e.target.value.replace(/\D/g, ""))} placeholder="25565"
-                    className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm text-white font-mono
-                               placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm text-white font-mono
+                               placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
                 </label>
               </div>
             </div>
@@ -362,7 +362,7 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
 
           {/* Install error */}
           {installError && (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5">
+            <div className="rounded-lg border border-[#F15BB5]/20 bg-[#F15BB5]/5 px-3 py-2.5">
               <p className="text-xs text-red-400">{installError}</p>
             </div>
           )}
@@ -387,13 +387,13 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
 
         {/* Footer */}
         {selectedPack && selectedFile && !installing && (
-          <div className="flex items-center justify-between border-t border-purple-500/15 px-5 py-3">
-            <p className="text-[10px] text-slate-700">
+          <div className="flex items-center justify-between border-t border-[#28223D] px-5 py-3">
+            <p className="text-[10px] text-[#6b6480]">
               API key saved in browser. Get yours at <span className="text-slate-600">console.curseforge.com</span>
             </p>
             <button onClick={handleInstall}
-              className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white transition
-                         hover:bg-violet-500 flex items-center gap-2">
+              className="rounded-lg bg-[#9D4EDD] px-5 py-2 text-sm font-medium text-white transition
+                         hover:bg-[#B100E8] flex items-center gap-2">
               <Download className="h-4 w-4" />
               Install Modpack
             </button>

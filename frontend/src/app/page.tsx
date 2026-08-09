@@ -14,20 +14,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const POLL_INTERVAL_MS = 5_000;
 
 function statusColor(status: ServerStatus["status"]) {
-  switch (status) { case "running": return "bg-emerald-500"; case "exited": case "created": case "paused": return "bg-amber-500"; default: return "bg-slate-600"; }
+  switch (status) { case "running": return "bg-emerald-500"; case "exited": case "created": case "paused": return "bg-amber-500"; default: return "bg-[#28223D]"; }
 }
 function statusLabel(status: ServerStatus["status"]) {
   switch (status) { case "running": return "Online"; case "exited": return "Stopped"; case "created": return "Created"; case "paused": return "Paused"; default: return "Unknown"; }
 }
 function statusBadgeColor(status: ServerStatus["status"]) {
-  switch (status) { case "running": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"; case "exited": case "created": case "paused": return "bg-amber-500/10 text-amber-400 border-amber-500/20"; default: return "bg-slate-500/10 text-slate-400 border-slate-500/20"; }
+  switch (status) { case "running": return "bg-[#00F5D4]/10 text-emerald-400 border-[#00F5D4]/20"; case "exited": case "created": case "paused": return "bg-[#FEE440]/10 text-amber-400 border-[#FEE440]/20"; default: return "bg-slate-500/10 text-slate-400 border-slate-500/20"; }
 }
 function statusAccent(status: ServerStatus["status"]) {
   switch (status) { case "running": return "via-emerald-500/50"; case "exited": case "created": case "paused": return "via-amber-500/50"; default: return "via-slate-500/30"; }
 }
 function formatRam(mb: number) { return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`; }
 function typeLabel(t: string) { switch (t) { case "fabric": return "Fabric"; case "velocity": return "Velocity"; default: return "Paper"; } }
-function typeBadgeColor(t: string) { switch (t) { case "fabric": return "bg-amber-500/10 text-amber-400 border-amber-500/20"; case "velocity": return "bg-purple-500/10 text-purple-400 border-purple-500/20"; default: return "bg-violet-500/10 text-violet-400 border-violet-500/20"; } }
+function typeBadgeColor(t: string) { switch (t) { case "fabric": return "bg-[#FEE440]/10 text-amber-400 border-[#FEE440]/20"; case "velocity": return "bg-purple-500/10 text-purple-400 border-[#28223D]"; default: return "bg-[#9D4EDD]/10 text-violet-400 border-violet-500/20"; } }
 function formatDisk(bytes: number | undefined) {
   if (bytes == null || bytes < 0) return null;
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
@@ -96,7 +96,7 @@ export default function DashboardPage() {
 
   // ---- Socket.IO ----
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("mcpanel-token") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("obsidian-token") : null;
     const socket = io(API_BASE, { transports: ["polling"], auth: { token } });
     socketRef.current = socket;
     socket.on("connect", () => { serversRef.current.forEach(s => { if (s.status === "running") socket.emit("stats:subscribe", { serverId: s.id }); }); });
@@ -218,17 +218,17 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertTriangle className="h-10 w-10 text-amber-500" />
               <p className="text-sm text-slate-500">{error}</p>
-              <button onClick={() => { setLoading(true); setError(null); fetchServers(); }} className="rounded-lg bg-purple-500/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-purple-500/10">Retry</button>
+              <button onClick={() => { setLoading(true); setError(null); fetchServers(); }} className="rounded-lg bg-[#9D4EDD]/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-[#9D4EDD]/10">Retry</button>
             </div>
           ) : (
             <>
               {/* Header */}
               <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-purple-500/5 transition" title="Open menu">
+                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-[#9D4EDD]/5 transition" title="Open menu">
                     <Menu className="h-5 w-5" />
                   </button>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10 shadow-lg">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#9D4EDD]/20 to-[#9D4EDD]/10 shadow-lg">
                     <Server className="h-5 w-5 text-violet-400" />
                   </div>
                   <div>
@@ -244,12 +244,12 @@ export default function DashboardPage() {
                   <div className="relative flex-1 sm:flex-initial">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-600 pointer-events-none" />
                     <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter…"
-                      className="w-full sm:w-36 rounded-lg border border-purple-500/15 bg-[#0a0c10] pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-700 focus:border-violet-500/40 focus:outline-none" />
+                      className="w-full sm:w-36 rounded-lg border border-[#28223D] bg-[#0B0914] pl-8 pr-3 py-2 text-sm text-white placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
                   </div>
-                  <button onClick={fetchServers} className="rounded-lg border border-purple-500/15 p-2 text-slate-600 transition hover:border-purple-500/30 hover:text-slate-400 shrink-0" title="Refresh">
+                  <button onClick={fetchServers} className="rounded-lg border border-[#28223D] p-2 text-slate-600 transition hover:border-[#9D4EDD]/40 hover:text-slate-400 shrink-0" title="Refresh">
                     <RefreshCw className="h-4 w-4" />
                   </button>
-                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 shadow-lg shrink-0">
+                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-[#9D4EDD] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B100E8] shadow-lg shrink-0">
                     <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Server</span>
                   </button>
                 </div>
@@ -260,7 +260,7 @@ export default function DashboardPage() {
                 <div className="mb-6 space-y-4">
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="surface flex items-center gap-3 p-4 animate-slide-up stagger-1">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#9D4EDD]/10">
                         <Server className="h-4 w-4 text-violet-400" />
                       </div>
                       <div>
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="surface flex items-center gap-3 p-4 animate-slide-up stagger-2">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#00F5D4]/10">
                         <CheckCircle className="h-4 w-4 text-emerald-400" />
                       </div>
                       <div>
@@ -287,7 +287,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="surface flex items-center gap-3 p-4 animate-slide-up stagger-4">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F15BB5]/10">
                         <AlertTriangle className="h-4 w-4 text-red-400" />
                       </div>
                       <div>
@@ -310,14 +310,14 @@ export default function DashboardPage() {
                         <span className="font-mono font-medium text-white tabular-nums">
                           {stats.usedRam >= 1e9 ? `${(stats.usedRam / 1e9).toFixed(1)}G` : `${(stats.usedRam / 1e6).toFixed(0)}M`}
                         </span>
-                        <span className="text-slate-700">/ {stats.totalRam >= 1024 ? `${(stats.totalRam / 1024).toFixed(1)} GB` : `${stats.totalRam} MB`}</span>
+                        <span className="text-[#6b6480]">/ {stats.totalRam >= 1024 ? `${(stats.totalRam / 1024).toFixed(1)} GB` : `${stats.totalRam} MB`}</span>
                       </div>
                       {stats.totalMaxPlayers > 0 && (
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">
                           <Users className="h-3.5 w-3.5" />
                           <span>Players</span>
                           <span className="font-mono font-medium text-white tabular-nums">{stats.totalPlayers}</span>
-                          <span className="text-slate-700">/ {stats.totalMaxPlayers}</span>
+                          <span className="text-[#6b6480]">/ {stats.totalMaxPlayers}</span>
                         </div>
                       )}
                       {stats.totalDisk > 0 && (
@@ -334,19 +334,19 @@ export default function DashboardPage() {
 
               {/* Server Cards */}
               {servers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-purple-500/15 py-20">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-violet-500/10">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#28223D] py-20">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#9D4EDD]/20 to-[#9D4EDD]/10">
                     <Server className="h-7 w-7 text-violet-400" />
                   </div>
                   <p className="text-sm font-medium text-slate-600 mb-1">No servers yet</p>
-                  <p className="text-xs text-slate-700 mb-4">Create your first Minecraft server to get started</p>
-                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500">
+                  <p className="text-xs text-[#6b6480] mb-4">Create your first Minecraft server to get started</p>
+                  <button onClick={() => setDialogOpen(true)} className="hover-scale flex items-center gap-2 rounded-lg bg-[#9D4EDD] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B100E8]">
                     <Plus className="h-4 w-4" /> Create Server
                   </button>
                 </div>
               ) : filteredServers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-purple-500/15 py-20">
-                  <Search className="h-8 w-8 text-slate-700 mb-3" />
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#28223D] py-20">
+                  <Search className="h-8 w-8 text-[#6b6480] mb-3" />
                   <p className="text-sm font-medium text-slate-500">No servers match &quot;{searchQuery}&quot;</p>
                 </div>
               ) : (
@@ -369,7 +369,7 @@ export default function DashboardPage() {
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             {/* Server icon */}
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg overflow-hidden bg-gradient-to-br from-violet-500/20 to-violet-500/10 border border-purple-500/15 relative">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg overflow-hidden bg-gradient-to-br from-[#9D4EDD]/20 to-[#9D4EDD]/10 border border-[#28223D] relative">
                               <Server className="h-5 w-5 text-violet-400 absolute" />
                               {iconUrl && (
                                 <img src={iconUrl} alt="" className="h-full w-full object-cover relative z-10"
@@ -390,31 +390,31 @@ export default function DashboardPage() {
                                 {stopConfirmId === s.id ? (
                                   <div className="flex items-center gap-1 px-2 py-1">
                                     <span className="text-[10px] text-amber-400">Stop?</span>
-                                    <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "stop"); }} disabled={actingId === s.id} className="rounded bg-amber-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-amber-500 disabled:opacity-50">Yes</button>
-                                    <button onClick={e => { e.stopPropagation(); setStopConfirmId(null); }} className="rounded bg-slate-600 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-500">No</button>
+                                    <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "stop"); }} disabled={actingId === s.id} className="rounded bg-[#FEE440] px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-[#FEE440]/80 disabled:opacity-50">Yes</button>
+                                    <button onClick={e => { e.stopPropagation(); setStopConfirmId(null); }} className="rounded bg-[#28223D] px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-[#3C096C]">No</button>
                                   </div>
                                 ) : (
                                   <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setStopConfirmId(s.id); }}
-                                    className="flex h-7 w-7 items-center justify-center text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Stop">
+                                    className="flex h-7 w-7 items-center justify-center text-amber-400 transition hover:bg-[#FEE440]/10 disabled:opacity-50" title="Stop">
                                     <Square className="h-3 w-3" />
                                   </button>
                                 )}
                                 {restartConfirmId === s.id ? (
                                   <div className="flex items-center gap-1 px-2 py-1">
                                     <span className="text-[10px] text-amber-400">Restart?</span>
-                                    <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "restart"); }} disabled={actingId === s.id} className="rounded bg-amber-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-amber-500 disabled:opacity-50">Yes</button>
-                                    <button onClick={e => { e.stopPropagation(); setRestartConfirmId(null); }} className="rounded bg-slate-600 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-500">No</button>
+                                    <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "restart"); }} disabled={actingId === s.id} className="rounded bg-[#FEE440] px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-[#FEE440]/80 disabled:opacity-50">Yes</button>
+                                    <button onClick={e => { e.stopPropagation(); setRestartConfirmId(null); }} className="rounded bg-[#28223D] px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-[#3C096C]">No</button>
                                   </div>
                                 ) : (
                                   <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setRestartConfirmId(s.id); }}
-                                    className="flex h-7 w-7 items-center justify-center text-slate-500 transition hover:bg-purple-500/5 hover:text-amber-400 disabled:opacity-50" title="Restart">
+                                    className="flex h-7 w-7 items-center justify-center text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-amber-400 disabled:opacity-50" title="Restart">
                                     <RotateCw className="h-3 w-3" />
                                   </button>
                                 )}
                               </>
                             ) : (
                               <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
-                                className="flex h-7 w-7 items-center justify-center text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start">
+                                className="flex h-7 w-7 items-center justify-center text-emerald-400 transition hover:bg-[#00F5D4]/10 disabled:opacity-50" title="Start">
                                 <Play className="h-3 w-3" />
                               </button>
                             )}
@@ -441,26 +441,26 @@ export default function DashboardPage() {
 
                         {/* Stats grid */}
                         <div className="grid grid-cols-2 gap-2 mt-auto">
-                          <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
+                          <div className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD]/[0.04] px-2.5 py-2">
                             <Wifi className="h-3 w-3 shrink-0 text-slate-600" />
                             <div className="min-w-0">
-                              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Port</p>
+                              <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6b6480]">Port</p>
                               <p className="text-xs font-mono font-medium text-white">:{s.port}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
+                          <div className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD]/[0.04] px-2.5 py-2">
                             <MemoryStick className="h-3 w-3 shrink-0 text-slate-600" />
                             <div className="min-w-0">
-                              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">RAM</p>
+                              <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6b6480]">RAM</p>
                               <p className="text-xs font-medium text-white">{formatRam(s.ram)}</p>
                             </div>
                           </div>
                           {s.status === "running" && (
                             <>
-                              <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
+                              <div className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD]/[0.04] px-2.5 py-2">
                                 <Users className="h-3 w-3 shrink-0 text-emerald-400" />
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Players</p>
+                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6b6480]">Players</p>
                                   <div className="flex items-center gap-1.5">
                                     <p className="text-xs font-medium text-white tabular-nums">
                                       <FlashValue value={playerCounts[s.id]?.online ?? 0} />{/*  */}
@@ -469,20 +469,20 @@ export default function DashboardPage() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
+                              <div className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD]/[0.04] px-2.5 py-2">
                                 <Zap className={`h-3 w-3 shrink-0 ${(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 80 ? "text-red-400" : (liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0) >= 50 ? "text-amber-400" : "text-emerald-400"}`} />
                                 <div className="min-w-0">
-                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">CPU</p>
+                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6b6480]">CPU</p>
                                   <p className="text-xs font-mono font-medium text-white tabular-nums"><FlashValue value={(liveStats[s.id]?.cpu ? Math.min(100, liveStats[s.id].cpu) : 0).toFixed(1)} />%</p>
                                 </div>
                               </div>
                             </>
                           )}
                           {s.status !== "running" && diskUsage[s.id] != null && diskUsage[s.id] >= 0 && (
-                            <div className="flex items-center gap-1.5 rounded-md bg-purple-500/[0.04] px-2.5 py-2">
+                            <div className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD]/[0.04] px-2.5 py-2">
                               <HardDrive className="h-3 w-3 shrink-0 text-slate-600" />
                               <div className="min-w-0">
-                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-700">Disk</p>
+                                <p className="text-[9px] font-semibold uppercase tracking-wider text-[#6b6480]">Disk</p>
                                 <p className="text-xs font-medium text-white">{formatDisk(diskUsage[s.id])}</p>
                               </div>
                             </div>

@@ -137,10 +137,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
     >
       <div
         className="relative w-full max-w-md overflow-hidden rounded-xl
-                   border border-purple-500/15 bg-[#0e0d14] shadow-2xl"
+                   border border-[#28223D] bg-[#151221] shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-purple-500/15 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#28223D] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Settings className="h-5 w-5 text-violet-400" />
             <h2 className="text-base font-bold text-white">
@@ -151,7 +151,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             onClick={onClose}
             disabled={submitting}
             className="rounded-md p-1.5 text-slate-600 transition
-                       hover:bg-purple-500/5 hover:text-slate-400
+                       hover:bg-[#9D4EDD]/5 hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -171,10 +171,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               onChange={(e) => setName(e.target.value)}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                          px-3.5 py-2.5 text-sm text-white
                          placeholder:text-slate-600
-                         focus:border-violet-500/40 focus:outline-none
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
@@ -193,10 +193,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               onChange={(e) => setRam(e.target.value)}
               placeholder="e.g. 4G or 4096M"
               disabled={submitting}
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                          px-3.5 py-2.5 text-sm text-white font-mono
                          placeholder:text-slate-600
-                         focus:border-violet-500/40 focus:outline-none
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
             {/* Preset chips */}
@@ -210,8 +210,8 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                   className={"rounded-md border px-2.5 py-1 text-[11px] font-medium transition"
                             + " disabled:opacity-50"
                             + (ram === opt
-                              ? " border-violet-500/40 bg-violet-500/15 text-violet-300"
-                              : " border-purple-500/15 bg-purple-500/[0.04] text-slate-500 hover:border-white/[0.1] hover:text-slate-400")}
+                              ? " border-violet-500/40 bg-[#9D4EDD]/15 text-violet-300"
+                              : " border-[#28223D] bg-[#9D4EDD]/[0.04] text-slate-500 hover:border-[#9D4EDD]/40 hover:text-slate-400")}
                 >
                   {opt}
                 </button>
@@ -232,9 +232,9 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               max={65535}
               required
               disabled={submitting}
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                          px-3.5 py-2.5 text-sm text-white
-                         focus:border-violet-500/40 focus:outline-none
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
           </label>
@@ -253,10 +253,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               }}
               placeholder="e.g. 24454 (SimpleVoiceChat)"
               disabled={submitting}
-              className="w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+              className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                          px-3.5 py-2.5 text-sm text-white
                          placeholder:text-slate-600
-                         focus:border-violet-500/40 focus:outline-none
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
             <p className="mt-1 text-[10px] text-slate-600">
@@ -275,10 +275,10 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               placeholder="Custom JVM flags (replaces Aikar GC defaults)"
               rows={3}
               disabled={submitting}
-              className="mt-2 w-full rounded-lg border border-purple-500/15 bg-[#0a0c10]
+              className="mt-2 w-full rounded-lg border border-[#28223D] bg-[#0B0914]
                          px-3.5 py-2.5 text-xs text-white font-mono
                          placeholder:text-slate-600
-                         focus:border-violet-500/40 focus:outline-none
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50 resize-none"
             />
             <p className="mt-1 text-[10px] text-slate-600">
@@ -293,7 +293,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
 
           {/* Error */}
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5">
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#F15BB5]/30 bg-[#F15BB5]/10 px-3 py-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
               <span className="text-sm text-red-400">{error}</span>
             </div>
@@ -304,8 +304,8 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             type="submit"
             disabled={submitting || !name.trim()}
             className="flex w-full items-center justify-center gap-2
-                       rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium
-                       text-white transition hover:bg-violet-500
+                       rounded-lg bg-[#9D4EDD] px-4 py-2.5 text-sm font-medium
+                       text-white transition hover:bg-[#B100E8]
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (

@@ -32,7 +32,7 @@ export default function LoginScreen({ onLogin }: Props) {
           throw new Error(data.error ?? "Login failed");
         }
         const data = await res.json();
-        localStorage.setItem("mcpanel-token", data.token);
+        localStorage.setItem("obsidian-token", data.token);
         onLogin(data.token);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Login failed");
@@ -44,11 +44,11 @@ export default function LoginScreen({ onLogin }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0c10]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B0914]">
       <div className="w-full max-w-xs animate-in">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <h1 className="text-xl font-bold tracking-tight text-white">MCPanel</h1>
+          <h1 className="text-xl font-bold tracking-tight text-white">Obsidian Panel</h1>
           <p className="mt-1 text-sm text-slate-500">Minecraft Server Dashboard</p>
         </div>
 
@@ -65,9 +65,9 @@ export default function LoginScreen({ onLogin }: Props) {
               placeholder="admin"
               autoFocus
               disabled={loading}
-              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm
-                         text-white placeholder:text-slate-700
-                         focus:border-violet-500/40 focus:outline-none
+              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm
+                         text-white placeholder:text-[#6b6480]
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
 
@@ -80,14 +80,14 @@ export default function LoginScreen({ onLogin }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="········"
               disabled={loading}
-              className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] px-3 py-2 text-sm
-                         text-white placeholder:text-slate-700
-                         focus:border-violet-500/40 focus:outline-none
+              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm
+                         text-white placeholder:text-[#6b6480]
+                         focus:border-[#9D4EDD]/40 focus:outline-none
                          disabled:opacity-50"
             />
 
             {error && (
-              <div className="mt-3 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              <div className="mt-3 rounded-md border border-[#F15BB5]/20 bg-[#F15BB5]/5 px-3 py-2 text-xs text-red-400">
                 {error}
               </div>
             )}
@@ -97,8 +97,8 @@ export default function LoginScreen({ onLogin }: Props) {
             type="submit"
             disabled={loading || !username || !password}
             className="flex w-full items-center justify-center gap-2 rounded-lg
-                       bg-violet-600 px-4 py-2.5 text-sm font-medium text-white
-                       transition hover:bg-violet-500
+                       bg-[#9D4EDD] px-4 py-2.5 text-sm font-medium text-white
+                       transition hover:bg-[#B100E8]
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}

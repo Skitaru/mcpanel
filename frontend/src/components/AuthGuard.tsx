@@ -12,7 +12,7 @@ function installInterceptor(token: string) {
   _token = token;
   const { fetch: originalFetch } = window;
   // Don't double-wrap
-  if ((window.fetch as any).__mcpanelPatched) return;
+  if ((window.fetch as any).__obsidianPatched) return;
   window.fetch = async function (...args: Parameters<typeof fetch>) {
     const [input, init] = args;
     let url = "";
@@ -28,14 +28,14 @@ function installInterceptor(token: string) {
       // If token expired, clear it and reload so user sees login screen
       if (res.status === 401) {
         _token = null;
-        localStorage.removeItem("mcpanel-token");
+        localStorage.removeItem("obsidian-token");
         window.location.reload();
       }
       return res;
     }
     return originalFetch(input, init);
   } as typeof fetch;
-  (window.fetch as any).__mcpanelPatched = true;
+  (window.fetch as any).__obsidianPatched = true;
 }
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -44,7 +44,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Check for existing token on mount
   useEffect(() => {
-    const stored = localStorage.getItem("mcpanel-token");
+    const stored = localStorage.getItem("obsidian-token");
     if (stored) {
       fetch(`${API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${stored}` },
@@ -54,10 +54,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             installInterceptor(stored);
             setToken(stored);
           } else {
-            localStorage.removeItem("mcpanel-token");
+            localStorage.removeItem("obsidian-token");
           }
         })
-        .catch(() => localStorage.removeItem("mcpanel-token"))
+        .catch(() => localStorage.removeItem("obsidian-token"))
         .finally(() => setChecking(false));
     } else {
       setChecking(false);
@@ -65,15 +65,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogin = useCallback((newToken: string) => {
-    localStorage.setItem("mcpanel-token", newToken);
+    localStorage.setItem("obsidian-token", newToken);
     installInterceptor(newToken);
     setToken(newToken);
   }, []);
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0c10]">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500/15 border-t-violet-500" />
+      <div className="flex min-h-screen items-center justify-center bg-[#0B0914]">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#28223D] border-t-violet-500" />
       </div>
     );
   }

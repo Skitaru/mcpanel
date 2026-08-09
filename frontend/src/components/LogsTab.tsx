@@ -56,35 +56,35 @@ export default function LogsTab({ serverId }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-purple-500/15 bg-[#0e0d14] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#28223D] bg-[#151221] px-3 py-2">
         <ScrollText className="h-4 w-4 text-slate-500 shrink-0" />
         <span className="text-xs text-slate-500">logs/latest.log</span>
         <div className="relative flex-1 min-w-[120px]">
           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-600" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-            className="w-full rounded-md border border-purple-500/15 bg-[#0a0c10] py-1 pl-7 pr-3 text-[11px] text-slate-200
-                       placeholder:text-slate-600 focus:border-violet-500/40 focus:outline-none" />
+            className="w-full rounded-md border border-[#28223D] bg-[#0B0914] py-1 pl-7 pr-3 text-[11px] text-slate-200
+                       placeholder:text-slate-600 focus:border-[#9D4EDD]/40 focus:outline-none" />
           {search && filteredLines && (
             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-600">{filteredLines.length} matches</span>
           )}
         </div>
-        <button onClick={handleCopy} className="rounded-md p-1.5 text-slate-600 transition hover:bg-purple-500/5 hover:text-slate-400" title="Copy to clipboard">
+        <button onClick={handleCopy} className="rounded-md p-1.5 text-slate-600 transition hover:bg-[#9D4EDD]/5 hover:text-slate-400" title="Copy to clipboard">
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button onClick={() => { setLoading(true); fetchLogs(); }}
-          className="flex items-center gap-1 rounded-md border border-purple-500/15 px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#252b3b] hover:text-slate-300">
+          className="flex items-center gap-1 rounded-md border border-[#28223D] px-2.5 py-1 text-[11px] text-slate-500 transition hover:border-[#9D4EDD]/40 hover:text-slate-300">
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />Refresh
         </button>
       </div>
 
       {/* Log viewer */}
-      <div className="overflow-hidden rounded-xl border border-purple-500/15 bg-[#0e0d14]">
+      <div className="overflow-hidden rounded-xl border border-[#28223D] bg-[#151221]">
         {loading && !logContent ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-slate-600" /></div>
         ) : error && !logContent ? (
           <div className="flex flex-col items-center justify-center gap-2 py-20">
             {error === "not_started" ? (<>
-              <ScrollText className="h-8 w-8 text-slate-700" />
+              <ScrollText className="h-8 w-8 text-[#6b6480]" />
               <p className="text-sm text-slate-500">No logs yet</p>
               <p className="text-xs text-slate-600">Start the server to generate log files.</p>
             </>) : (<>
@@ -94,14 +94,14 @@ export default function LogsTab({ serverId }: Props) {
           </div>
         ) : (
           <pre ref={preRef} onScroll={handleScroll}
-            className="bg-[#0a0c10] p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 overflow-auto"
+            className="bg-[#0B0914] p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 overflow-auto"
             style={{ height: "calc(100vh - 14rem)" }}>
             {filteredLines ? filteredLines.join("\n") : logContent}
           </pre>
         )}
       </div>
 
-      <p className="text-center text-[10px] text-slate-700">
+      <p className="text-center text-[10px] text-[#6b6480]">
         Auto-refreshes every 5 s — scroll up to pause auto-scroll
       </p>
     </div>

@@ -35,7 +35,7 @@ const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
 ];
 
 function statusColor(s: ServerStatus["status"]) {
-  switch (s) { case "running": return "bg-emerald-500"; case "exited": case "created": case "paused": return "bg-amber-500"; default: return "bg-slate-600"; }
+  switch (s) { case "running": return "bg-emerald-500"; case "exited": case "created": case "paused": return "bg-amber-500"; default: return "bg-[#28223D]"; }
 }
 function statusLabel(s: ServerStatus["status"]) {
   switch (s) { case "running": return "Active"; case "exited": return "Stopped"; case "created": return "Created"; default: return "Unknown"; }
@@ -161,7 +161,7 @@ export default function ServerDetailPage() {
   const hostname = typeof window !== "undefined" ? window.location.hostname : "84.234.99.121";
 
   return (
-    <div className="flex min-h-screen bg-[#08080c] bg-obsidian-grid">
+    <div className="flex min-h-screen bg-[#0B0914] bg-obsidian-grid">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
 
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
@@ -171,7 +171,7 @@ export default function ServerDetailPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertTriangle className="h-10 w-10 text-amber-500" />
               <p className="text-sm text-slate-500">{error ?? "Server not found."}</p>
-              <button onClick={() => router.push("/")} className="rounded-lg border border-purple-500/20 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-purple-500/10">Back to Dashboard</button>
+              <button onClick={() => router.push("/")} className="rounded-lg border border-[#28223D] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-[#9D4EDD]/10">Back to Dashboard</button>
             </div>
           ) : (
             <>
@@ -184,7 +184,7 @@ export default function ServerDetailPage() {
                   <span className="text-slate-600">/</span>
                   <span className="text-white font-bold text-sm tracking-tight">{server.name}</span>
                   <span className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                    server.status === "running" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                    server.status === "running" ? "bg-[#00F5D4]/10 text-emerald-400 border border-[#00F5D4]/20" : "bg-[#FEE440]/10 text-amber-400 border border-[#FEE440]/20"
                   }`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
                     {statusLabel(server.status)}
@@ -192,36 +192,36 @@ export default function ServerDetailPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-1.5 bg-[#0e0d14] p-1.5 rounded-xl border border-purple-500/15 shadow-lg overflow-x-auto max-w-full">
+                <div className="flex items-center gap-1.5 bg-[#151221] p-1.5 rounded-xl border border-[#28223D] shadow-lg overflow-x-auto max-w-full">
                   {actionConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1">
+                    <div className="flex items-center gap-1 rounded-lg border border-[#FEE440]/30 bg-[#FEE440]/10 px-2 py-1">
                       <span className="text-[11px] font-medium text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
-                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-amber-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-amber-500 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
-                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-700">No</button>
+                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-[#FEE440] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#FEE440]/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
                     </div>
                   ) : server.status === "running" ? (<>
-                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2 text-amber-400 transition hover:bg-amber-500/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
-                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2 text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2 text-amber-400 transition hover:bg-[#FEE440]/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2 text-rose-400 transition hover:bg-[#F15BB5]/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
                   </>) : (
-                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2 text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2 text-emerald-400 transition hover:bg-[#00F5D4]/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
                   )}
-                  <span className="w-px h-4 bg-purple-500/20 mx-0.5" />
-                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2 text-slate-400 transition hover:bg-purple-500/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <label className={`rounded-lg p-2 text-slate-400 transition hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
+                  <span className="w-px h-4 bg-[#28223D] mx-0.5" />
+                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <label className={`rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
                     <Upload className="h-4 w-4" strokeWidth={1.75} />
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
-                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2 text-slate-400 transition hover:bg-purple-500/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2 text-slate-400 transition hover:bg-purple-500/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
-                  <span className="w-px h-4 bg-purple-500/20 mx-0.5" />
+                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2 text-slate-400 transition hover:bg-[#9D4EDD]/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <span className="w-px h-4 bg-[#28223D] mx-0.5" />
                   {deleteConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1">
+                    <div className="flex items-center gap-1 rounded-lg border border-[#F15BB5]/30 bg-[#F15BB5]/10 px-2 py-1">
                       <span className="text-[11px] text-rose-400">Delete?</span>
-                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-rose-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-rose-500 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
-                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-slate-700">No</button>
+                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-[#F15BB5] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#F15BB5]/80 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
+                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2 text-slate-500 transition hover:bg-[#F15BB5]/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
                   )}
                 </div>
               </div>
@@ -233,7 +233,7 @@ export default function ServerDetailPage() {
                 <div className="w-full lg:w-60 shrink-0 space-y-4">
                   {/* Server Details Card */}
                   <div className="surface p-4 space-y-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-purple-500/15 pb-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#28223D] pb-2">
                       SERVER DETAILS
                     </div>
 
@@ -282,8 +282,8 @@ export default function ServerDetailPage() {
                           onClick={() => setActiveTab(id)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition font-medium ${
                             active
-                              ? "bg-purple-600/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
-                              : "text-slate-400 hover:text-slate-200 hover:bg-purple-500/5 border-l-2 border-transparent"
+                              ? "bg-[#9D4EDD]/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-[#9D4EDD]/5 border-l-2 border-transparent"
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -327,12 +327,12 @@ export default function ServerDetailPage() {
       {/* ── Docker Logs Dialog ── */}
       {dockerLogs.text != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
-          <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4 border border-purple-500/20 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-purple-500/15 px-5 py-3.5 bg-[#0e0d14]">
+          <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4 border border-[#28223D] shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#28223D] px-5 py-3.5 bg-[#151221]">
               <h3 className="text-xs font-semibold text-white">Docker Logs — {server?.name}</h3>
               <button onClick={() => setDockerLogs({ loading: false, text: null })} className="rounded-md p-1 text-slate-400 transition hover:text-white">✕</button>
             </div>
-            <pre className="flex-1 overflow-auto p-4 text-xs font-mono leading-relaxed text-slate-400 bg-[#06050a] whitespace-pre-wrap break-all">{dockerLogs.text}</pre>
+            <pre className="flex-1 overflow-auto p-4 text-xs font-mono leading-relaxed text-slate-400 bg-[#000000] whitespace-pre-wrap break-all">{dockerLogs.text}</pre>
           </div>
         </div>
       )}
