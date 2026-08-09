@@ -23,7 +23,7 @@ import {
   resolveJavaImage,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
-import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats } from "../services/discord";
+import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
 
 const router = Router();
 
@@ -519,11 +519,30 @@ router.post("/:id/start", async (req: Request, res: Response) => {
 
     await startContainer(server.containerId);
     res.json({ message: `Server "${server.name}" is starting.` });
-    // Discord: send initial status embed + start live updater
+    // Discord: send initial status embed + start live updater + stats stream
     if (server.discordWebhook) {
-      // Init stats store so embed has memory limit from the start
       initLiveStats(server.id, server.ram * 1e6);
-      // Send ONE embed — will be edited live every 10s
+      // Start Docker stats stream to feed liveStore (independent of WebSocket)
+      import("../services/docker").then(({ getStatsStream }) => {
+        getStatsStream(server.containerId!).then(stream => {
+          stream.on("data", (chunk: Buffer) => {
+            try {
+              const raw = JSON.parse(chunk.toString());
+              const cpuDelta = raw.cpu_stats.cpu_usage.total_usage - raw.precpu_stats.cpu_usage.total_usage;
+              const sysDelta = raw.cpu_stats.system_cpu_usage - raw.precpu_stats.system_cpu_usage;
+              if (cpuDelta > 0 && sysDelta > 0) {
+                const cpu = (cpuDelta / sysDelta) * raw.cpu_stats.online_cpus * 100;
+                const memUsage = raw.memory_stats?.usage ?? 0;
+                setLiveStats(server.id, { cpuPercent: Math.round(cpu * 100) / 100, memoryUsage: memUsage });
+              }
+            } catch {}
+          });
+          stream.on("error", () => stream.destroy());
+          // Store stream ref so we can destroy on stop
+          (server as any)._discordStatsStream = stream;
+        }).catch(() => {});
+      });
+      // Send ONE embed — edited live every 10s
       const embed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "online");
       sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
         if (msgId) {
@@ -558,10 +577,15 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
 
     await stopContainer(server.containerId);
     res.json({ message: `Server "${server.name}" is stopping.` });
-    // Discord: stop live updater + edit embed to offline
+    // Discord: stop live updater + stats stream + edit embed to offline
     if (server.discordWebhook) {
       stopStatusEmbedUpdater(server.id);
       clearLiveStats(server.id);
+      // Destroy the stats stream if active
+      if ((server as any)._discordStatsStream) {
+        (server as any)._discordStatsStream.destroy();
+        (server as any)._discordStatsStream = undefined;
+      }
       if (server.discordMessageId) {
         const offlineEmbed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "offline");
         editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
