@@ -158,7 +158,7 @@ export default function ServerDetailPage() {
   }, [serverId, fetchServer]);
 
   const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "84.234.99.121";
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "5.231.108.226";
 
   return (
     <div className="flex min-h-screen bg-[#0B0914] bg-obsidian-grid">
