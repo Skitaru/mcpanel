@@ -171,7 +171,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       // Deduplicate — one stats stream per server per socket is enough.
       if (session.statsSubs.has(serverId)) return;
 
-      const server = getServer(serverId);
+      const server = await getServer(serverId);
       if (!server?.containerId) {
         socket.emit("stats:error", {
           serverId,
@@ -245,7 +245,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       const { serverId } = payload;
       if (session.tpsIntervals.has(serverId)) return;
 
-      const server = getServer(serverId);
+      const server = await getServer(serverId);
       if (!server?.containerId) {
         socket.emit("tps:error", { serverId, message: "Server not found." });
         return;
@@ -301,7 +301,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
       if (session.consoleSubs.has(serverId)) return;
 
-      const server = getServer(serverId);
+      const server = await getServer(serverId);
       if (!server?.containerId) {
         socket.emit("console:error", {
           serverId,

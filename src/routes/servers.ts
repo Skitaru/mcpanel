@@ -4,7 +4,6 @@ import { Router, Request, Response } from "express";
 import { v4 as uuid } from "uuid";
 import path from "node:path";
 import fs from "node:fs";
-import net from "node:net";
 import multer from "multer";
 import { CreateServerRequest, ServerConfig, ServerStatus, ServerType } from "../types";
 import {
@@ -24,6 +23,10 @@ import {
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
 import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
+import { downloadPaperJar } from "../services/paper";
+import { downloadFabricJar } from "../services/fabric";
+import { downloadVelocityJar } from "../services/velocity";
+import { pingMinecraftServer } from "../services/minecraft-ping";
 
 const router = Router();
 
@@ -54,250 +57,6 @@ function parseRamToMB(ram: string | number): number {
     throw new Error("RAM must be between 512 and " + MAX_RAM + " (MB).");
   }
   return mb;
-}
-
-/**
- * Ping a Minecraft server using the Server List Ping protocol.
- * Returns player count + player list or null if the server is unreachable.
- */
-function pingMinecraftServer(host: string, port: number, timeoutMs = 3000): Promise<{ online: number; max: number; players: { name: string; id: string }[] } | null> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    let buf: Buffer = Buffer.alloc(0);
-    let resolved = false;
-
-    const done = (result: { online: number; max: number; players: { name: string; id: string }[] } | null) => {
-      if (resolved) return;
-      resolved = true;
-      socket.destroy();
-      resolve(result);
-    };
-
-    socket.setTimeout(timeoutMs, () => done(null));
-    socket.on("error", () => done(null));
-
-    socket.connect(port, host, () => {
-      const hostBytes = Buffer.from(host, "utf8");
-      const writeVarInt = (b: Buffer, val: number): Buffer => {
-        do {
-          let temp = val & 0x7f;
-          val >>>= 7;
-          if (val !== 0) temp |= 0x80;
-          b = Buffer.concat([b, Buffer.from([temp])]);
-        } while (val !== 0);
-        return b;
-      };
-
-      let pkt: Buffer = Buffer.from([0x00]);
-      pkt = writeVarInt(pkt, -1);
-      pkt = writeVarInt(pkt, hostBytes.length);
-      pkt = Buffer.concat([pkt, hostBytes]);
-      pkt = Buffer.concat([pkt, Buffer.from([port >> 8, port & 0xff])]);
-      pkt = writeVarInt(pkt, 1);
-
-      const len = writeVarInt(Buffer.alloc(0), pkt.length);
-      socket.write(Buffer.concat([len, pkt]));
-      socket.write(Buffer.from([0x01, 0x00]));
-    });
-
-    socket.on("data", (chunk: Buffer) => {
-      buf = Buffer.concat([buf, chunk]) as Buffer;
-      try {
-        // Parse VarInt length prefix
-        let pos = 0;
-        let length = 0;
-        let shift = 0;
-        while (pos < buf.length) {
-          const b = buf[pos++];
-          length |= (b & 0x7f) << shift;
-          if (!(b & 0x80)) break;
-          shift += 7;
-        }
-        if (pos + length > buf.length) return; // incomplete
-
-        const payload = buf.subarray(pos, pos + length);
-        if (payload[0] !== 0x00) return; // not a status response
-
-        // Read VarInt string length prefix from the response body
-        let strPos = 1;
-        let strLen = 0;
-        let strShift = 0;
-        while (strPos < payload.length) {
-          const sb = payload[strPos++];
-          strLen |= (sb & 0x7f) << strShift;
-          if (!(sb & 0x80)) break;
-          strShift += 7;
-        }
-
-        const jsonStr = payload.subarray(strPos, strPos + strLen).toString("utf8");
-        const data = JSON.parse(jsonStr);
-        if (data.players) {
-          done({
-            online: data.players.online ?? 0,
-            max: data.players.max ?? 0,
-            players: (data.players.sample ?? []).map((p: any) => ({ name: p.name, id: p.id })),
-          });
-        } else {
-          done(null);
-        }
-      } catch {
-        // incomplete or invalid, wait for more data
-      }
-    });
-  });
-}
-
-/**
- * Download the latest PaperMC server jar for the given Minecraft version.
- * Saves it to `paper.jar` inside `dataPath`.
- *
- * Uses the PaperMC v2 API:
- *   1. GET …/versions/{version}/builds    → find latest build
- *   2. GET …/builds/{build}/downloads/…   → stream jar to disk
- */
-async function downloadPaperJar(
-  paperVersion: string,
-  dataPath: string,
-): Promise<void> {
-  const headers = {
-    "User-Agent": "MCPanel/1.0",
-    Accept: "application/json",
-  };
-
-  const buildsUrl = `https://fill.papermc.io/v3/projects/paper/versions/${paperVersion}/builds`;
-
-  // 1. Fetch build list (v3 returns a plain array, not { builds: [...] }).
-  console.log(`[paper] Fetching builds for PaperMC ${paperVersion} …`);
-  const buildsRes = await fetch(buildsUrl, { headers });
-  if (!buildsRes.ok) {
-    throw new Error(
-      `PaperMC API returned ${buildsRes.status} for version "${paperVersion}". ` +
-        `Verify the version exists at https://papermc.io/downloads/paper`,
-    );
-  }
-
-  const buildsData = (await buildsRes.json()) as {
-    id: number;
-    channel: string;
-    downloads: Record<string, { name: string; url?: string }>;
-  }[];
-
-  if (!Array.isArray(buildsData) || buildsData.length === 0) {
-    throw new Error(`No builds available for PaperMC version "${paperVersion}".`);
-  }
-
-  // Prefer STABLE builds, fall back to the latest available.
-  const stable = buildsData.filter((b) => b.channel === "STABLE");
-  const build = stable.length > 0
-    ? stable[stable.length - 1]
-    : buildsData[buildsData.length - 1];
-
-  const buildId = build.id;
-  const dl = build.downloads["server:default"];
-  if (!dl) {
-    throw new Error(`No download found for build #${buildId}.`);
-  }
-
-  // 2. Download the jar (use direct URL from v3 API if available).
-  const downloadUrl = dl.url
-    ?? `https://fill.papermc.io/v3/projects/paper/versions/${paperVersion}/builds/${buildId}/downloads/${dl.name}`;
-
-  console.log(`[paper] Downloading ${dl.name} (build #${buildId}) …`);
-  const downloadRes = await fetch(downloadUrl, { headers });
-  if (!downloadRes.ok) {
-    throw new Error(
-      `Failed to download PaperMC jar (HTTP ${downloadRes.status}).`,
-    );
-  }
-
-  const buffer = Buffer.from(await downloadRes.arrayBuffer());
-  const jarPath = path.join(dataPath, "paper.jar");
-  fs.writeFileSync(jarPath, buffer);
-
-  console.log(
-    `[paper] Saved paper.jar (${(buffer.length / 1e6).toFixed(1)} MB) to ${jarPath}`,
-  );
-}
-
-/**
- * Download the Fabric server launcher JAR from meta.fabricmc.net.
- */
-async function downloadFabricJar(
-  mcVersion: string,
-  dataPath: string,
-): Promise<void> {
-  const headers = {
-    "User-Agent": "MCPanel/1.0",
-    Accept: "application/json",
-  };
-
-  console.log(`[fabric] Fetching Fabric loader for MC ${mcVersion} …`);
-  const loaderRes = await fetch("https://meta.fabricmc.net/v2/versions/loader", { headers });
-  if (!loaderRes.ok) throw new Error(`Fabric API returned ${loaderRes.status}`);
-  const loaderData = (await loaderRes.json()) as { version: string }[];
-  const loaderVer = loaderData[0]?.version;
-  if (!loaderVer) throw new Error("No Fabric loader versions available.");
-
-  const installerRes = await fetch("https://meta.fabricmc.net/v2/versions/installer", { headers });
-  if (!installerRes.ok) throw new Error(`Fabric API returned ${installerRes.status}`);
-  const installerData = (await installerRes.json()) as { version: string }[];
-  const installerVer = installerData[0]?.version;
-  if (!installerVer) throw new Error("No Fabric installer versions available.");
-
-  console.log(`[fabric] Loader ${loaderVer} / Installer ${installerVer}`);
-
-  const dlUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVer}/${installerVer}/server/jar`;
-  console.log(`[fabric] Downloading fabric-server-launch.jar …`);
-  const res = await fetch(dlUrl, { headers });
-  if (!res.ok) throw new Error(`Fabric download failed (HTTP ${res.status}). Check if version "${mcVersion}" supports Fabric.`);
-
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const jarPath = path.join(dataPath, "fabric-server-launch.jar");
-  fs.writeFileSync(jarPath, buffer);
-  console.log(`[fabric] Saved fabric-server-launch.jar (${(buffer.length / 1e6).toFixed(1)} MB) to ${jarPath}`);
-}
-
-/**
- * Download the Velocity proxy JAR from PaperMC API.
- */
-async function downloadVelocityJar(
-  version: string,
-  dataPath: string,
-): Promise<void> {
-  const headers = {
-    "User-Agent": "MCPanel/1.0",
-    Accept: "application/json",
-  };
-
-  const buildsUrl = `https://fill.papermc.io/v3/projects/velocity/versions/${version}/builds`;
-  console.log(`[velocity] Fetching builds for Velocity ${version} …`);
-  const buildsRes = await fetch(buildsUrl, { headers });
-  if (!buildsRes.ok) throw new Error(`PaperMC API returned ${buildsRes.status} for Velocity "${version}".`);
-
-  const buildsData = (await buildsRes.json()) as {
-    id: number; channel: string;
-    downloads: Record<string, { name: string; url?: string }>;
-  }[];
-  if (!Array.isArray(buildsData) || buildsData.length === 0) {
-    throw new Error(`No builds available for Velocity "${version}".`);
-  }
-
-  const stable = buildsData.filter((b) => b.channel === "STABLE");
-  const build = stable.length > 0 ? stable[stable.length - 1] : buildsData[buildsData.length - 1];
-  const dl = build.downloads["server:default"];
-  if (!dl) throw new Error(`No download found for build #${build.id}.`);
-
-  const downloadUrl = dl.url
-    ?? `https://fill.papermc.io/v3/projects/velocity/versions/${version}/builds/${build.id}/downloads/${dl.name}`;
-
-  console.log(`[velocity] Downloading ${dl.name} …`);
-  const downloadRes = await fetch(downloadUrl, { headers });
-  if (!downloadRes.ok) throw new Error(`Failed to download Velocity jar (HTTP ${downloadRes.status}).`);
-
-  const buffer = Buffer.from(await downloadRes.arrayBuffer());
-  const jarPath = path.join(dataPath, "velocity.jar");
-  fs.writeFileSync(jarPath, buffer);
-  console.log(`[velocity] Saved velocity.jar (${(buffer.length / 1e6).toFixed(1)} MB) to ${jarPath}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +90,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     // ---- port conflict check ----
-    const existing = loadServers();
+    const existing = await loadServers();
     if (existing.some((s) => s.port === port)) {
       res
         .status(409)
@@ -462,15 +221,15 @@ router.post("/", async (req: Request, res: Response) => {
       maxPlayers,
       voicePort,
     };
-    addServer(config);
+    await addServer(config);
 
     // ---- create Docker container ----
     const containerId = await createContainer(config, javaImage, { jarName, extraCmd, javaArgs: config.javaArgs });
 
     // Update config with the real container id.
     config.containerId = containerId;
-    removeServer(id);
-    addServer(config);
+    await removeServer(id);
+    await addServer(config);
 
     // Auto-start the container
     try {
@@ -507,7 +266,7 @@ router.post("/", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post("/:id/start", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -544,9 +303,9 @@ router.post("/:id/start", async (req: Request, res: Response) => {
       });
       // Send ONE embed — edited live every 10s
       const embed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "online");
-      sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
+      sendDiscordEmbed(server.discordWebhook, embed).then(async msgId => {
         if (msgId) {
-          updateServer(server.id, { discordMessageId: msgId } as any);
+          await updateServer(server.id, { discordMessageId: msgId } as any);
           startStatusEmbedUpdater(server.discordWebhook!, msgId, server.id,
             server.name, server.serverType, server.version, server.port);
         }
@@ -565,7 +324,7 @@ router.post("/:id/start", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post("/:id/stop", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -584,7 +343,7 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
       if (server.discordMessageId) {
         const offlineEmbed = buildStatusEmbed(server.id, server.name, server.serverType, server.version, server.port, "offline");
         await editDiscordEmbed(server.discordWebhook, server.discordMessageId, offlineEmbed);
-        updateServer(server.id, { discordMessageId: undefined as any });
+        await updateServer(server.id, { discordMessageId: undefined as any });
       }
     }
     res.json({ message: `Server "${server.name}" is stopping.` });
@@ -601,7 +360,7 @@ router.post("/:id/stop", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post("/:id/restart", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     if (!server.containerId) { res.status(500).json({ error: "Server has no associated container." }); return; }
 
@@ -639,9 +398,9 @@ router.post("/:id/restart", async (req: Request, res: Response) => {
         startStatusEmbedUpdater(server.discordWebhook, server.discordMessageId, server.id,
           server.name, server.serverType, server.version, server.port);
       } else {
-        sendDiscordEmbed(server.discordWebhook, embed).then(msgId => {
+        sendDiscordEmbed(server.discordWebhook, embed).then(async msgId => {
           if (msgId) {
-            updateServer(server.id, { discordMessageId: msgId } as any);
+            await updateServer(server.id, { discordMessageId: msgId } as any);
             startStatusEmbedUpdater(server.discordWebhook!, msgId, server.id,
               server.name, server.serverType, server.version, server.port);
           }
@@ -659,7 +418,7 @@ router.post("/:id/restart", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id/logs", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     if (!server.containerId) { res.status(400).json({ error: "Server has no associated container." }); return; }
 
@@ -685,7 +444,7 @@ router.get("/:id/logs", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const servers = loadServers();
+    const servers = await loadServers();
 
     // Gather container ids that are known.
     const ids = servers
@@ -729,7 +488,7 @@ router.get("/", async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -750,7 +509,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
     }
 
     // 3. Remove from config store.
-    removeServer(server.id);
+    await removeServer(server.id);
 
     console.log(`[api] Deleted server "${server.name}" (${server.id.slice(0, 8)})`);
     res.json({ message: `Server "${server.name}" deleted.` });
@@ -765,7 +524,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post("/:id/backup", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -796,15 +555,22 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
       return;
     }
 
-    const stat = fs.statSync(backupPath);
-    console.log(`[api] Backup: ${backupName} (${(stat.size / 1e6).toFixed(1)} MB)`);
+    const st = fs.statSync(backupPath);
+    console.log(`[api] Backup: ${backupName} (${(st.size / 1e6).toFixed(1)} MB)`);
 
-    // Read file into buffer, send, then clean up
-    const buffer = fs.readFileSync(backupPath);
+    // Stream the file directly to the response — avoids buffering the
+    // entire backup in RAM. Clean up the temp file after sending.
     res.set("Content-Type", "application/gzip");
     res.set("Content-Disposition", `attachment; filename="${backupName}"`);
-    res.send(buffer);
-    try { fs.unlinkSync(backupPath); } catch {}
+    const rs = fs.createReadStream(backupPath);
+    rs.on("error", (err) => {
+      console.error("[api] Backup stream error:", err.message);
+      try { fs.unlinkSync(backupPath); } catch {}
+    });
+    rs.on("end", () => {
+      try { fs.unlinkSync(backupPath); } catch {}
+    });
+    rs.pipe(res);
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/backup error:", err);
     res.status(500).json({ error: "Failed to create backup.", detail: err.message });
@@ -820,7 +586,7 @@ try { fs.mkdirSync("/tmp/mcpanel-restores", { recursive: true }); } catch {}
 
 router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -912,7 +678,7 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
 // ---------------------------------------------------------------------------
 router.post("/:id/command", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -942,7 +708,7 @@ router.post("/:id/command", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id/players", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -963,7 +729,7 @@ router.get("/:id/players", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id/disk", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
     const { execFile } = await import("node:child_process");
@@ -997,7 +763,7 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.put("/:id", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
@@ -1029,7 +795,7 @@ router.put("/:id", async (req: Request, res: Response) => {
         return;
       }
       // Port conflict check (exclude current server)
-      const existing = loadServers();
+      const existing = await loadServers();
       if (existing.some((s) => s.id !== server.id && s.port === port)) {
         res.status(409).json({ error: `Port ${port} is already in use by another server.` });
         return;
@@ -1054,14 +820,14 @@ router.put("/:id", async (req: Request, res: Response) => {
         res.status(400).json({ error: "Field 'voicePort' must be between 1024 and 65535." });
         return;
       }
-      const existing = loadServers();
+      const existing = await loadServers();
       if (existing.some((s) => s.id !== server.id && s.voicePort === voicePort)) {
         res.status(409).json({ error: "Voice port " + voicePort + " is already in use by another server." });
         return;
       }
     }
 
-    const updated = updateServer(server.id, {
+    const updated = await updateServer(server.id, {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(ram !== undefined ? { ram } : {}),
       ...(port !== undefined ? { port } : {}),
@@ -1106,7 +872,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.get("/:id/properties", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
     const propsPath = path.join(server.dataPath, "server.properties");
@@ -1137,7 +903,7 @@ router.get("/:id/properties", async (req: Request, res: Response) => {
 
 router.put("/:id/properties", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     if (server.serverType === "velocity") {
       res.status(400).json({ error: "Velocity proxies use velocity.toml, not server.properties." });
@@ -1189,7 +955,7 @@ try { fs.mkdirSync("/tmp/mcpanel-icons", { recursive: true }); } catch {}
 
 router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     if (!req.file) { res.status(400).json({ error: "No icon file uploaded." }); return; }
 
@@ -1221,7 +987,7 @@ router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Re
 // ---------------------------------------------------------------------------
 router.get("/:id/schedule", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     res.json({ schedule: server.schedule ?? {} });
   } catch (err: any) {
@@ -1231,7 +997,7 @@ router.get("/:id/schedule", async (req: Request, res: Response) => {
 
 router.put("/:id/schedule", async (req: Request, res: Response) => {
   try {
-    const server = getServer(req.params.id);
+    const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
     const { restart, backup } = req.body ?? {};
 
@@ -1255,7 +1021,7 @@ router.put("/:id/schedule", async (req: Request, res: Response) => {
       (server as any).schedule = schedule;
     }
 
-    updateServer(server.id, { schedule: (server as any).schedule } as any);
+    await updateServer(server.id, { schedule: (server as any).schedule } as any);
     res.json({ message: "Schedule updated.", schedule: (server as any).schedule ?? {} });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to save schedule.", detail: err.message });
@@ -1317,7 +1083,7 @@ router.post("/modpack", async (req: Request, res: Response) => {
       return;
     }
 
-    const existing = loadServers();
+    const existing = await loadServers();
     if (existing.some(s => s.port === serverPort)) {
       res.status(409).json({ error: `Port ${serverPort} is already in use.` });
       return;

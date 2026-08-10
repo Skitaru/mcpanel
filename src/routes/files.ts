@@ -64,7 +64,7 @@ async function resolveSafe(
   serverId: string,
   subPath: string,
 ): Promise<{ absolutePath: string; dataRoot: string } | null> {
-  const server = getServer(serverId);
+  const server = await getServer(serverId);
   if (!server) return null;
 
   // Normalise and resolve `..` segments. Strip leading `/` so

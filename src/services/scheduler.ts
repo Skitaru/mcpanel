@@ -11,12 +11,16 @@ import {
   resolveJavaImage,
 } from "./docker";
 import path from "node:path";
-import { execFileSync, execFile } from "node:child_process";
-import fs from "node:fs";
+import { execFile } from "node:child_process";
+import { readdir, stat, unlink } from "node:fs/promises";
 
 const CHECK_INTERVAL_MS = 30_000;
 
 let _interval: ReturnType<typeof setInterval> | null = null;
+
+/** Tracks the last HH:MM a task was executed for a given server+task key.
+ *  Prevents double-firing when the 30 s check interval hits the same minute twice. */
+const lastFired = new Map<string, string>();
 
 export function startScheduler(): void {
   if (_interval) return;
@@ -25,7 +29,7 @@ export function startScheduler(): void {
 }
 
 async function tick(): Promise<void> {
-  const servers = loadServers();
+  const servers = await loadServers();
   const now = new Date();
   const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
@@ -35,23 +39,31 @@ async function tick(): Promise<void> {
 
     // ---- Scheduled restart ----
     if (schedule.restart && schedule.restart === currentTime && srv.containerId) {
-      console.log(`[scheduler] Restarting server "${srv.name}" (scheduled ${schedule.restart})`);
-      try {
-        await restartContainer(srv);
-        console.log(`[scheduler] Server "${srv.name}" restarted successfully`);
-      } catch (err: any) {
-        console.error(`[scheduler] Failed to restart "${srv.name}":`, err.message);
+      const key = `${srv.id}:restart`;
+      if (lastFired.get(key) !== currentTime) {
+        lastFired.set(key, currentTime);
+        console.log(`[scheduler] Restarting server "${srv.name}" (scheduled ${schedule.restart})`);
+        try {
+          await restartContainer(srv);
+          console.log(`[scheduler] Server "${srv.name}" restarted successfully`);
+        } catch (err: any) {
+          console.error(`[scheduler] Failed to restart "${srv.name}":`, err.message);
+        }
       }
     }
 
     // ---- Scheduled backup ----
     if (schedule.backup && schedule.backup === currentTime) {
-      console.log(`[scheduler] Backing up server "${srv.name}" (scheduled ${schedule.backup})`);
-      try {
-        await performBackup(srv);
-        console.log(`[scheduler] Backup of "${srv.name}" completed`);
-      } catch (err: any) {
-        console.error(`[scheduler] Failed to backup "${srv.name}":`, err.message);
+      const key = `${srv.id}:backup`;
+      if (lastFired.get(key) !== currentTime) {
+        lastFired.set(key, currentTime);
+        console.log(`[scheduler] Backing up server "${srv.name}" (scheduled ${schedule.backup})`);
+        try {
+          await performBackup(srv);
+          console.log(`[scheduler] Backup of "${srv.name}" completed`);
+        } catch (err: any) {
+          console.error(`[scheduler] Failed to backup "${srv.name}":`, err.message);
+        }
       }
     }
   }
@@ -83,9 +95,9 @@ async function restartContainer(srv: any): Promise<void> {
   await startContainer(newId);
 
   // Update the containerId in servers.json
-  const all = loadServers();
+  const all = await loadServers();
   const idx = all.findIndex((s: any) => s.id === srv.id);
-  if (idx >= 0) { all[idx].containerId = newId; saveServers(all); }
+  if (idx >= 0) { all[idx].containerId = newId; await saveServers(all); }
 }
 
 function resolveJavaImageFallback(version: string): string {
@@ -111,15 +123,15 @@ async function performBackup(srv: any): Promise<void> {
     });
   });
 
-  const stat = fs.statSync(backupPath);
-  console.log(`[scheduler] Backup saved: ${backupName} (${(stat.size / 1e6).toFixed(1)} MB)`);
+  const st = await stat(backupPath);
+  console.log(`[scheduler] Backup saved: ${backupName} (${(st.size / 1e6).toFixed(1)} MB)`);
 
   // Keep only the 5 most recent scheduled backups
-  const backups = fs.readdirSync(backupDir)
+  const backups = (await readdir(backupDir))
     .filter(f => f.startsWith(`scheduled-backup-${srv.id.slice(0, 8)}-`) && f.endsWith(".tar.gz"))
     .sort()
     .reverse();
   for (const old of backups.slice(5)) {
-    try { fs.unlinkSync(path.join(backupDir, old)); } catch {}
+    try { await unlink(path.join(backupDir, old)); } catch {}
   }
 }

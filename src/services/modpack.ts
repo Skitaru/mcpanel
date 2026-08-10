@@ -2,13 +2,16 @@
 //
 // Downloads and installs CurseForge modpacks as MCPanel servers.
 // Supports Forge, NeoForge, Fabric, and Quilt mod loaders.
+//
+// All I/O is async — nothing blocks the event loop.
 
 import path from "node:path";
 import fs from "node:fs";
-import { execSync, execFileSync } from "node:child_process";
+import { exec, execFile } from "node:child_process";
+import { mkdir, readFile, writeFile, unlink, readdir, copyFile } from "node:fs/promises";
 import { v4 as uuid } from "uuid";
 import { ServerConfig, ServerType } from "../types";
-import { addServer, loadServers } from "./config-store";
+import { addServer, loadServers, saveServers } from "./config-store";
 import { createContainer, startContainer, resolveJavaImage } from "./docker";
 
 const CF_BASE = "https://api.curseforge.com/v1";
@@ -70,6 +73,35 @@ interface Manifest {
 }
 
 // ---------------------------------------------------------------------------
+// Async helpers
+// ---------------------------------------------------------------------------
+
+/** fs/promises doesn't expose exists(). Use access() wrapped in try/catch. */
+async function exists(p: string): Promise<boolean> {
+  try { await fs.promises.access(p); return true; } catch { return false; }
+}
+
+/** Promisified exec — runs a shell command, returns stdout. */
+function execAsync(cmd: string, opts?: { timeout?: number; maxBuffer?: number }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { encoding: "utf-8", ...opts }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout);
+    });
+  });
+}
+
+/** Promisified execFile — runs a command with args, returns stdout. */
+function execFileAsync(cmd: string, args: string[], opts?: { encoding?: BufferEncoding; timeout?: number; maxBuffer?: number }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { encoding: "utf-8", ...opts }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CurseForge API helpers
 // ---------------------------------------------------------------------------
 
@@ -117,18 +149,16 @@ async function getModFileInfo(apiKey: string, projectId: number, fileId: number)
 }
 
 /** Check if a JAR is client-only by inspecting its mod metadata. */
-function isClientOnlyMod(jarPath: string): boolean {
+async function isClientOnlyMod(jarPath: string): Promise<boolean> {
   // ---- Check mods.toml / neoforge.mods.toml for side = "CLIENT" ----
   try {
-    let tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/mods.toml"], {
-      encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    let tomlData = (await execFileAsync("unzip", ["-p", jarPath, "META-INF/mods.toml"], {
+      maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+    })).trim();
     if (!tomlData) {
-      tomlData = execFileSync("unzip", ["-p", jarPath, "META-INF/neoforge.mods.toml"], {
-        encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
+      tomlData = (await execFileAsync("unzip", ["-p", jarPath, "META-INF/neoforge.mods.toml"], {
+        maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+      })).trim();
     }
     if (tomlData) {
       // Find all side declarations in [[mods]] sections
@@ -136,16 +166,12 @@ function isClientOnlyMod(jarPath: string): boolean {
       if (sides.length > 0 && sides.every(s => s === "CLIENT")) return true;
 
       // ---- Heuristic: no side declared (defaults to BOTH) but JAR only references client classes ----
-      // Some mods forget to declare side = "CLIENT" yet only reference net/minecraft/client/…
-      // and never net/minecraft/server/ or net/minecraft/world/. These crash the dedicated server
-      // because NeoForge's RuntimeDistCleaner refuses to load client classes on DEDICATED_SERVER.
       if (sides.length === 0) {
         try {
-          const raw = execFileSync("unzip", ["-p", jarPath], {
+          const raw = await execFileAsync("unzip", ["-p", jarPath], {
             maxBuffer: 16 * 1024 * 1024, timeout: 8000,
-            stdio: ["ignore", "pipe", "ignore"],
           });
-          const text = raw.toString("latin1"); // fast, no UTF-8 decode issues for byte scan
+          const text = Buffer.from(raw, "latin1").toString("latin1"); // fast byte scan
           const hasClient = text.includes("net/minecraft/client/");
           const hasServer = text.includes("net/minecraft/server/") || text.includes("net/minecraft/world/");
           if (hasClient && !hasServer) return true;
@@ -158,10 +184,9 @@ function isClientOnlyMod(jarPath: string): boolean {
 
   // ---- Check fabric.mod.json for environment = "client" ----
   try {
-    const jsonData = execFileSync("unzip", ["-p", jarPath, "fabric.mod.json"], {
-      encoding: "utf-8", maxBuffer: 2 * 1024 * 1024, timeout: 5000,
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    const jsonData = (await execFileAsync("unzip", ["-p", jarPath, "fabric.mod.json"], {
+      maxBuffer: 2 * 1024 * 1024, timeout: 5000,
+    })).trim();
     if (jsonData) {
       const meta = JSON.parse(jsonData);
       if (meta?.environment === "client") return true;
@@ -192,12 +217,11 @@ async function downloadFile(url: string, dest: string, expectedBytes?: number, a
     throw new Error(`Download returned ${ct} (expected binary): ${preview}`);
   }
 
-  // Read entire response into memory (modpack ZIPs are typically <500MB, server has 15GB RAM)
   const buf = Buffer.from(await res.arrayBuffer());
   if (expectedBytes && buf.length < expectedBytes * 0.95) {
     throw new Error(`Download truncated: got ${buf.length} bytes, expected ~${expectedBytes}`);
   }
-  fs.writeFileSync(dest, buf);
+  await writeFile(dest, buf);
 }
 
 function getJavaDockerImage(mcVersion: string): string {
@@ -208,17 +232,14 @@ function getJavaDockerImage(mcVersion: string): string {
   return "eclipse-temurin:8-jre-alpine";
 }
 
-function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): void {
+async function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): Promise<void> {
   const javaImage = getJavaDockerImage(mcVersion);
   const jarName = path.basename(jarPath);
   // Run as root — this is a one-shot installer container that needs to write
   // files (installer logs, libraries, etc.) to the bind-mounted data directory.
-  // The data dir files are owned by root on the host (created by the Node.js
-  // backend), so -u 1000:1000 would get Permission denied.
-  // Ownership is fixed by the main server container's chown on every startup.
-  execSync(
+  await execAsync(
     `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
-    { stdio: "pipe", timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
+    { timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
   );
 }
 
@@ -229,7 +250,7 @@ function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVer
 export async function createModpackServer(name: string, ram: number, port: number): Promise<ServerConfig> {
   const id = uuid();
   const dataPath = path.join(DATA_ROOT, id);
-  fs.mkdirSync(dataPath, { recursive: true });
+  await mkdir(dataPath, { recursive: true });
 
   const config: ServerConfig = {
     id, name, serverType: "custom", ram, port,
@@ -237,7 +258,7 @@ export async function createModpackServer(name: string, ram: number, port: numbe
     rconPassword: uuid().replace(/-/g, "").slice(0, 16),
     version: "pending", containerId: null, dataPath,
   };
-  addServer(config);
+  await addServer(config);
   return config;
 }
 
@@ -272,7 +293,7 @@ export async function runModpackInstall(
 
     // 3. Validate ZIP integrity before unzipping
     {
-      const buf = fs.readFileSync(zipPath);
+      const buf = await readFile(zipPath);
       if (buf.length < 22) throw new Error(`Downloaded file too small (${buf.length} bytes)`);
       const magic = buf[0] === 0x50 && buf[1] === 0x4b; // PK
       if (!magic) {
@@ -290,22 +311,22 @@ export async function runModpackInstall(
       if (!found) throw new Error(`Downloaded ${buf.length} bytes but ZIP is incomplete (missing end-of-central-directory). The download may have been interrupted by the CDN.`);
     }
 
-    // 4. Extract
+    // 4. Extract (async via execFile)
     emitProgress(serverId, "Extracting modpack…", 20);
-    execFileSync("unzip", ["-o", zipPath, "-d", dataPath], { stdio: "pipe", timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
-    fs.unlinkSync(zipPath);
+    await execFileAsync("unzip", ["-o", zipPath, "-d", dataPath], { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
+    await unlink(zipPath);
 
     // 5. Parse manifest
     const manifestPath = path.join(dataPath, "manifest.json");
-    if (!fs.existsSync(manifestPath)) throw new Error("manifest.json not found in modpack.");
-    const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    if (!(await exists(manifestPath))) throw new Error("manifest.json not found in modpack.");
+    const manifest: Manifest = JSON.parse((await readFile(manifestPath, "utf-8")));
     const primaryLoader = manifest.minecraft.modLoaders?.find(l => l.primary);
     const loaderId = primaryLoader?.id || "";
     const mcVersion = manifest.minecraft.version;
 
     emitProgress(serverId, `Installing ${manifest.name}…`, 25);
 
-    // 5. Install mod loader
+    // 6. Install mod loader
     let jarName = "server.jar";
     let serverType: ServerType = "custom";
 
@@ -314,15 +335,15 @@ export async function runModpackInstall(
       serverType = "fabric";
 
       const lr = await fetch("https://meta.fabricmc.net/v2/versions/loader", { headers: { "User-Agent": "MCPanel/1.0" } });
-      const iv = (await fetch("https://meta.fabricmc.net/v2/versions/installer", { headers: { "User-Agent": "MCPanel/1.0" } }));
+      const iv = await fetch("https://meta.fabricmc.net/v2/versions/installer", { headers: { "User-Agent": "MCPanel/1.0" } });
       const loaderVer = ((await lr.json()) as { version: string }[])[0]?.version || "0.16.0";
       const instVer = ((await iv.json()) as { version: string }[])[0]?.version || "1.0.0";
 
       const instUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/${instVer}/fabric-installer-${instVer}.jar`;
       const instPath = path.join(dataPath, "fabric-installer.jar");
       await downloadFile(instUrl, instPath);
-      runJavaInDocker(instPath, ["server", "-mcversion", mcVersion, "-downloadMinecraft"], dataPath, mcVersion);
-      try { fs.unlinkSync(instPath); } catch {}
+      await runJavaInDocker(instPath, ["server", "-mcversion", mcVersion, "-downloadMinecraft"], dataPath, mcVersion);
+      try { await unlink(instPath); } catch {}
       jarName = "fabric-server-launch.jar";
 
     } else if (loaderId.startsWith("forge-")) {
@@ -333,12 +354,13 @@ export async function runModpackInstall(
       const instUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVersion}-${forgeVer}/forge-${mcVersion}-${forgeVer}-installer.jar`;
       const instPath = path.join(dataPath, "forge-installer.jar");
       await downloadFile(instUrl, instPath);
-      runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
-      try { fs.unlinkSync(instPath); } catch {}
+      await runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
+      try { await unlink(instPath); } catch {}
 
-      const forgeJar = fs.readdirSync(dataPath).find(f => /^forge-.+\.jar$/.test(f) && !f.includes("installer"));
-      if (forgeJar) fs.copyFileSync(path.join(dataPath, forgeJar), path.join(dataPath, "server.jar"));
-      else if (fs.existsSync(path.join(dataPath, "run.sh"))) jarName = "run.sh";
+      const entries = await readdir(dataPath);
+      const forgeJar = entries.find(f => /^forge-.+\.jar$/.test(f) && !f.includes("installer"));
+      if (forgeJar) await copyFile(path.join(dataPath, forgeJar), path.join(dataPath, "server.jar"));
+      else if (await exists(path.join(dataPath, "run.sh"))) jarName = "run.sh";
 
     } else if (loaderId.startsWith("neoforge-")) {
       const neoVer = loaderId.replace("neoforge-", "");
@@ -348,9 +370,9 @@ export async function runModpackInstall(
       const instUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoVer}/neoforge-${neoVer}-installer.jar`;
       const instPath = path.join(dataPath, "neoforge-installer.jar");
       await downloadFile(instUrl, instPath);
-      runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
-      try { fs.unlinkSync(instPath); } catch {}
-      if (fs.existsSync(path.join(dataPath, "run.sh"))) jarName = "run.sh";
+      await runJavaInDocker(instPath, ["--installServer"], dataPath, mcVersion);
+      try { await unlink(instPath); } catch {}
+      if (await exists(path.join(dataPath, "run.sh"))) jarName = "run.sh";
 
     } else if (loaderId.startsWith("quilt-")) {
       emitProgress(serverId, "Installing Quilt server…", 30);
@@ -361,8 +383,8 @@ export async function runModpackInstall(
       const instUrl = `https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/${instVer}/quilt-installer-${instVer}.jar`;
       const instPath = path.join(dataPath, "quilt-installer.jar");
       await downloadFile(instUrl, instPath);
-      runJavaInDocker(instPath, ["install", "server", mcVersion, "--download-server"], dataPath, mcVersion);
-      try { fs.unlinkSync(instPath); } catch {}
+      await runJavaInDocker(instPath, ["install", "server", mcVersion, "--download-server"], dataPath, mcVersion);
+      try { await unlink(instPath); } catch {}
       jarName = "quilt-server-launch.jar";
     }
 
@@ -370,37 +392,31 @@ export async function runModpackInstall(
     if (jarName === "run.sh") {
       const heapMin = Math.floor(config.ram / 2);
       const javaArgsPath = path.join(dataPath, "user_jvm_args.txt");
-      const existing = fs.existsSync(javaArgsPath) ? fs.readFileSync(javaArgsPath, "utf-8") : "";
-      // Replace existing -Xms/-Xmx or append
+      const existing = (await exists(javaArgsPath)) ? await readFile(javaArgsPath, "utf-8") : "";
       let lines = existing.split("\n").filter(l => !l.trimStart().startsWith("-Xms") && !l.trimStart().startsWith("-Xmx"));
       lines.push(`-Xms${heapMin}M`, `-Xmx${config.ram}M`);
-      fs.writeFileSync(javaArgsPath, lines.filter(Boolean).join("\n") + "\n");
+      await writeFile(javaArgsPath, lines.filter(Boolean).join("\n") + "\n");
 
       // Ensure run.sh uses `exec java` so SIGTERM reaches the JVM on stop.
-      // Without exec, the shell wrapper absorbs the signal and java keeps
-      // running until Docker force-kills after the grace period.
       const runShPath = path.join(dataPath, "run.sh");
-      let content = fs.readFileSync(runShPath, "utf-8");
+      let content = await readFile(runShPath, "utf-8");
       const runLines = content.split("\n");
       let patched = false;
       for (let i = runLines.length - 1; i >= 0; i--) {
         const trimmed = runLines[i].trim();
         if (trimmed === "") continue;
         if (trimmed.startsWith("#")) continue;
-        // Already uses exec — nothing to do.
         if (trimmed.startsWith("exec java ")) { patched = true; break; }
-        // Found the java invocation — insert exec.
         if (trimmed.startsWith("java ")) {
           const indent = runLines[i].match(/^(\s*)/)?.[1] ?? "";
           runLines[i] = `${indent}exec ${trimmed}`;
           patched = true;
           break;
         }
-        // Bail at any other non-comment, non-empty line — not a simple launcher.
         break;
       }
       if (patched) {
-        fs.writeFileSync(runShPath, runLines.join("\n"));
+        await writeFile(runShPath, runLines.join("\n"));
         console.log(`[modpack:${serverId.slice(0, 8)}] Patched run.sh exec java for signal forwarding`);
       }
     }
@@ -414,10 +430,10 @@ export async function runModpackInstall(
       ? "eclipse-temurin:8-jre-alpine"
       : resolveJavaImage(mcVersion);
 
-    // 6. Download mods
+    // 7. Download mods
     const modsDir = path.join(dataPath, "mods");
     if (manifest.files?.length > 0) {
-      fs.mkdirSync(modsDir, { recursive: true });
+      await mkdir(modsDir, { recursive: true });
       const total = manifest.files.length;
       const batchSize = 5;
       let downloaded = 0;
@@ -432,8 +448,8 @@ export async function runModpackInstall(
             const dest = path.join(modsDir, info.fileName);
             await downloadFile(info.url, dest);
             // Skip client-only mods (e.g. Zume, inventory HUD mods, etc.)
-            if (isClientOnlyMod(dest)) {
-              fs.unlinkSync(dest);
+            if (await isClientOnlyMod(dest)) {
+              await unlink(dest);
               skippedMods.push(info.fileName);
               return false;
             }
@@ -450,7 +466,7 @@ export async function runModpackInstall(
       }
     }
 
-    // 7. Server config
+    // 8. Server config
     emitProgress(serverId, "Writing server config…", 92);
     const props = [
       `server-port=${config.port}`, `enable-rcon=true`,
@@ -458,24 +474,24 @@ export async function runModpackInstall(
       `motd=${config.name} | ${manifest.name}`, `max-players=20`,
       `difficulty=normal`, `gamemode=survival`, `online-mode=true`,
     ].join("\n");
-    fs.writeFileSync(path.join(dataPath, "server.properties"), props + "\n");
-    fs.writeFileSync(path.join(dataPath, "eula.txt"), "eula=true\n");
+    await writeFile(path.join(dataPath, "server.properties"), props + "\n");
+    await writeFile(path.join(dataPath, "eula.txt"), "eula=true\n");
 
-    // 8. Docker container
+    // 9. Docker container
     emitProgress(serverId, "Creating Docker container…", 95);
     const containerId = await createContainer(config, javaImage, { jarName });
 
-    // 9. Update config
-    const servers = loadServers();
+    // 10. Update config
+    const servers = await loadServers();
     const idx = servers.findIndex(s => s.id === serverId);
     if (idx !== -1) {
       servers[idx].containerId = containerId;
       servers[idx].version = mcVersion;
       servers[idx].serverType = serverType;
-      fs.writeFileSync(path.resolve(process.cwd(), "servers.json"), JSON.stringify(servers, null, 2));
+      await saveServers(servers);
     }
 
-    // 10. Auto-start the container
+    // 11. Auto-start the container
     emitProgress(serverId, "Starting server…", 98);
     try {
       await startContainer(containerId);
