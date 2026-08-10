@@ -15,6 +15,7 @@ import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
 import ScheduleCard from "@/components/ScheduleCard";
 import ServerSidebar from "@/components/ServerSidebar";
+import AddressPill from "@/components/AddressPill";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { formatDisk, formatRam, statusColor, statusLabel, typeLabel } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
@@ -39,6 +40,20 @@ export default function ServerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("console");
+  // URL sync: ?tab=files|logs survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "files" || t === "logs") setActiveTab(t);
+  }, []);
+  const setTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "console") url.searchParams.delete("tab");
+      else url.searchParams.set("tab", tab);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
   const [acting, setActing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -124,8 +139,15 @@ export default function ServerDetailPage() {
 
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
-  const handleRestore = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  const [restoreConfirm, setRestoreConfirm] = useState<File | null>(null);
+  const handleRestoreSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setRestoreConfirm(file);
+  }, []);
+  const handleRestore = useCallback(async () => {
+    const file = restoreConfirm;
+    setRestoreConfirm(null);
+    if (!file) return;
     setRestoring(true);
     try {
       const fd = new FormData(); fd.append("backup", file);
@@ -134,7 +156,20 @@ export default function ServerDetailPage() {
       toast.success("Backup restored! Server is restarting."); await fetchServer();
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Restore failed"); }
     finally { setRestoring(false); if (restoreInputRef.current) restoreInputRef.current.value = ""; }
-  }, [serverId, fetchServer]);
+  }, [serverId, fetchServer, restoreConfirm]);
+
+  // ---- keyboard shortcuts: 1-3 switch tabs (skip when typing) ----
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable) return;
+      if (e.key === "1") setTab("console");
+      else if (e.key === "2") setTab("files");
+      else if (e.key === "3") setTab("logs");
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [setTab]);
 
   const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
 
@@ -178,19 +213,19 @@ export default function ServerDetailPage() {
                       <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
                     </div>
                   ) : server.status === "running" ? (<>
-                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2.5 text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
-                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2.5 text-rose-400 transition hover:bg-danger/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2.5 text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Restart" aria-label="Restart"><RefreshCw className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2.5 text-rose-400 transition hover:bg-danger/10 disabled:opacity-50" title="Stop" aria-label="Stop"><Square className="h-4 w-4" /></button>
                   </>) : (
-                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2.5 text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2.5 text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start" aria-label="Start"><Play className="h-4 w-4" /></button>
                   )}
                   <span className="w-px h-5 bg-edge mx-0.5" />
-                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <label className={`rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
+                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup" aria-label="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <label className={`rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup" aria-label="Restore Backup">
                     <Upload className="h-4 w-4" strokeWidth={1.75} />
-                    <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
+                    <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestoreSelect} className="hidden" />
                   </label>
-                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs" aria-label="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300" title="Edit Server" aria-label="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
                   <span className="w-px h-5 bg-edge mx-0.5" />
                   {deleteConfirm ? (
                     <div className="flex items-center gap-1 rounded-lg border border-danger/30 bg-danger/10 px-2 py-1">
@@ -199,9 +234,18 @@ export default function ServerDetailPage() {
                       <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-danger/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-danger/10 hover:text-rose-400" title="Delete Server" aria-label="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
                   )}
                 </div>
+              </div>
+
+              {/* ── Mobile address bar (desktop: copy lives in the console sidebar) ── */}
+              <div className="lg:hidden flex items-center justify-between gap-2 mb-4 rounded-xl border border-edge bg-surface px-3 py-2">
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Address</span>
+                <AddressPill
+                  hostname={typeof window !== "undefined" ? window.location.hostname : "188.214.30.159"}
+                  port={server.port}
+                />
               </div>
 
               {/* ── Mobile tab bar (desktop hides this — left nav takes over) ── */}
@@ -211,7 +255,7 @@ export default function ServerDetailPage() {
                   return (
                     <button
                       key={id}
-                      onClick={() => setActiveTab(id)}
+                      onClick={() => setTab(id)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                         active
                           ? "bg-accent/20 text-purple-200"
@@ -276,7 +320,7 @@ export default function ServerDetailPage() {
                       return (
                         <button
                           key={id}
-                          onClick={() => setActiveTab(id)}
+                          onClick={() => setTab(id)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition font-medium ${
                             active
                               ? "bg-accent/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
@@ -316,6 +360,30 @@ export default function ServerDetailPage() {
 
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />
       <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={fetchServer} />
+
+      {/* ── Restore confirmation ── */}
+      {restoreConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setRestoreConfirm(null)}>
+          <div className="surface w-full max-w-sm m-4 border border-edge p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-white mb-1.5">Restore backup?</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              The current world data of <span className="text-white">{server?.name}</span> will be
+              <span className="text-amber-400 font-medium"> overwritten</span> by the backup and the server restarts.
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button onClick={() => setRestoreConfirm(null)} disabled={restoring}
+                className="rounded-md bg-edge px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-accent-deep disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleRestore} disabled={restoring}
+                className="flex items-center gap-1.5 rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-white transition hover:bg-danger/80 disabled:opacity-50">
+                {restoring ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {restoring ? "Restoring…" : "Restore"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Docker Logs Dialog ── */}
       {dockerLogs.text != null && (

@@ -479,3 +479,27 @@
 **Deploy:** Server-Build OK, Service active, Panel 200, Health OK.
 
 > **Last updated:** 2026-08-10 · Session: Design review implemented — semantic tokens, RAM semantics, helper dedup, polish
+
+---
+
+### 2026-08-10 — UX-Review umgesetzt: URL-Tabs, Autocomplete, Mobile-Adresse, Shortcuts, A11y
+
+**1. URL-Tab-Sync (Detailseite):** Aktiver Tab jetzt in `?tab=files|logs` (Query-Param). Refresh/Deep-Link funktionieren. Via `useEffect` nach Mount gelesen (SSR-Hydration-sicher), `history.replaceState` beim Wechsel.
+
+**2. Mobile-Adresse:** Neue `AddressPill.tsx` (Copy-IP mit Clipboard-Fallback, dedupliziert). Auf Mobile kompakte Adress-Leiste über der Tab-Leiste (`lg:hidden`), Console-Sidebar nutzt dieselbe Komponente (Hover-Reveal bleibt).
+
+**3. Console-Autocomplete:** Tab-Komplettierung für ~40 gängige MC-Befehle (bei `/`-Präfix) + Online-Spielernamen (ab 2. Token, aus gepollter Player-Liste). Dropdown über dem Input, ArrowUp/Down navigieren, Tab vervollständigt, Klick wählt. Pfeiltasten fallen bei offenem Dropdown auf Vorschläge statt History zurück.
+
+**4. Shortcuts:** Detailseite `1-3` = Tabs wechseln (ignoriert Eingabefelder), Dashboard `/` fokussiert Suche, Esc in allen 4 Dialogen (InstallModpackDialog bekam den fehlenden Handler).
+
+**5. Status-Filter:** Chips "All/Online/Stopped" mit Counts über den Server-Cards (Dashboard), kombiniert mit der Textsuche, `aria-pressed` gesetzt.
+
+**6. Restore-Warnung:** Dateiauswahl öffnet jetzt Confirm-Modal ("overwrites the current world data") — Restore läuft erst nach Bestätigung (pink/danger).
+
+**7. aria-labels:** Alle Icon-Buttons mit `title=` bekamen `aria-label=` (per sed): Dashboard, Detail-Header, FileManager (Upload/Download/Delete/Search/…), LogsTab (Copy), Sidebar (collapsed-Links), Console-Input.
+
+**8. Spieler-Badge:** Sidebar "Quick Access" zeigt zusätzlich zum Running-Count die Summe aller Online-Spieler (🪖 N, Prop `onlinePlayers` vom Dashboard; Detailseite ohne — dort nicht verfügbar).
+
+**Deploy:** Server-Build OK, Service active, Panel 200, Health OK.
+
+> **Last updated:** 2026-08-10 · Session: UX review implemented — URL tabs, console autocomplete, mobile address, shortcuts, a11y

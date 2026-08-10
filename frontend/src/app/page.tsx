@@ -35,9 +35,31 @@ export default function DashboardPage() {
   const serversRef = useRef(servers);
   serversRef.current = servers;
 
+  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "stopped">("all");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const filteredServers = servers.filter(s =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (statusFilter === "all" ||
+      (statusFilter === "running" ? s.status === "running" : s.status !== "running"))
   );
+
+  // ---- keyboard shortcut: "/" focuses the search (skip when typing) ----
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable) return;
+      if (e.key === "/") { e.preventDefault(); searchInputRef.current?.focus(); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  const statusFilterChips: { id: typeof statusFilter; label: string; count: number }[] = [
+    { id: "all", label: "All", count: servers.length },
+    { id: "running", label: "Online", count: servers.filter(s => s.status === "running").length },
+    { id: "stopped", label: "Stopped", count: servers.filter(s => s.status !== "running").length },
+  ];
 
   const stats = {
     total: servers.length,
@@ -136,7 +158,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-void">
-      <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} onInstallModpack={() => setModpackDialogOpen(true)} />
+      <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={stats.totalPlayers} />
       <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-13" : "lg:ml-52"}`}>
         <div className="mx-auto max-w-6xl px-6 sm:px-8 py-6 sm:py-10">
 
@@ -155,7 +177,7 @@ export default function DashboardPage() {
               {/* ── Header ── */}
               <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-accent/5 transition" title="Open menu">
+                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-accent/5 transition" title="Open menu" aria-label="Open menu">
                     <Menu className="h-5 w-5" />
                   </button>
                   <div>
@@ -169,10 +191,10 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:flex-initial">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
-                    <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter…"
+                    <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter… ( / )"
                       className="w-full sm:w-40 rounded-lg border border-edge bg-surface pl-9 pr-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent/40 focus:outline-none" />
                   </div>
-                  <button onClick={fetchServers} className="rounded-lg border border-edge p-2 text-muted transition hover:border-accent/40 hover:text-slate-400 shrink-0" title="Refresh">
+                  <button onClick={fetchServers} className="rounded-lg border border-edge p-2 text-muted transition hover:border-accent/40 hover:text-slate-400 shrink-0" title="Refresh" aria-label="Refresh">
                     <RefreshCw className="h-4 w-4" />
                   </button>
                   <button onClick={() => setDialogOpen(true)} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-strong shadow-[0_0_20px_rgba(157,78,221,0.25)] shrink-0">
@@ -231,6 +253,34 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* ── Status filter chips ── */}
+              {servers.length > 0 && (
+                <div className="mb-4 flex items-center gap-1.5 flex-wrap">
+                  {statusFilterChips.map((chip) => {
+                    const active = statusFilter === chip.id;
+                    return (
+                      <button
+                        key={chip.id}
+                        onClick={() => setStatusFilter(chip.id)}
+                        aria-pressed={active}
+                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          active
+                            ? chip.id === "running"
+                              ? "border-online/30 bg-online/10 text-emerald-400"
+                              : chip.id === "stopped"
+                                ? "border-warn/30 bg-warn/10 text-amber-400"
+                                : "border-accent/40 bg-accent/10 text-purple-200"
+                            : "border-edge text-slate-400 hover:border-accent/30 hover:text-slate-200"
+                        }`}
+                      >
+                        {chip.label}
+                        <span className="tabular-nums opacity-70">{chip.count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* ── Server Cards ── */}
               {servers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-edge py-20">
@@ -286,7 +336,7 @@ export default function DashboardPage() {
                                 </div>
                               ) : (
                                 <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setStopConfirmId(s.id); }}
-                                  className="flex h-9 w-9 items-center justify-center text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Stop"><Square className="h-3.5 w-3.5" /></button>
+                                  className="flex h-9 w-9 items-center justify-center text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Stop" aria-label="Stop"><Square className="h-3.5 w-3.5" /></button>
                               )}
                               {restartConfirmId === s.id ? (
                                 <div className="flex items-center gap-1 px-2 py-1">
@@ -296,11 +346,11 @@ export default function DashboardPage() {
                                 </div>
                               ) : (
                                 <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setRestartConfirmId(s.id); }}
-                                  className="flex h-9 w-9 items-center justify-center text-muted transition hover:bg-accent/5 hover:text-amber-400 disabled:opacity-50" title="Restart"><RotateCw className="h-3.5 w-3.5" /></button>
+                                  className="flex h-9 w-9 items-center justify-center text-muted transition hover:bg-accent/5 hover:text-amber-400 disabled:opacity-50" title="Restart" aria-label="Restart"><RotateCw className="h-3.5 w-3.5" /></button>
                               )}
                             </>) : (
                               <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
-                                className="flex h-9 w-9 items-center justify-center text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start"><Play className="h-3.5 w-3.5" /></button>
+                                className="flex h-9 w-9 items-center justify-center text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start" aria-label="Start"><Play className="h-3.5 w-3.5" /></button>
                             )}
                           </div>
                         </div>

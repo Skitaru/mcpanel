@@ -234,15 +234,15 @@ export default function FileManagerTab({ serverId }: Props) {
         {/* Toolbar */}
         <div className="flex items-center gap-0.5 border-b border-edge px-2 py-1.5">
           <button onClick={() => setShowCreate("file")}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New File">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New File" aria-label="New File">
             <FilePlus className="h-3.5 w-3.5" />
           </button>
           <button onClick={() => setShowCreate("folder")}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New Folder">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New Folder" aria-label="New Folder">
             <FolderPlus className="h-3.5 w-3.5" />
           </button>
           <button onClick={handleUploadClick} disabled={uploading}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-violet-400" title="Upload Files">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-violet-400" title="Upload Files" aria-label="Upload Files">
             <Upload className="h-3.5 w-3.5" />
           </button>
           <span className="flex-1" />
@@ -335,7 +335,7 @@ export default function FileManagerTab({ serverId }: Props) {
                     ) : (
                       <button onClick={e => { e.stopPropagation(); setDeleteTarget(f.name); }}
                         className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted opacity-0 transition hover:bg-danger/20 hover:text-red-400 group-hover:opacity-100"
-                        title="Delete"><Trash2 className="h-3 w-3" /></button>
+                        title="Delete" aria-label="Delete"><Trash2 className="h-3 w-3" /></button>
                     )}
                   </li>
                 );
@@ -370,30 +370,30 @@ export default function FileManagerTab({ serverId }: Props) {
                   )}
                   <button onClick={() => navigateSearch(-1)} disabled={searchMatchLines.length === 0}
                     className="rounded p-0.5 text-slate-500 hover:text-slate-300 disabled:opacity-30"
-                    title="Previous match (Shift+Enter)">
+                    title="Previous match (Shift+Enter)" aria-label="Previous match (Shift+Enter)">
                     <ChevronUp className="h-3 w-3" />
                   </button>
                   <button onClick={() => navigateSearch(1)} disabled={searchMatchLines.length === 0}
                     className="rounded p-0.5 text-slate-500 hover:text-slate-300 disabled:opacity-30"
-                    title="Next match (Enter)">
+                    title="Next match (Enter)" aria-label="Next match (Enter)">
                     <ChevronDown className="h-3 w-3" />
                   </button>
                   <button onClick={() => { setSearchOpen(false); setSearchQuery(""); setSearchMatchLines([]); }}
-                    className="rounded p-0.5 text-slate-600 hover:text-slate-400" title="Close search">
+                    className="rounded p-0.5 text-slate-600 hover:text-slate-400" title="Close search" aria-label="Close search">
                     <X className="h-3 w-3" />
                   </button>
                 </div>
               ) : (
                 <button onClick={() => setSearchOpen(true)}
                   className="rounded p-1 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300"
-                  title="Find in file">
+                  title="Find in file" aria-label="Find in file">
                   <Search className="h-3.5 w-3.5" />
                 </button>
               )}
               {saveMessage && (
                 <span className={`text-[11px] ${saveMessage.startsWith("Saved") || saveMessage.startsWith("Error") === false ? "text-emerald-400" : "text-red-400"}`}>{saveMessage}</span>
               )}
-              <button onClick={downloadFile} className="rounded p-1 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="Download">
+              <button onClick={downloadFile} className="rounded p-1 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="Download" aria-label="Download">
                 <Download className="h-3.5 w-3.5" />
               </button>
               <button onClick={saveFile} disabled={saving}

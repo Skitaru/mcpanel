@@ -134,6 +134,15 @@ export default function InstallModpackDialog({ open, onClose, onCreated }: Props
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
+  // ---- close on Escape ----
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
   // ---- Select modpack → load versions ----
   const selectPack = useCallback(async (pack: CfModpack) => {
     setSelectedPack(pack); setSelectedFile(null); setFiles([]); setLoadingFiles(true);

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Plus, KeyRound, Download, LayoutDashboard, Server } from "lucide-react";
+import { LogOut, Plus, KeyRound, Download, LayoutDashboard, Server, Users } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { statusColor } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
@@ -15,10 +15,12 @@ interface Props {
   onToggle: () => void;
   onCreateClick: () => void;
   onInstallModpack: () => void;
+  /** Total online players across all running servers (dashboard only). */
+  onlinePlayers?: number;
 }
 
 export default function ServerSidebar({
-  servers, activeId, collapsed, onToggle, onCreateClick, onInstallModpack,
+  servers, activeId, collapsed, onToggle, onCreateClick, onInstallModpack, onlinePlayers,
 }: Props) {
   const [pwDialogOpen, setPwDialogOpen] = useState(false);
   const pathname = usePathname();
@@ -75,8 +77,14 @@ export default function ServerSidebar({
                 <div className="mb-1 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted">
                   Quick Access
                   {runningCount > 0 && (
-                    <span className="ml-1.5 rounded-full bg-online/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                    <span className="ml-1.5 rounded-full bg-online/10 px-1.5 py-0.5 text-[10px] text-emerald-400" title="Servers online">
                       {runningCount}
+                    </span>
+                  )}
+                  {onlinePlayers != null && onlinePlayers > 0 && (
+                    <span className="ml-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] text-purple-300" title="Players online">
+                      <Users className="h-2.5 w-2.5 inline -mt-0.5 mr-0.5" />
+                      {onlinePlayers}
                     </span>
                   )}
                 </div>
@@ -89,6 +97,7 @@ export default function ServerSidebar({
                       key={s.id}
                       href={`/servers/${s.id}`}
                       onClick={() => { if (window.innerWidth < 1024) onToggle(); }}
+                      aria-label={collapsed ? s.name : undefined}
                       className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition
                         ${collapsed ? "justify-center" : ""}
                         ${isActive

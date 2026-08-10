@@ -71,7 +71,7 @@ export default function LogsTab({ serverId }: Props) {
             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-600">{filteredLines.length} matches</span>
           )}
         </div>
-        <button onClick={handleCopy} className="rounded-md p-1.5 text-slate-600 transition hover:bg-accent/5 hover:text-slate-400" title="Copy to clipboard">
+        <button onClick={handleCopy} className="rounded-md p-1.5 text-slate-600 transition hover:bg-accent/5 hover:text-slate-400" title="Copy to clipboard" aria-label="Copy to clipboard">
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button onClick={() => { setLoading(true); fetchLogs(); }}

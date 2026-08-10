@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  Cpu, MemoryStick, TerminalSquare, Server, Users, Copy, Check, Activity,
+  Cpu, MemoryStick, TerminalSquare, Server, Users, Activity,
 } from "lucide-react";
+import AddressPill from "@/components/AddressPill";
 import { formatBytes, formatRam, typeLabel } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +14,16 @@ import { formatBytes, formatRam, typeLabel } from "@/lib/format";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const MAX_LINES = 2000;
+
+/** Common Minecraft server commands for console tab-completion. */
+const MC_COMMANDS = [
+  "stop", "restart", "say", "tell", "msg", "tp", "teleport", "op", "deop",
+  "whitelist", "list", "save-all", "save-on", "save-off", "kick", "ban",
+  "ban-ip", "pardon", "pardon-ip", "banlist", "plugins", "pl", "version",
+  "ver", "seed", "difficulty", "gamemode", "gamerule", "time", "weather",
+  "give", "clear", "effect", "summon", "kill", "spawnpoint", "setworldspawn",
+  "worldborder", "reload", "help", "?",
+];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,7 +107,8 @@ export default function ConsoleTab({
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
   const [playersExpanded, setPlayersExpanded] = useState(false);
-  const [addrCopied, setAddrCopied] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggIdx, setSuggIdx] = useState(-1);
 
   // ---- auto-scroll ----
   const autoScrollRef = useRef(true);
@@ -337,14 +349,53 @@ export default function ConsoleTab({
     socket.emit("console:input", { serverId, command: cmd });
     setCmdHistory((prev) => [...prev, cmd]);
     setHistoryIdx(-1);
+    setSuggestions([]);
+    setSuggIdx(-1);
     input.value = "";
   }, [serverId]);
+
+  // ---- tab-completion (MC commands + online player names) ----
+  const updateSuggestions = useCallback((value: string) => {
+    const parts = value.split(/\s+/);
+    const last = parts[parts.length - 1] ?? "";
+    let list: string[] = [];
+    if (last.startsWith("/") && parts.length === 1) {
+      list = MC_COMMANDS.filter((c) => c.startsWith(last.slice(1))).slice(0, 8);
+    } else if (last && parts.length > 1) {
+      const names = playerList.map((p) => p.name);
+      if (names.length) {
+        list = names.filter((n) => n.toLowerCase().startsWith(last.toLowerCase())).slice(0, 8);
+      }
+    }
+    setSuggestions(list);
+    setSuggIdx(list.length ? 0 : -1);
+  }, [playerList]);
+
+  const completeSuggestion = useCallback((sug: string) => {
+    const el = inputRef.current;
+    if (!el) return;
+    const parts = el.value.split(/\s+/);
+    const isCmd = (parts[parts.length - 1] ?? "").startsWith("/");
+    parts[parts.length - 1] = isCmd ? `/${sug}` : sug;
+    el.value = `${parts.join(" ")} `;
+    setSuggestions([]);
+    setSuggIdx(-1);
+    el.focus();
+  }, []);
 
   const handleCmdKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") { e.preventDefault(); sendCommand(); return; }
+      if (e.key === "Tab") {
+        if (suggestions.length) {
+          e.preventDefault();
+          completeSuggestion(suggestions[suggIdx >= 0 ? suggIdx : 0]);
+        }
+        return;
+      }
       if (e.key === "ArrowUp") {
         e.preventDefault();
+        if (suggestions.length) { setSuggIdx((i) => (i - 1 + suggestions.length) % suggestions.length); return; }
         if (cmdHistory.length === 0) return;
         const newIdx = historyIdx === -1 ? cmdHistory.length - 1 : Math.max(0, historyIdx - 1);
         setHistoryIdx(newIdx);
@@ -353,6 +404,7 @@ export default function ConsoleTab({
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        if (suggestions.length) { setSuggIdx((i) => (i + 1) % suggestions.length); return; }
         if (historyIdx === -1) return;
         const newIdx = historyIdx + 1;
         if (newIdx >= cmdHistory.length) {
@@ -364,7 +416,7 @@ export default function ConsoleTab({
         }
       }
     },
-    [sendCommand, cmdHistory, historyIdx],
+    [sendCommand, cmdHistory, historyIdx, suggestions, suggIdx, completeSuggestion],
   );
 
   const isOnline = serverStatus === "running";
@@ -495,8 +547,27 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2 border-t border-edge bg-surface px-3 py-2"
+          className="relative flex items-center gap-2 border-t border-edge bg-surface px-3 py-2"
         >
+          {/* Tab-completion dropdown */}
+          {suggestions.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 z-20 mb-1 max-h-56 overflow-y-auto rounded-lg border border-edge bg-surface shadow-2xl">
+              {suggestions.map((s, i) => (
+                <button
+                  key={s}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => completeSuggestion(s)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-[12px] transition ${
+                    i === suggIdx ? "bg-accent/20 text-purple-200" : "text-slate-300 hover:bg-accent/10"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
           <span className="select-none font-mono text-[13px] text-violet-400 shrink-0">❯</span>
           <input
             ref={inputRef}
@@ -504,6 +575,9 @@ export default function ConsoleTab({
             placeholder="Type a command…"
             disabled={!connected}
             onKeyDown={handleCmdKeyDown}
+            onChange={(e) => updateSuggestions(e.target.value)}
+            onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+            aria-label="Console command input"
             className="flex-1 bg-transparent py-0 font-mono text-[12px] text-slate-200
                        placeholder:text-slate-600 focus:outline-none
                        disabled:opacity-40"
@@ -541,30 +615,12 @@ export default function ConsoleTab({
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
-          <div className="flex items-center gap-1.5 group/addr">
-            <span className="text-sm font-medium text-slate-200 tabular-nums">
-              {typeof window !== "undefined" ? window.location.hostname : "—"}:{port}
-            </span>
-            <button
-              onClick={() => {
-                const addr = `${window.location.hostname}:${port}`;
-                if (navigator.clipboard) {
-                  navigator.clipboard.writeText(addr);
-                } else {
-                  // Fallback for HTTP (non-secure context)
-                  const ta = document.createElement("textarea");
-                  ta.value = addr; ta.style.position = "fixed"; ta.style.opacity = "0";
-                  document.body.appendChild(ta); ta.select();
-                  document.execCommand("copy"); document.body.removeChild(ta);
-                }
-                setAddrCopied(true);
-                setTimeout(() => setAddrCopied(false), 1500);
-              }}
-              className="opacity-0 group-hover/addr:opacity-100 transition rounded p-0.5 text-slate-600 hover:text-slate-400"
-              title="Copy address"
-            >
-              {addrCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-            </button>
+          <div className="group/addr">
+            <AddressPill
+              hostname={typeof window !== "undefined" ? window.location.hostname : "—"}
+              port={port}
+              hoverReveal
+            />
           </div>
         </div>
 
