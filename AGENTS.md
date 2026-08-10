@@ -593,3 +593,28 @@
 **Ergebnis:** Eine Navigationsebene (Topbar), Server mit visueller Identität (Banner), Power-Aktionen prominent, Console als Herzstück. Verifiziert: Build 0 Fehler, Deployed, Panel 200, CSS-Klassen (`banner-texture*`, `card-glow-online`) im Build-Bundle.
 
 > **Last updated:** 2026-08-10 · Session: Pterodactyl-style redesign — banner cards, TopBar, console-first detail page, thick bars
+
+---
+
+### 2026-08-10 — Topbar-Fixes & Discord-Ideen (Session-Abschluss)
+
+**Modpack-Button sichtbar (Commit `221fdb6`):**
+- Der Modpack-Installer war nach dem Sidebar-Removal nur noch ein unscheinbares Icon in der Topbar (User fand ihn nicht).
+- Fix: Icon + Label-Button `⬇ Modpack` in der Topbar (Desktop mit Text, Mobile nur Icon), rechts zwischen Server-Switch und Passwort.
+
+**Mockups (gitignored, `screenshots/`):**
+- `mockup-dashboard.html` — Ops-Console-Tabelle (vom User ABGELEHNT, nur als Referenz)
+- `mockup-pterodactyl.html` — Pterodactyl-Stil (vom User abgenickt → als `33ac140` umgesetzt)
+
+**Offen — Discord-Webhook-Features (Frage wurde gestellt, Auswahl steht aus!):**
+Aktuell existiert NUR der Live-Status-Embed (`discord.ts`: send/edit/buildStatusEmbed, liveStore, Updater alle 10s, online/offline bei Start/Stop). Vorgeschlagen + vom User noch nicht ausgewählt:
+
+1. **Crash-Alert** (empfohlen): unerwarteter Container-Stop (nicht via /stop) → Embed "💥 crashed" + Exit-Code + letzte Log-Zeilen. Erkennung: Poller running→exited + Flag ob explizit gestoppt.
+2. **Spieler Join/Leave**: server-seitiger RCON-"list"-Poller (wie TPS) + Diff → Embed mit Minecraft-Avatar (mc-heads.net). Cooldown gegen Spam (max 1×/5s, Reset bei Restart).
+3. **Ressourcen-Warnungen**: CPU >90% / RAM >90% / TPS <15 → Embed, Cooldown max 1×/30min pro Server.
+4. **Backup/Modpack-Benachrichtigungen** (empfohlen): "✅ Backup fertig (2.4 GB)" nach manuellem + geplantem Backup; "✅ Modpack installiert" nach `runModpackInstall`.
+5. **Tägliche Zusammenfassung**: um 23:59 Embed mit Uptime/Peak-Spieler/Backups des Tages.
+
+Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — dafür bräuchte es einen echten Bot (Gateway). Webhook = nur reine Benachrichtigungen.
+
+> **Last updated:** 2026-08-10 · Session-Ende: Modpack-Button-Fix, Discord-Ideen vorgeschlagen (Auswahl offen), Mockups in screenshots/
