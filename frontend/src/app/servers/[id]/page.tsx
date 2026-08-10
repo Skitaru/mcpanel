@@ -13,7 +13,7 @@ import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
-import SettingsTab from "@/components/SettingsTab";
+import ScheduleCard from "@/components/ScheduleCard";
 import ServerSidebar from "@/components/ServerSidebar";
 import { DetailSkeleton } from "@/components/Skeleton";
 import type { ServerStatus } from "@/lib/types";
@@ -25,12 +25,11 @@ function formatRam(mb: number) {
   return `${mb} MB`;
 }
 
-type Tab = "console" | "files" | "settings" | "logs";
+type Tab = "console" | "files" | "logs";
 
 const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
   { id: "files", label: "File Manager", icon: FolderOpen },
-  { id: "settings", label: "Settings", icon: Settings2 },
   { id: "logs", label: "Activity Logs", icon: ScrollText },
 ];
 
@@ -158,7 +157,6 @@ export default function ServerDetailPage() {
   }, [serverId, fetchServer]);
 
   const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "5.231.108.226";
 
   return (
     <div className="flex min-h-screen bg-[#0B0914]">
@@ -226,11 +224,32 @@ export default function ServerDetailPage() {
                 </div>
               </div>
 
+              {/* ── Mobile tab bar (desktop hides this — left nav takes over) ── */}
+              <div className="lg:hidden flex items-center gap-1 mb-4 overflow-x-auto rounded-xl border border-[#28223D] bg-[#151221] p-1">
+                {SUB_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+                  const active = activeTab === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setActiveTab(id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                        active
+                          ? "bg-[#9D4EDD]/20 text-purple-200"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-[#9D4EDD]/5"
+                      }`}
+                    >
+                      <Icon className={`h-3.5 w-3.5 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* ── 2-COLUMN WORKSPACE LAYOUT ── */}
               <div className="flex flex-col lg:flex-row gap-6">
 
-                {/* ── LEFT SUB-SIDEBAR ── */}
-                <div className="w-full lg:w-60 shrink-0 space-y-4">
+                {/* ── LEFT SUB-SIDEBAR (desktop only) ── */}
+                <div className="hidden lg:block lg:w-60 shrink-0 space-y-4">
                   {/* Server Details Card */}
                   <div className="surface p-4 space-y-3">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#28223D] pb-2">
@@ -241,11 +260,6 @@ export default function ServerDetailPage() {
                       <div>
                         <span className="text-slate-400 block text-[11px]">Server Name</span>
                         <span className="font-semibold text-white tracking-tight">{server.name}</span>
-                      </div>
-
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">IP & Port</span>
-                        <span className="font-mono text-purple-300 font-medium block truncate">{hostname}:{server.port}</span>
                       </div>
 
                       <div>
@@ -271,6 +285,9 @@ export default function ServerDetailPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Scheduled Tasks (desktop only — was part of the removed Settings tab) */}
+                  <ScheduleCard serverId={serverId} />
 
                   {/* Vertical Sub-Navigation */}
                   <div className="surface p-1.5 space-y-0.5">
@@ -299,15 +316,11 @@ export default function ServerDetailPage() {
                 {/* ── RIGHT MAIN VIEWPORT ── */}
                 <div className="flex-1 min-w-0">
                   <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
-                    <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} restartTick={restartTick} />
+                    <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} />
                   </div>
 
                   <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>
                     <FileManagerTab serverId={serverId} />
-                  </div>
-
-                  <div className={`tab-content ${activeTab === "settings" ? "" : "hidden"}`}>
-                    <SettingsTab serverId={serverId} serverType={server.serverType} />
                   </div>
 
                   <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}>

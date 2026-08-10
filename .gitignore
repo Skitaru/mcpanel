@@ -23,6 +23,7 @@ panel-config.json
 .DS_Store
 Thumbs.db
 scripts/
+screenshots/
 
 # Internal dev files — not for public repo
 AGENTS.md

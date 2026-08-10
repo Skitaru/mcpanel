@@ -36,6 +36,8 @@ interface Props {
   ram: number; // MB
   serverType: string;
   version: string;
+  /** Docker container start timestamp (ISO) — base for real server uptime. */
+  startedAt?: string | null;
   /** Incremented by parent on restart — triggers explicit detach + reattach. */
   restartTick?: number;
 }
@@ -85,7 +87,7 @@ function typeLabel(t: string) {
 // ---------------------------------------------------------------------------
 
 export default function ConsoleTab({
-  serverId, serverStatus, port, ram, serverType, version, restartTick,
+  serverId, serverStatus, port, ram, serverType, version, startedAt, restartTick,
 }: Props) {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,7 +112,6 @@ export default function ConsoleTab({
   });
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [upSeconds, setUpSeconds] = useState(-1);
-  const startTimeRef = useRef<number | null>(null);
   const uptimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
@@ -143,18 +144,15 @@ export default function ConsoleTab({
     });
   }, []);
 
-  // ---- uptime tracking ----
+  // ---- uptime tracking (real container uptime from docker startedAt) ----
   useEffect(() => {
-    if (serverStatus === "running") {
-      if (!startTimeRef.current) startTimeRef.current = Date.now();
-      setUpSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    const startMs = startedAt ? new Date(startedAt).getTime() : null;
+    if (serverStatus === "running" && startMs != null && !Number.isNaN(startMs)) {
+      setUpSeconds(Math.floor((Date.now() - startMs) / 1000));
       uptimeIntervalRef.current = setInterval(() => {
-        if (startTimeRef.current) {
-          setUpSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
-        }
+        setUpSeconds(Math.floor((Date.now() - startMs) / 1000));
       }, 1000);
     } else {
-      startTimeRef.current = null;
       setUpSeconds(-1);
       if (uptimeIntervalRef.current) {
         clearInterval(uptimeIntervalRef.current);
@@ -164,7 +162,7 @@ export default function ConsoleTab({
     return () => {
       if (uptimeIntervalRef.current) clearInterval(uptimeIntervalRef.current);
     };
-  }, [serverStatus]);
+  }, [serverStatus, startedAt]);
 
   // ---- persist command history to localStorage (capped at 100) ----
   const MAX_CMD_HISTORY = 100;
@@ -402,7 +400,7 @@ export default function ConsoleTab({
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* ── Live Stats Bar ── */}
         {isOnline && (
-          <div className="grid grid-cols-4 gap-0 border-b border-[#28223D] bg-[#0B0914]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-b border-[#28223D] bg-[#0B0914]">
             {/* CPU */}
             <div className="relative px-4 py-3 border-r border-[#28223D]">
               <div className="flex items-center gap-1.5 mb-1.5">
@@ -542,8 +540,8 @@ export default function ConsoleTab({
         </form>
       </div>
 
-      {/* ── Stats sidebar ── */}
-      <div className="flex-shrink-0 border-t border-[#28223D] lg:border-t-0 lg:border-l lg:w-[232px] bg-[#9D4EDD]/[0.04] flex flex-col overflow-y-auto">
+      {/* ── Stats sidebar (desktop only — console gets full width on mobile) ── */}
+      <div className="hidden lg:flex flex-shrink-0 border-t border-[#28223D] lg:border-t-0 lg:border-l lg:w-[232px] bg-[#9D4EDD]/[0.04] flex-col overflow-y-auto">
         {/* Status indicator */}
         <div className="px-4 py-3 border-b border-[#28223D]">
           <div className="flex items-center gap-2">
@@ -638,69 +636,6 @@ export default function ConsoleTab({
           </div>
           <div className="text-sm font-medium text-slate-200 tabular-nums">
             {formatUptime(upSeconds)}
-          </div>
-        </div>
-
-        {/* CPU */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Cpu className="h-3 w-3 text-slate-500" />
-            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-              CPU
-            </span>
-          </div>
-          <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
-          </div>
-          {stats?.cpuPercent != null && (
-            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  stats.cpuPercent > 90 ? "bg-red-500" : stats.cpuPercent > 70 ? "bg-amber-500" : "bg-violet-500"
-                }`}
-                style={{ width: `${Math.min(100, stats.cpuPercent)}%` }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Memory */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
-          <div className="flex items-center gap-1.5 mb-1">
-            <MemoryStick className="h-3 w-3 text-slate-500" />
-            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-              Memory
-            </span>
-          </div>
-          <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {stats ? formatBytes(stats.memoryUsage) : "—"}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            of {formatRam(ram)}
-          </div>
-          {stats && (
-            <div className="mt-2 h-1.5 rounded-full bg-[#28223D] overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  stats.memoryUsage / stats.memoryLimit > 0.9
-                    ? "bg-red-500"
-                    : stats.memoryUsage / stats.memoryLimit > 0.75
-                      ? "bg-amber-500"
-                      : "bg-violet-500"
-                }`}
-                style={{ width: `${Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100)}%` }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* RAM Limit */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
-          <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-            RAM Limit
-          </div>
-          <div className="text-sm font-medium text-slate-200">
-            {formatRam(ram)}
           </div>
         </div>
 

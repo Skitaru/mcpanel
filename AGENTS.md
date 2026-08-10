@@ -423,3 +423,28 @@
 - Legacy `deploy.ps1` / `update.ps1` / `deploy_second_server.py` (zeigten auf abgeschaltete Server; update.ps1 nutzte das kaputte `NEXT_PUBLIC_API_URL`-Build-Muster) — **gelöscht**. `deploy.sh` bleibt (IP-agnostisch).
 
 > **Last updated:** 2026-08-10 · Session: Server migration to 188.214.30.159, key-based SSH
+
+---
+
+### 2026-08-10 — Server-Detailseite: Uptime-Fix, Settings raus, Mobile-Redesign
+
+**Uptime-Fix (ConsoleTab):**
+- **Problem:** Sidebar-"Uptime" zählte die Seiten-Öffnungszeit (`Date.now()` beim Mount) — resettete bei jedem Reload auf 0s.
+- **Fix:** ConsoleTab bekommt jetzt `startedAt` (Docker `State.StartedAt`, bereits im ServerStatus-Payload) als Prop und berechnet die Uptime daraus (1s-Intervall). Reset nach Restart automatisch durch 3s-Polling.
+
+**Entrümpelung:**
+- **Settings-Tab entfernt** (server.properties wird direkt über den File Manager editiert). `SettingsTab.tsx` gelöscht.
+- **Scheduler** (Auto-Restart/Auto-Backup) als neue kompakte `ScheduleCard.tsx` in die linke Spalte der Detailseite (Desktop) verschoben.
+- **Doppelte Stats entfernt:** Sidebar-CPU/Memory/RAM-Limit-Blöcke raus (stehen in der Top-Bar). Sidebar zeigt nur noch Status, Address (Copy), Uptime, Players-Liste, Typ/Version.
+- **Server-Details-Card:** "IP & Port"-Zeile entfernt (Duplikat zur Sidebar-Adresse mit Copy-Button).
+
+**Mobile-Redesign:**
+- Linke Spalte (Details + Nav) nur noch Desktop (`hidden lg:block`). Mobile: horizontale Tab-Leiste oben, Console in voller Breite.
+- ConsoleTab-Sidebar auf Mobile versteckt (`hidden lg:flex`), Top-Bar 2×2 (`grid-cols-2 lg:grid-cols-4`).
+- Stale-Hostname-Fallback `5.231.108.226` → `188.214.30.159` entfernt (Variable war nach Dedup ungenutzt).
+
+**Sonstiges:** `screenshots/` in .gitignore (UI-Review-Bilder, nicht fürs Repo). Backend unverändert (`/properties`, `/icon`, `/schedule`-Endpoints bleiben).
+
+**Deploy:** Server-Build OK, Service active, Panel 200, API liefert `startedAt` korrekt.
+
+> **Last updated:** 2026-08-10 · Session: Server detail cleanup — real uptime, Settings tab removed, mobile overhaul
