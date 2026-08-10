@@ -448,3 +448,34 @@
 **Deploy:** Server-Build OK, Service active, Panel 200, API liefert `startedAt` korrekt.
 
 > **Last updated:** 2026-08-10 · Session: Server detail cleanup — real uptime, Settings tab removed, mobile overhaul
+
+---
+
+### 2026-08-10 — Design-Review umgesetzt: Tokens, RAM-Semantik, Helper-Dedup, Feinschliff
+
+**1. Semantische Design-Tokens (globals.css):**
+- Neue `@theme`-Tokens als Single Source of Truth: `void` (#0B0914), `surface` (#151221), `edge` (#28223D), `accent` (#9D4EDD), `accent-strong` (#B100E8), `accent-deep` (#3C096C), `muted` (#6b6480), `ink` (#F8F7FF), `online` (#00F5D4), `warn` (#FEE440), `danger` (#F15BB5).
+- **~430 hardcoded Hex-Werte per sed in allen 15 tsx-Dateien → Tokens migriert.** `globals.css` bleibt Kanon (definiert die Hex-Werte). Im generierten CSS verifiziert (`.bg-void{background-color:#0b0914}` etc.).
+- **Konsistenz-Bug gefixt:** `--color-violet-400` war `#E0AAFF` (Lavendel), aber `--color-purple-400` `#9D4EDD` (Violett) — gleiche "Stufe", verschiedene Farben. Violet-400 jetzt `#9D4EDD`; Lavendel bleibt über violet-300/purple-300 für Text-Akzente.
+- Tote CSS-Klassen entfernt: `value-flash`, `card-accent`, `hover-scale`, `glow-online`/`glow-pulse` (0 Nutzungen).
+
+**2. RAM-Semantik (Dashboard):**
+- Overview-Karte: zeigt jetzt **Verbrauch** (summierte Live-Stats) groß + Fortschrittsbalken + "X total" — vorher zeigte sie den totalen Alloc als große Zahl.
+- Server-Cards: RAM-Tile zeigt Live-Verbrauch (`liveStats[id].mem`, Daten lagen ungenutzt im State); Alloc nur noch als Fallback bei gestoppten Servern.
+
+**3. Helper-Dedup (`lib/format.ts` neu):**
+- `statusColor`, `statusLabel`, `statusBadgeColor`, `typeLabel`, `typeBadgeColor`, `formatRam`, `formatBytes`, `formatDisk`, `formatUptime` — vorher 3× dupliziert (Dashboard/Detail/ConsoleTab) mit abweichenden Labels ("Online" vs. "Active"). Jetzt eine Quelle; Status heißt überall einheitlich "Online/Stopped/…".
+- `ServerSidebar.statusColor` ebenfalls dedupliziert.
+
+**4. Feinschliff:**
+- `text-[9px]` → `text-[10px]` überall (6+ Stellen; Mindest-Labelgröße).
+- Touch-Targets: Dashboard-Card-Actions h-8→h-9 (36px), Detail-Header-Buttons p-2→p-2.5 (40px).
+- Login-Branding: Gradient-Logo-Quadrat (accent→accent-strong, Glow) + Server-Icon.
+- Header-Redundanz raus: Dashboard-Subtitle zeigt nicht mehr "· N running" (steht in der Servers-Karte).
+- Tab umbenannt: "Activity Logs" → "Server Logs".
+
+**Bewusst nicht gemacht:** `#000000`-Log-Terminal bleibt (echtes Schwarz). Sidebar-Spieler-Badge war nur Ausblick, nicht Teil des Reviews. `formatUptime(seconds)` in ConsoleTab bleibt lokal (andere Signatur als `formatUptime(startedAt)`).
+
+**Deploy:** Server-Build OK, Service active, Panel 200, Health OK.
+
+> **Last updated:** 2026-08-10 · Session: Design review implemented — semantic tokens, RAM semantics, helper dedup, polish

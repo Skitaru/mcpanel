@@ -16,38 +16,18 @@ import InstallModpackDialog from "@/components/InstallModpackDialog";
 import ScheduleCard from "@/components/ScheduleCard";
 import ServerSidebar from "@/components/ServerSidebar";
 import { DetailSkeleton } from "@/components/Skeleton";
+import { formatDisk, formatRam, statusColor, statusLabel, typeLabel } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
-
-function formatRam(mb: number) {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
-  return `${mb} MB`;
-}
 
 type Tab = "console" | "files" | "logs";
 
 const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
   { id: "files", label: "File Manager", icon: FolderOpen },
-  { id: "logs", label: "Activity Logs", icon: ScrollText },
+  { id: "logs", label: "Server Logs", icon: ScrollText },
 ];
-
-function statusColor(s: ServerStatus["status"]) {
-  switch (s) { case "running": return "bg-emerald-500"; case "exited": case "created": case "paused": return "bg-amber-500"; default: return "bg-[#28223D]"; }
-}
-function statusLabel(s: ServerStatus["status"]) {
-  switch (s) { case "running": return "Active"; case "exited": return "Stopped"; case "created": return "Created"; default: return "Unknown"; }
-}
-function typeLabel(t: string) {
-  switch (t) { case "fabric": return "Fabric"; case "velocity": return "Velocity"; default: return "Paper"; }
-}
-function formatDisk(bytes: number | undefined) {
-  if (bytes == null || bytes < 0) return null;
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
-  return `${(bytes / 1e3).toFixed(1)} KB`;
-}
 
 export default function ServerDetailPage() {
   const params = useParams<{ id: string }>();
@@ -159,7 +139,7 @@ export default function ServerDetailPage() {
   const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
 
   return (
-    <div className="flex min-h-screen bg-[#0B0914]">
+    <div className="flex min-h-screen bg-void">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
 
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
@@ -169,20 +149,20 @@ export default function ServerDetailPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-20">
               <AlertTriangle className="h-10 w-10 text-amber-500" />
               <p className="text-sm text-slate-500">{error ?? "Server not found."}</p>
-              <button onClick={() => router.push("/")} className="rounded-lg border border-[#28223D] px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-[#9D4EDD]/10">Back to Dashboard</button>
+              <button onClick={() => router.push("/")} className="rounded-lg border border-edge px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-accent/10">Back to Dashboard</button>
             </div>
           ) : (
             <>
               {/* ── Top Bar: Breadcrumb + Actions ── */}
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-[#6b6480] hover:text-purple-300 transition text-xs">
+                  <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-muted hover:text-purple-300 transition text-xs">
                     <ArrowLeft className="h-3.5 w-3.5" /> Back
                   </button>
-                  <span className="text-[#28223D]">/</span>
+                  <span className="text-edge">/</span>
                   <h1 className="font-display font-bold text-xl text-white tracking-tight">{server.name}</h1>
                   <span className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                    server.status === "running" ? "bg-[#00F5D4]/10 text-emerald-400 border border-[#00F5D4]/20" : "bg-[#FEE440]/10 text-amber-400 border border-[#FEE440]/20"
+                    server.status === "running" ? "bg-online/10 text-emerald-400 border border-online/20" : "bg-warn/10 text-amber-400 border border-warn/20"
                   }`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
                     {statusLabel(server.status)}
@@ -190,42 +170,42 @@ export default function ServerDetailPage() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-1 bg-[#151221] p-1 rounded-xl border border-[#28223D] overflow-x-auto max-w-full">
+                <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-edge overflow-x-auto max-w-full">
                   {actionConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-[#FEE440]/30 bg-[#FEE440]/10 px-2 py-1">
+                    <div className="flex items-center gap-1 rounded-lg border border-warn/30 bg-warn/10 px-2 py-1">
                       <span className="text-[11px] font-medium text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
-                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-[#FEE440] px-2 py-0.5 text-[11px] font-medium text-black hover:bg-[#FEE440]/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
-                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
+                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-warn px-2 py-0.5 text-[11px] font-medium text-black hover:bg-warn/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
                     </div>
                   ) : server.status === "running" ? (<>
-                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2 text-amber-400 transition hover:bg-[#FEE440]/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
-                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2 text-rose-400 transition hover:bg-[#F15BB5]/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2.5 text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Restart"><RefreshCw className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2.5 text-rose-400 transition hover:bg-danger/10 disabled:opacity-50" title="Stop"><Square className="h-4 w-4" /></button>
                   </>) : (
-                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2 text-emerald-400 transition hover:bg-[#00F5D4]/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
+                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2.5 text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start"><Play className="h-4 w-4" /></button>
                   )}
-                  <span className="w-px h-5 bg-[#28223D] mx-0.5" />
-                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <label className={`rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
+                  <span className="w-px h-5 bg-edge mx-0.5" />
+                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <label className={`rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup">
                     <Upload className="h-4 w-4" strokeWidth={1.75} />
                     <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestore} className="hidden" />
                   </label>
-                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#9D4EDD]/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
-                  <span className="w-px h-5 bg-[#28223D] mx-0.5" />
+                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
+                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300" title="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <span className="w-px h-5 bg-edge mx-0.5" />
                   {deleteConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-[#F15BB5]/30 bg-[#F15BB5]/10 px-2 py-1">
+                    <div className="flex items-center gap-1 rounded-lg border border-danger/30 bg-danger/10 px-2 py-1">
                       <span className="text-[11px] text-rose-400">Delete?</span>
-                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-[#F15BB5] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#F15BB5]/80 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
-                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-[#28223D] px-2 py-0.5 text-[11px] text-slate-300 hover:bg-[#3C096C]">No</button>
+                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-danger px-2 py-0.5 text-[11px] font-medium text-white hover:bg-danger/80 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
+                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2 text-[#6b6480] transition hover:bg-[#F15BB5]/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
+                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-danger/10 hover:text-rose-400" title="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
                   )}
                 </div>
               </div>
 
               {/* ── Mobile tab bar (desktop hides this — left nav takes over) ── */}
-              <div className="lg:hidden flex items-center gap-1 mb-4 overflow-x-auto rounded-xl border border-[#28223D] bg-[#151221] p-1">
+              <div className="lg:hidden flex items-center gap-1 mb-4 overflow-x-auto rounded-xl border border-edge bg-surface p-1">
                 {SUB_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
                   const active = activeTab === id;
                   return (
@@ -234,8 +214,8 @@ export default function ServerDetailPage() {
                       onClick={() => setActiveTab(id)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                         active
-                          ? "bg-[#9D4EDD]/20 text-purple-200"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-[#9D4EDD]/5"
+                          ? "bg-accent/20 text-purple-200"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-accent/5"
                       }`}
                     >
                       <Icon className={`h-3.5 w-3.5 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
@@ -252,7 +232,7 @@ export default function ServerDetailPage() {
                 <div className="hidden lg:block lg:w-60 shrink-0 space-y-4">
                   {/* Server Details Card */}
                   <div className="surface p-4 space-y-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#28223D] pb-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-edge pb-2">
                       SERVER DETAILS
                     </div>
 
@@ -299,8 +279,8 @@ export default function ServerDetailPage() {
                           onClick={() => setActiveTab(id)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition font-medium ${
                             active
-                              ? "bg-[#9D4EDD]/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
-                              : "text-slate-400 hover:text-slate-200 hover:bg-[#9D4EDD]/5 border-l-2 border-transparent"
+                              ? "bg-accent/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-accent/5 border-l-2 border-transparent"
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -340,8 +320,8 @@ export default function ServerDetailPage() {
       {/* ── Docker Logs Dialog ── */}
       {dockerLogs.text != null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setDockerLogs({ loading: false, text: null })}>
-          <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4 border border-[#28223D] shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#28223D] px-5 py-3.5 bg-[#151221]">
+          <div className="surface w-full max-w-2xl max-h-[70vh] flex flex-col m-4 border border-edge shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-edge px-5 py-3.5 bg-surface">
               <h3 className="text-xs font-semibold text-white">Docker Logs — {server?.name}</h3>
               <button onClick={() => setDockerLogs({ loading: false, text: null })} className="rounded-md p-1 text-slate-400 transition hover:text-white">✕</button>
             </div>

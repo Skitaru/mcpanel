@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, LogIn } from "lucide-react";
+import { Loader2, LogIn, Server } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -44,12 +44,15 @@ export default function LoginScreen({ onLogin }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B0914]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-void">
       <div className="w-full max-w-xs animate-in">
         {/* Logo */}
         <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent-strong shadow-[0_0_30px_rgba(157,78,221,0.35)]">
+            <Server className="h-7 w-7 text-white" />
+          </div>
           <h1 className="text-xl font-bold tracking-tight text-white">Obsidian Panel</h1>
-          <p className="mt-1 text-sm text-slate-500">Minecraft Server Dashboard</p>
+          <p className="mt-1 text-sm text-muted">Minecraft Server Dashboard</p>
         </div>
 
         {/* Form */}
@@ -65,9 +68,9 @@ export default function LoginScreen({ onLogin }: Props) {
               placeholder="admin"
               autoFocus
               disabled={loading}
-              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm
-                         text-white placeholder:text-[#6b6480]
-                         focus:border-[#9D4EDD]/40 focus:outline-none
+              className="w-full rounded-md border border-edge bg-void px-3 py-2 text-sm
+                         text-white placeholder:text-muted
+                         focus:border-accent/40 focus:outline-none
                          disabled:opacity-50"
             />
 
@@ -80,14 +83,14 @@ export default function LoginScreen({ onLogin }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="········"
               disabled={loading}
-              className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-3 py-2 text-sm
-                         text-white placeholder:text-[#6b6480]
-                         focus:border-[#9D4EDD]/40 focus:outline-none
+              className="w-full rounded-md border border-edge bg-void px-3 py-2 text-sm
+                         text-white placeholder:text-muted
+                         focus:border-accent/40 focus:outline-none
                          disabled:opacity-50"
             />
 
             {error && (
-              <div className="mt-3 rounded-md border border-[#F15BB5]/20 bg-[#F15BB5]/5 px-3 py-2 text-xs text-red-400">
+              <div className="mt-3 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-red-400">
                 {error}
               </div>
             )}
@@ -97,8 +100,8 @@ export default function LoginScreen({ onLogin }: Props) {
             type="submit"
             disabled={loading || !username || !password}
             className="flex w-full items-center justify-center gap-2 rounded-lg
-                       bg-[#9D4EDD] px-4 py-2.5 text-sm font-medium text-white
-                       transition hover:bg-[#B100E8]
+                       bg-accent px-4 py-2.5 text-sm font-medium text-white
+                       transition hover:bg-accent-strong
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}

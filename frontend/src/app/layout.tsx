@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="en"
       className={`${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans text-[#F8F7FF] bg-[#0B0914]">
+      <body className="min-h-full font-sans text-ink bg-void">
         <Toaster
           position="bottom-right"
           toastOptions={{

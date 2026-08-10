@@ -223,26 +223,26 @@ export default function FileManagerTab({ serverId }: Props) {
       }))];
 
   return (
-    <div className="relative flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#28223D] bg-[#151221] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]"
+    <div className="relative flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-edge bg-surface h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]"
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
       onDragEnter={() => { dragCounter.current++; setDragOver(true); }}
       onDragLeave={() => { dragCounter.current--; if (dragCounter.current === 0) setDragOver(false); }}
       onDrop={handleDrop}>
 
       {/* ── Left: File tree ── */}
-      <div className="flex flex-col lg:w-64 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-[#28223D] min-h-0">
+      <div className="flex flex-col lg:w-64 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-edge min-h-0">
         {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border-b border-[#28223D] px-2 py-1.5">
+        <div className="flex items-center gap-0.5 border-b border-edge px-2 py-1.5">
           <button onClick={() => setShowCreate("file")}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-slate-300" title="New File">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New File">
             <FilePlus className="h-3.5 w-3.5" />
           </button>
           <button onClick={() => setShowCreate("folder")}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-slate-300" title="New Folder">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="New Folder">
             <FolderPlus className="h-3.5 w-3.5" />
           </button>
           <button onClick={handleUploadClick} disabled={uploading}
-            className="rounded p-1.5 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-violet-400" title="Upload Files">
+            className="rounded p-1.5 text-slate-500 transition hover:bg-accent/5 hover:text-violet-400" title="Upload Files">
             <Upload className="h-3.5 w-3.5" />
           </button>
           <span className="flex-1" />
@@ -250,12 +250,12 @@ export default function FileManagerTab({ serverId }: Props) {
         </div>
 
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-0.5 overflow-x-auto border-b border-[#28223D] px-3 py-1.5 text-[11px]">
+        <div className="flex items-center gap-0.5 overflow-x-auto border-b border-edge px-3 py-1.5 text-[11px]">
           {breadcrumbs.map((crumb, i) => (
             <span key={crumb.path} className="flex items-center gap-0.5 whitespace-nowrap">
-              {i > 0 && <ChevronRight className="h-3 w-3 text-[#6b6480] shrink-0" />}
+              {i > 0 && <ChevronRight className="h-3 w-3 text-muted shrink-0" />}
               <button onClick={() => { setSelectedFile(null); setFileContent(""); setCurrentPath(crumb.path); }}
-                className="rounded px-1 py-0.5 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-slate-300">
+                className="rounded px-1 py-0.5 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300">
                 {crumb.label}
               </button>
             </span>
@@ -264,14 +264,14 @@ export default function FileManagerTab({ serverId }: Props) {
 
         {/* Create form */}
         {showCreate && (
-          <form onSubmit={e => { e.preventDefault(); handleCreate(); }} className="flex items-center gap-1.5 border-b border-[#28223D] px-2 py-1.5">
+          <form onSubmit={e => { e.preventDefault(); handleCreate(); }} className="flex items-center gap-1.5 border-b border-edge px-2 py-1.5">
             <span className="text-[10px] text-slate-500 shrink-0">New {showCreate}:</span>
             <input type="text" value={createName} onChange={e => setCreateName(e.target.value)}
               placeholder={showCreate === "folder" ? "name" : "file.yml"} autoFocus disabled={creating}
-              className="flex-1 rounded border border-[#28223D] bg-[#0B0914] px-1.5 py-0.5 text-[11px] text-slate-200
-                         placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
+              className="flex-1 rounded border border-edge bg-void px-1.5 py-0.5 text-[11px] text-slate-200
+                         placeholder:text-muted focus:border-accent/40 focus:outline-none" />
             <button type="submit" disabled={creating || !createName.trim()}
-              className="rounded bg-[#9D4EDD] px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-[#B100E8] disabled:opacity-50">OK</button>
+              className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-accent-strong disabled:opacity-50">OK</button>
             <button type="button" onClick={() => { setShowCreate(null); setCreateName(""); }} disabled={creating}
               className="rounded px-1 py-0.5 text-[10px] text-slate-500 hover:text-slate-300">×</button>
           </form>
@@ -279,7 +279,7 @@ export default function FileManagerTab({ serverId }: Props) {
 
         {/* Drag overlay */}
         {dragOver && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#151221]/90 backdrop-blur-sm pointer-events-none">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface/90 backdrop-blur-sm pointer-events-none">
             <Upload className="h-8 w-8 text-violet-400" />
             <p className="text-sm font-medium text-violet-300">Drop files to upload</p>
             <p className="text-[11px] text-slate-500">to {currentPath}</p>
@@ -302,7 +302,7 @@ export default function FileManagerTab({ serverId }: Props) {
               {currentPath !== "/" && (
                 <li>
                   <button onClick={goUp}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-slate-400 transition hover:bg-[#9D4EDD]/5">
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-slate-400 transition hover:bg-accent/5">
                     <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" />..
                   </button>
                 </li>
@@ -319,22 +319,22 @@ export default function FileManagerTab({ serverId }: Props) {
                       openFile(f.name);
                     }}
                       title={bin ? "Binary file — cannot preview" : undefined}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-[#9D4EDD]/5 ${isSelected ? "bg-[#9D4EDD]/10 text-violet-300" : bin ? "text-[#6b6480] cursor-default" : "text-slate-300"}`}>
-                      {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-[#6b6480]" : "text-slate-500"}`} />}
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-accent/5 ${isSelected ? "bg-accent/10 text-violet-300" : bin ? "text-muted cursor-default" : "text-slate-300"}`}>
+                      {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-muted" : "text-slate-500"}`} />}
                       <span className="truncate flex-1">{f.name}</span>
                       {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0 mr-5">{formatSize(f.size)}</span>}
                     </button>
                     {deleteTarget === f.name ? (
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-[#151221] border border-[#28223D] px-1.5 py-0.5">
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-surface border border-edge px-1.5 py-0.5">
                         <span className="text-[10px] text-red-400">Delete?</span>
                         <button onClick={() => confirmDelete(f.name)} disabled={deleting}
-                          className="rounded bg-[#F15BB5] px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-[#F15BB5]/80">Yes</button>
+                          className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-danger/80">Yes</button>
                         <button onClick={() => setDeleteTarget(null)}
-                          className="rounded bg-[#28223D] px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-[#3C096C]">No</button>
+                          className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep">No</button>
                       </div>
                     ) : (
                       <button onClick={e => { e.stopPropagation(); setDeleteTarget(f.name); }}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#6b6480] opacity-0 transition hover:bg-[#F15BB5]/20 hover:text-red-400 group-hover:opacity-100"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted opacity-0 transition hover:bg-danger/20 hover:text-red-400 group-hover:opacity-100"
                         title="Delete"><Trash2 className="h-3 w-3" /></button>
                     )}
                   </li>
@@ -348,13 +348,13 @@ export default function FileManagerTab({ serverId }: Props) {
       {/* ── Right: Editor ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Editor header */}
-        <div className="flex items-center justify-between border-b border-[#28223D] px-3 py-1.5 gap-2">
+        <div className="flex items-center justify-between border-b border-edge px-3 py-1.5 gap-2">
           <span className="truncate font-mono text-[11px] text-slate-500 min-w-0">{selectedFile ?? "No file selected"}</span>
           {selectedFile && (
             <div className="flex items-center gap-1 shrink-0">
               {/* Search bar */}
               {searchOpen ? (
-                <div className="flex items-center gap-1 rounded-md border border-[#28223D] bg-[#0B0914] px-2 py-0.5">
+                <div className="flex items-center gap-1 rounded-md border border-edge bg-void px-2 py-0.5">
                   <input ref={searchInputRef} type="text" value={searchQuery}
                     onChange={e => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
                     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); navigateSearch(e.shiftKey ? -1 : 1); } }}
@@ -366,7 +366,7 @@ export default function FileManagerTab({ serverId }: Props) {
                     </span>
                   )}
                   {searchQuery && searchMatchLines.length === 0 && (
-                    <span className="text-[10px] text-[#6b6480]">0 matches</span>
+                    <span className="text-[10px] text-muted">0 matches</span>
                   )}
                   <button onClick={() => navigateSearch(-1)} disabled={searchMatchLines.length === 0}
                     className="rounded p-0.5 text-slate-500 hover:text-slate-300 disabled:opacity-30"
@@ -385,7 +385,7 @@ export default function FileManagerTab({ serverId }: Props) {
                 </div>
               ) : (
                 <button onClick={() => setSearchOpen(true)}
-                  className="rounded p-1 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-slate-300"
+                  className="rounded p-1 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300"
                   title="Find in file">
                   <Search className="h-3.5 w-3.5" />
                 </button>
@@ -393,11 +393,11 @@ export default function FileManagerTab({ serverId }: Props) {
               {saveMessage && (
                 <span className={`text-[11px] ${saveMessage.startsWith("Saved") || saveMessage.startsWith("Error") === false ? "text-emerald-400" : "text-red-400"}`}>{saveMessage}</span>
               )}
-              <button onClick={downloadFile} className="rounded p-1 text-slate-500 transition hover:bg-[#9D4EDD]/5 hover:text-slate-300" title="Download">
+              <button onClick={downloadFile} className="rounded p-1 text-slate-500 transition hover:bg-accent/5 hover:text-slate-300" title="Download">
                 <Download className="h-3.5 w-3.5" />
               </button>
               <button onClick={saveFile} disabled={saving}
-                className="flex items-center gap-1 rounded-md bg-[#9D4EDD] px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-[#B100E8] disabled:opacity-50">
+                className="flex items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-accent-strong disabled:opacity-50">
                 {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                 {saving ? "…" : "Save"}
               </button>
@@ -416,13 +416,13 @@ export default function FileManagerTab({ serverId }: Props) {
           <div className="flex flex-1 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-600" /></div>
         ) : (
           <div className="flex flex-1 min-h-0">
-            <div ref={lineNumberRef} className="select-none overflow-hidden bg-[#0B0914] py-3 pl-3 pr-2 font-mono text-[12.5px] leading-[1.75] text-right" style={{ minWidth: "2.5rem" }}>
+            <div ref={lineNumberRef} className="select-none overflow-hidden bg-void py-3 pl-3 pr-2 font-mono text-[12.5px] leading-[1.75] text-right" style={{ minWidth: "2.5rem" }}>
               {(fileContent || "\n").split("\n").map((_, i) => {
                 const isMatch = searchMatchLines.includes(i);
                 const isActive = isMatch && searchMatchLines[searchIndex] === i;
                 return (
                   <div key={i}
-                    className={`${isActive ? "bg-violet-500/30 text-violet-200" : isMatch ? "bg-[#9D4EDD]/10 text-violet-400" : "text-[#6b6480]"}`}>
+                    className={`${isActive ? "bg-violet-500/30 text-violet-200" : isMatch ? "bg-accent/10 text-violet-400" : "text-muted"}`}>
                     {i + 1}
                   </div>
                 );
@@ -430,7 +430,7 @@ export default function FileManagerTab({ serverId }: Props) {
             </div>
             <textarea ref={textareaRef} value={fileContent} onChange={e => setFileContent(e.target.value)}
               onScroll={() => { if (textareaRef.current && lineNumberRef.current) lineNumberRef.current.scrollTop = textareaRef.current.scrollTop; }}
-              className="flex-1 resize-none bg-[#0B0914] p-3 font-mono text-[12.5px] leading-[1.75] text-slate-200 placeholder:text-[#6b6480] focus:outline-none"
+              className="flex-1 resize-none bg-void p-3 font-mono text-[12.5px] leading-[1.75] text-slate-200 placeholder:text-muted focus:outline-none"
               spellCheck={false} placeholder="File content…" />
           </div>
         )}

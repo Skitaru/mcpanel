@@ -37,7 +37,7 @@ export default function ScheduleCard({ serverId }: Props) {
 
   return (
     <div className="surface p-4">
-      <div className="flex items-center gap-2 border-b border-[#28223D] pb-2 mb-3">
+      <div className="flex items-center gap-2 border-b border-edge pb-2 mb-3">
         <Clock className="h-4 w-4 text-slate-500" />
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Scheduled Tasks</span>
       </div>
@@ -45,19 +45,19 @@ export default function ScheduleCard({ serverId }: Props) {
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Restart</span>
           <input type="text" value={schedRestart} onChange={e => setSchedRestart(e.target.value)} placeholder="HH:MM (e.g. 04:00)"
-            className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-2.5 py-1.5 text-xs text-white font-mono
-                       placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
+            className="w-full rounded-md border border-edge bg-void px-2.5 py-1.5 text-xs text-white font-mono
+                       placeholder:text-muted focus:border-accent/40 focus:outline-none" />
         </label>
         <label className="block">
           <span className="mb-1 block text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Auto-Backup</span>
           <input type="text" value={schedBackup} onChange={e => setSchedBackup(e.target.value)} placeholder="HH:MM (e.g. 03:00)"
-            className="w-full rounded-md border border-[#28223D] bg-[#0B0914] px-2.5 py-1.5 text-xs text-white font-mono
-                       placeholder:text-[#6b6480] focus:border-[#9D4EDD]/40 focus:outline-none" />
+            className="w-full rounded-md border border-edge bg-void px-2.5 py-1.5 text-xs text-white font-mono
+                       placeholder:text-muted focus:border-accent/40 focus:outline-none" />
         </label>
       </div>
       <div className="mt-3 flex items-center gap-2">
         <button onClick={handleSave} disabled={saving}
-          className="flex items-center gap-1.5 rounded-md bg-[#9D4EDD] px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-[#B100E8] disabled:opacity-50">
+          className="flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-accent-strong disabled:opacity-50">
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save Schedule"}
         </button>
         {msg && <span className={`text-[10px] ${msg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>{msg}</span>}

@@ -226,12 +226,12 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-2xl overflow-hidden rounded-xl
-                   border border-[#28223D] bg-[#151221] shadow-2xl"
+                   border border-edge bg-surface shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#28223D] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-edge px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#9D4EDD]/10">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10">
               <Server className="h-5 w-5 text-violet-400" />
             </div>
             <div>
@@ -245,7 +245,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             onClick={onClose}
             disabled={submitting}
             className="rounded-md p-1.5 text-slate-600 transition
-                       hover:bg-[#9D4EDD]/5 hover:text-slate-400
+                       hover:bg-accent/5 hover:text-slate-400
                        disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -258,7 +258,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             {/* ── Left Column: Basic Information ── */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#9D4EDD]/10">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10">
                   <Info className="h-3.5 w-3.5 text-violet-400" />
                 </div>
                 <div>
@@ -280,10 +280,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     placeholder="e.g. Survival World"
                     required
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                    className="w-full rounded-lg border border-edge bg-void
                                px-3.5 py-2.5 text-sm text-white
                                placeholder:text-slate-600
-                               focus:border-[#9D4EDD]/40 focus:outline-none
+                               focus:border-accent/40 focus:outline-none
                                disabled:opacity-50"
                   />
                 </label>
@@ -299,13 +299,13 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       onChange={(e) => setServerType(e.target.value as "paper" | "fabric" | "velocity")}
                       disabled={submitting}
                       className="w-full appearance-none rounded-lg border
-                                 border-[#28223D] bg-[#0B0914] px-3.5 py-2.5
-                                 text-sm text-white focus:border-[#9D4EDD]/40
+                                 border-edge bg-void px-3.5 py-2.5
+                                 text-sm text-white focus:border-accent/40
                                  focus:outline-none disabled:opacity-50"
                     >
-                      <option value="paper" className="bg-[#0a0a0a] text-white">PaperMC (Vanilla)</option>
-                      <option value="fabric" className="bg-[#0a0a0a] text-white">Fabric (Modded)</option>
-                      <option value="velocity" className="bg-[#0a0a0a] text-white">Velocity (Proxy)</option>
+                      <option value="paper" className="bg-void text-white">PaperMC (Vanilla)</option>
+                      <option value="fabric" className="bg-void text-white">Fabric (Modded)</option>
+                      <option value="velocity" className="bg-void text-white">Velocity (Proxy)</option>
                     </select>
                     <ChevronDown
                       className="pointer-events-none absolute right-3 top-1/2
@@ -320,14 +320,14 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     {serverType === "velocity" ? "Velocity Version" : "Minecraft Version"}
                   </span>
                   {versionsLoading ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-[#28223D] bg-[#0B0914] px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 rounded-lg border border-edge bg-void px-3.5 py-2.5">
                       <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                       <span className="text-sm text-slate-500">
                         Loading versions…
                       </span>
                     </div>
                   ) : versionsError ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-[#FEE440]/20 bg-[#FEE440]/5 px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 rounded-lg border border-warn/20 bg-warn/5 px-3.5 py-2.5">
                       <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
                       <span className="text-sm text-amber-400">
                         {versionsError}
@@ -340,12 +340,12 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                         onChange={(e) => setPaperVersion(e.target.value)}
                         disabled={submitting}
                         className="w-full appearance-none rounded-lg border
-                                   border-[#28223D] bg-[#0B0914] px-3.5 py-2.5
-                                   text-sm text-white focus:border-[#9D4EDD]/40
+                                   border-edge bg-void px-3.5 py-2.5
+                                   text-sm text-white focus:border-accent/40
                                    focus:outline-none disabled:opacity-50"
                       >
                         {versions.map((v) => (
-                          <option key={v} value={v} className="bg-[#0a0a0a] text-white">
+                          <option key={v} value={v} className="bg-void text-white">
                             {v}
                           </option>
                         ))}
@@ -363,7 +363,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             {/* ── Right Column: Server Configuration ── */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#9D4EDD]/10">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10">
                   <Settings2 className="h-3.5 w-3.5 text-violet-400" />
                 </div>
                 <div>
@@ -384,9 +384,9 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       min={1024}
                       max={65535}
                       disabled={submitting}
-                      className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                      className="w-full rounded-lg border border-edge bg-void
                                  px-3.5 py-2.5 text-sm text-white
-                                 focus:border-[#9D4EDD]/40 focus:outline-none
+                                 focus:border-accent/40 focus:outline-none
                                  disabled:opacity-50"
                     />
                   </label>
@@ -399,9 +399,9 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                       min={1}
                       max={1000}
                       disabled={submitting}
-                      className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                      className="w-full rounded-lg border border-edge bg-void
                                  px-3.5 py-2.5 text-sm text-white
-                                 focus:border-[#9D4EDD]/40 focus:outline-none
+                                 focus:border-accent/40 focus:outline-none
                                  disabled:opacity-50"
                     />
                   </label>
@@ -421,10 +421,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     }}
                     placeholder="e.g. 24454 (SimpleVoiceChat)"
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                    className="w-full rounded-lg border border-edge bg-void
                                px-3.5 py-2.5 text-sm text-white
                                placeholder:text-slate-600
-                               focus:border-[#9D4EDD]/40 focus:outline-none
+                               focus:border-accent/40 focus:outline-none
                                disabled:opacity-50"
                   />
                   <p className="mt-1 text-[10px] text-slate-600">
@@ -443,14 +443,14 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                           onChange={(e) => setDifficulty(e.target.value)}
                           disabled={submitting}
                           className="w-full appearance-none rounded-lg border
-                                     border-[#28223D] bg-[#0B0914] px-3.5 py-2.5
-                                     text-sm text-white focus:border-[#9D4EDD]/40
+                                     border-edge bg-void px-3.5 py-2.5
+                                     text-sm text-white focus:border-accent/40
                                      focus:outline-none disabled:opacity-50"
                         >
-                          <option value="peaceful" className="bg-[#0a0a0a] text-white">Peaceful</option>
-                          <option value="easy" className="bg-[#0a0a0a] text-white">Easy</option>
-                          <option value="normal" className="bg-[#0a0a0a] text-white">Normal</option>
-                          <option value="hard" className="bg-[#0a0a0a] text-white">Hard</option>
+                          <option value="peaceful" className="bg-void text-white">Peaceful</option>
+                          <option value="easy" className="bg-void text-white">Easy</option>
+                          <option value="normal" className="bg-void text-white">Normal</option>
+                          <option value="hard" className="bg-void text-white">Hard</option>
                         </select>
                         <ChevronDown
                           className="pointer-events-none absolute right-3 top-1/2
@@ -467,10 +467,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                         className={`relative mt-0.5 inline-flex h-9 w-full cursor-pointer items-center rounded-lg border px-3 transition
                                    disabled:opacity-50 disabled:cursor-not-allowed
                                    ${hardcore
-                                     ? "border-[#F15BB5]/30 bg-[#F15BB5]/10 text-red-400"
-                                     : "border-[#28223D] bg-[#0B0914] text-slate-600 hover:border-[#9D4EDD]/40"}`}
+                                     ? "border-danger/30 bg-danger/10 text-red-400"
+                                     : "border-edge bg-void text-slate-600 hover:border-accent/40"}`}
                       >
-                        <span className={`mr-2 h-2 w-2 rounded-full ${hardcore ? "bg-red-500 animate-pulse" : "bg-[#28223D]"}`} />
+                        <span className={`mr-2 h-2 w-2 rounded-full ${hardcore ? "bg-red-500 animate-pulse" : "bg-edge"}`} />
                         <span className="text-sm font-medium">{hardcore ? "Enabled" : "Off"}</span>
                       </button>
                     </label>
@@ -491,10 +491,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     onChange={(e) => setRam(e.target.value)}
                     placeholder="e.g. 4G or 4096M"
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                    className="w-full rounded-lg border border-edge bg-void
                                px-3.5 py-2.5 text-sm text-white font-mono
                                placeholder:text-slate-600
-                               focus:border-[#9D4EDD]/40 focus:outline-none
+                               focus:border-accent/40 focus:outline-none
                                disabled:opacity-50"
                   />
                   {/* Preset chips */}
@@ -508,8 +508,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                         className={"rounded-md border px-2.5 py-1 text-[11px] font-medium transition"
                                   + " disabled:opacity-50"
                                   + (ram === opt
-                                    ? " border-violet-500/40 bg-[#9D4EDD]/15 text-violet-300"
-                                    : " border-[#28223D] bg-[#9D4EDD]/[0.04] text-slate-500 hover:border-[#9D4EDD]/40 hover:text-slate-400")}
+                                    ? " border-violet-500/40 bg-accent/15 text-violet-300"
+                                    : " border-edge bg-accent/[0.04] text-slate-500 hover:border-accent/40 hover:text-slate-400")}
                       >
                         {opt}
                       </button>
@@ -528,10 +528,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     placeholder="Custom JVM flags (replaces Aikar GC defaults)&#10;e.g. -XX:+UseZGC -XX:+ZGenerational"
                     rows={3}
                     disabled={submitting}
-                    className="w-full rounded-lg border border-[#28223D] bg-[#0B0914]
+                    className="w-full rounded-lg border border-edge bg-void
                                px-3.5 py-2.5 text-xs text-white font-mono
                                placeholder:text-slate-600
-                               focus:border-[#9D4EDD]/40 focus:outline-none
+                               focus:border-accent/40 focus:outline-none
                                disabled:opacity-50 resize-none"
                   />
                   <p className="mt-1 text-[10px] text-slate-600">
@@ -546,7 +546,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           {error && (
             <div
               className="mt-5 flex items-start gap-2 rounded-lg
-                          border border-[#F15BB5]/30 bg-[#F15BB5]/10 px-3 py-2.5"
+                          border border-danger/30 bg-danger/10 px-3 py-2.5"
             >
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
               <span className="text-sm text-red-400">{error}</span>
@@ -560,8 +560,8 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
               submitting || !name.trim() || !paperVersion || versionsLoading
             }
             className="mt-5 flex w-full items-center justify-center gap-2
-                       rounded-lg bg-[#9D4EDD] px-4 py-2.5 text-sm font-medium
-                       text-white transition hover:bg-[#B100E8] hover:scale-[1.02]
+                       rounded-lg bg-accent px-4 py-2.5 text-sm font-medium
+                       text-white transition hover:bg-accent-strong hover:scale-[1.02]
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
@@ -576,7 +576,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
           {submitting && (
             <div className="mt-3 space-y-2">
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#9D4EDD]/[0.04]">
+              <div className="h-1.5 overflow-hidden rounded-full bg-accent/[0.04]">
                 <div
                   className="h-full animate-pulse rounded-full bg-violet-500"
                   style={{ width: `${Math.min(elapsed * 3, 90)}%` }}

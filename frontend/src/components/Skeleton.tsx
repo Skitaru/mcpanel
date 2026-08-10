@@ -3,14 +3,14 @@
 /** Pulse-animated skeleton placeholder. */
 export function Skeleton({ className = "" }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-lg bg-[#1a1f2e] ${className}`} />
+    <div className={`animate-pulse rounded-lg bg-edge ${className}`} />
   );
 }
 
 /** Dashboard card skeleton */
 export function CardSkeleton() {
   return (
-    <div className="rounded-xl border border-[#28223D] bg-[#151221] p-4">
+    <div className="rounded-xl border border-edge bg-surface p-4">
       <div className="mb-3 flex items-center gap-2">
         <Skeleton className="h-2.5 w-2.5 rounded-full" />
         <Skeleton className="h-3 w-14" />

@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import {
   Cpu, MemoryStick, TerminalSquare, Server, Users, Copy, Check, Activity,
 } from "lucide-react";
+import { formatBytes, formatRam, typeLabel } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -43,21 +44,8 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (local — component-specific signatures)
 // ---------------------------------------------------------------------------
-
-function formatBytes(bytes: number | null | undefined) {
-  if (bytes == null || bytes <= 0) return "—";
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
-  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
-
-function formatRam(mb: number) {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
-  return `${mb} MB`;
-}
 
 function formatTime(ts: number) {
   const d = new Date(ts);
@@ -72,14 +60,6 @@ function formatUptime(seconds: number) {
   if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
-}
-
-function typeLabel(t: string) {
-  switch (t) {
-    case "fabric": return "Fabric";
-    case "velocity": return "Velocity";
-    default: return "Paper";
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -395,77 +375,77 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-[#28223D] bg-[#151221] h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
+    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-edge bg-surface h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
       {/* ── Console panel ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* ── Live Stats Bar ── */}
         {isOnline && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-b border-[#28223D] bg-[#0B0914]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-b border-edge bg-void">
             {/* CPU */}
-            <div className="relative px-4 py-3 border-r border-[#28223D]">
+            <div className="relative px-4 py-3 border-r border-edge">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <Cpu className="h-3 w-3 text-[#9D4EDD]" />
-                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">CPU</span>
+                <Cpu className="h-3 w-3 text-accent" />
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">CPU</span>
               </div>
-              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none mb-2">
+              <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
                 {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
               </div>
-              <div className="h-1 rounded-full bg-[#28223D] overflow-hidden">
+              <div className="h-1 rounded-full bg-edge overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ease-out ${
-                  (stats?.cpuPercent ?? 0) > 90 ? "bg-[#F15BB5]" : (stats?.cpuPercent ?? 0) > 70 ? "bg-[#FEE440]" : "bg-[#00F5D4]"
+                  (stats?.cpuPercent ?? 0) > 90 ? "bg-danger" : (stats?.cpuPercent ?? 0) > 70 ? "bg-warn" : "bg-online"
                 }`}
                   style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
               </div>
             </div>
             {/* RAM */}
-            <div className="relative px-4 py-3 border-r border-[#28223D]">
+            <div className="relative px-4 py-3 border-r border-edge">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <MemoryStick className="h-3 w-3 text-[#00F5D4]" />
-                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">RAM</span>
+                <MemoryStick className="h-3 w-3 text-online" />
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">RAM</span>
               </div>
-              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none mb-2">
+              <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
                 {stats ? formatBytes(stats.memoryUsage) : "—"}
               </div>
-              <div className="h-1 rounded-full bg-[#28223D] overflow-hidden">
+              <div className="h-1 rounded-full bg-edge overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-700 ease-out ${
-                  stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-[#F15BB5]"
-                  : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-[#FEE440]" : "bg-[#9D4EDD]"
+                  stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-danger"
+                  : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-warn" : "bg-accent"
                 }`}
                   style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
               </div>
-              <div className="text-[10px] text-[#6b6480] mt-1">{formatRam(ram)} total</div>
+              <div className="text-[10px] text-muted mt-1">{formatRam(ram)} total</div>
             </div>
             {/* TPS */}
-            <div className="relative px-4 py-3 border-r border-[#28223D]">
+            <div className="relative px-4 py-3 border-r border-edge">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <Activity className="h-3 w-3 text-[#FEE440]" />
-                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">TPS</span>
+                <Activity className="h-3 w-3 text-warn" />
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">TPS</span>
               </div>
               <div className="flex items-baseline gap-2">
                 {tps ? (
                   <>
-                    <span className={`text-lg font-bold tabular-nums leading-none ${tps.tps5s >= 19 ? "text-[#00F5D4]" : tps.tps5s >= 15 ? "text-[#FEE440]" : "text-[#F15BB5]"}`}>{tps.tps5s.toFixed(1)}</span>
-                    <span className={`text-sm font-medium tabular-nums ${tps.tps1m >= 19 ? "text-[#00F5D4]/70" : tps.tps1m >= 15 ? "text-[#FEE440]/70" : "text-[#F15BB5]/70"}`}>{tps.tps1m.toFixed(1)}</span>
-                    <span className="text-xs text-[#6b6480] tabular-nums">{tps.tps5m.toFixed(1)}</span>
+                    <span className={`text-lg font-bold tabular-nums leading-none ${tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger"}`}>{tps.tps5s.toFixed(1)}</span>
+                    <span className={`text-sm font-medium tabular-nums ${tps.tps1m >= 19 ? "text-online/70" : tps.tps1m >= 15 ? "text-warn/70" : "text-danger/70"}`}>{tps.tps1m.toFixed(1)}</span>
+                    <span className="text-xs text-muted tabular-nums">{tps.tps5m.toFixed(1)}</span>
                   </>
                 ) : (
-                  <span className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none">—</span>
+                  <span className="text-lg font-bold text-ink tabular-nums leading-none">—</span>
                 )}
               </div>
-              <div className="flex gap-3 mt-1.5 text-[9px] text-[#6b6480]">
+              <div className="flex gap-3 mt-1.5 text-[10px] text-muted">
                 <span>5s</span><span>1m</span><span>5m</span>
               </div>
             </div>
             {/* Players */}
             <div className="relative px-4 py-3">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <Users className="h-3 w-3 text-[#00F5D4]" />
-                <span className="text-[10px] font-semibold text-[#6b6480] uppercase tracking-wider">Players</span>
+                <Users className="h-3 w-3 text-online" />
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Players</span>
               </div>
-              <div className="text-lg font-bold text-[#F8F7FF] tabular-nums leading-none">
-                {playerCount.online}<span className="text-[#6b6480] text-sm font-medium">/{playerCount.max}</span>
+              <div className="text-lg font-bold text-ink tabular-nums leading-none">
+                {playerCount.online}<span className="text-muted text-sm font-medium">/{playerCount.max}</span>
               </div>
-              <div className="text-[10px] text-[#6b6480] mt-1">{playerCount.online > 0 ? `${playerList.length} connected` : "Empty"}</div>
+              <div className="text-[10px] text-muted mt-1">{playerCount.online > 0 ? `${playerList.length} connected` : "Empty"}</div>
             </div>
           </div>
         )}
@@ -473,13 +453,13 @@ export default function ConsoleTab({
         <div
           ref={outputRef}
           onScroll={handleOutputScroll}
-          className="flex-1 overflow-y-auto bg-[#0B0914] p-4 font-mono text-[12.5px] leading-[1.75]"
+          className="flex-1 overflow-y-auto bg-void p-4 font-mono text-[12.5px] leading-[1.75]"
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <TerminalSquare className="h-12 w-12 empty-ghost" />
               <p className="text-sm font-medium text-slate-500">Server is offline</p>
-              <p className="text-xs text-[#6b6480]">Start the server to view the live console.</p>
+              <p className="text-xs text-muted">Start the server to view the live console.</p>
             </div>
           ) : (
             lines.map((line, i) => (
@@ -493,7 +473,7 @@ export default function ConsoleTab({
                       : "text-slate-300"
                 }`}
               >
-                <span className="select-none text-[#6b6480] mr-3">
+                <span className="select-none text-muted mr-3">
                   [{formatTime(line.time)}]
                 </span>
                 {line.text}
@@ -504,7 +484,7 @@ export default function ConsoleTab({
 
         {/* Offline banner */}
         {!isOnline && hasOutput && (
-          <div className="flex items-center gap-2 border-t border-[#FEE440]/20 bg-[#FEE440]/5 px-4 py-2">
+          <div className="flex items-center gap-2 border-t border-warn/20 bg-warn/5 px-4 py-2">
             <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-amber-400" />
             <p className="text-xs text-amber-400/80">
               Server stopped — console is read-only. Start the server to send commands.
@@ -515,7 +495,7 @@ export default function ConsoleTab({
         {/* Command input */}
         <form
           onSubmit={(e) => { e.preventDefault(); sendCommand(); }}
-          className="flex items-center gap-2 border-t border-[#28223D] bg-[#151221] px-3 py-2"
+          className="flex items-center gap-2 border-t border-edge bg-surface px-3 py-2"
         >
           <span className="select-none font-mono text-[13px] text-violet-400 shrink-0">❯</span>
           <input
@@ -531,8 +511,8 @@ export default function ConsoleTab({
           <button
             type="submit"
             disabled={!connected}
-            className="shrink-0 rounded-md bg-[#9D4EDD] px-2.5 py-1 text-[11px] font-medium
-                       text-white transition hover:bg-[#B100E8]
+            className="shrink-0 rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium
+                       text-white transition hover:bg-accent-strong
                        disabled:cursor-not-allowed disabled:opacity-50"
           >
             Send
@@ -541,9 +521,9 @@ export default function ConsoleTab({
       </div>
 
       {/* ── Stats sidebar (desktop only — console gets full width on mobile) ── */}
-      <div className="hidden lg:flex flex-shrink-0 border-t border-[#28223D] lg:border-t-0 lg:border-l lg:w-[232px] bg-[#9D4EDD]/[0.04] flex-col overflow-y-auto">
+      <div className="hidden lg:flex flex-shrink-0 border-t border-edge lg:border-t-0 lg:border-l lg:w-[232px] bg-accent/[0.04] flex-col overflow-y-auto">
         {/* Status indicator */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
+        <div className="px-4 py-3 border-b border-edge">
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
               isOnline ? "bg-emerald-500 pulse-dot" : "bg-amber-500"
@@ -557,7 +537,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Address */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
+        <div className="px-4 py-3 border-b border-edge">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
@@ -589,7 +569,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Players */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
+        <div className="px-4 py-3 border-b border-edge">
           <div className="flex items-center gap-1.5 mb-1">
             <Users className="h-3 w-3 text-slate-500" />
             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
@@ -630,7 +610,7 @@ export default function ConsoleTab({
         </div>
 
         {/* Uptime */}
-        <div className="px-4 py-3 border-b border-[#28223D]">
+        <div className="px-4 py-3 border-b border-edge">
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Uptime
           </div>
