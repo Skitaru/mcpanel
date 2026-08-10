@@ -420,6 +420,6 @@
 **Local updates:**
 - `AGENTS.md` identity table + deploy workflow → new IP.
 - `deploy.py` (gitignored helper): HOST → `188.214.30.159`, password auth removed → key-based (paramiko `key_filename=~/.ssh/id_ed25519`).
-- Legacy `deploy.ps1` / `update.ps1` / `deploy_second_server.py` still reference decommissioned servers — flagged, not touched (pending user decision).
+- Legacy `deploy.ps1` / `update.ps1` / `deploy_second_server.py` (zeigten auf abgeschaltete Server; update.ps1 nutzte das kaputte `NEXT_PUBLIC_API_URL`-Build-Muster) — **gelöscht**. `deploy.sh` bleibt (IP-agnostisch).
 
 > **Last updated:** 2026-08-10 · Session: Server migration to 188.214.30.159, key-based SSH
