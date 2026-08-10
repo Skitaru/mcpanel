@@ -517,7 +517,7 @@
 - Login: eigener Ambient-Glow-Layer hinter dem Formular (fixed Overlay deckt body::before ab).
 
 **B — Bewegung & Feedback:**
-- **`value-flash`** (0.45s Pop + Lavendel-Glow): Top-Bar-Werte der Console flashen bei signifikanter Änderung — CPU (quantisiert 2pp), RAM (50MB), TPS (0.5), Players (1). Umsetzung: `key` = quantisierter Wert → Remount → Animation.
+- ~~`value-flash`~~ — **wieder entfernt auf Nutzerwunsch** (wirkte zu blinky). Nur `console-line` + Status-Badge-Animation blieben.
 - **`console-line`**: Neue Console-Zeilen faden sanft ein (0.18s, translateY).
 - Status-Badge im Detail-Header: `key={server.status}` + `animate-in` → animiert bei Statuswechsel (offline→online).
 

@@ -156,14 +156,6 @@ select option {
 }
 .card-glow-online { animation: glow-breathe 4s ease-in-out infinite; }
 
-/* ── Live value flash (brief pop on meaningful change) ──────── */
-@keyframes value-flash {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.18); color: #E0AAFF; text-shadow: 0 0 12px rgba(157, 78, 221, 0.6); }
-  100% { transform: scale(1); }
-}
-.value-flash { animation: value-flash 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
-
 /* ── Console line entry ────────────────────────────────────── */
 @keyframes line-in {
   from { opacity: 0; transform: translateY(-2px); }
