@@ -1,0 +1,407 @@
+# Obsidian Panel — Project Context & Session Log
+
+> **Auto-loaded by Deep Code.** Every new session reads this file first.
+> Keep it updated at the end of each session.
+
+---
+
+## Project Identity
+
+| Key | Value |
+|-----|-------|
+| **Name** | Obsidian Panel — Minecraft Server Panel |
+| **GitHub** | `https://github.com/Skitaru/mcpanel` |
+| **Stack** | Backend: Node.js / Express / TypeScript · Frontend: Next.js 15 / React 19 / Tailwind 4 |
+| **Server IP** | `5.231.108.226` (SSH: `root@5.231.108.226`) |
+| **Server OS** | Debian 13 ("GA1TznLQBZCG") |
+| **Local Dev** | Windows 11, Git Bash at `C:\Users\bross\Desktop\Claude\deepseek` |
+
+---
+
+## Server Layout (`/opt/mcpanel`)
+
+```
+/opt/mcpanel/
+├── .env                  # PANEL_PORT=3000, PANEL_API_KEY=..., BACKEND_URL=http://127.0.0.1:3000
+├── panel-config.json     # Username/password hash (default: admin/admin)
+├── servers.json          # Server definitions
+├── data/                 # Server data directories
+├── src/                  # Backend source
+├── dist/                 # Backend compiled JS
+├── frontend/             # Next.js frontend (source + built .next)
+│   └── .next/            # Production build output
+├── package.json          # Backend dependencies
+└── node_modules/
+```
+
+### Systemd Services
+
+| Service | Port | Command | EnvFile |
+|---------|------|---------|---------|
+| `mcpanel-backend` | 3000 | `node /opt/mcpanel/dist/index.js` | `/opt/mcpanel/.env` |
+| `mcpanel-frontend` | 3001 | `npx next start -p 3001` | `/opt/mcpanel/.env` |
+
+---
+
+## Core Working Principles
+
+1. **Changes go to GitHub AND the server.** After editing local files, deploy to the server via SCP + rebuild, then push to GitHub. Never leave server and GitHub out of sync.
+
+2. **Deploy workflow:**
+   ```bash
+   # Copy changed files to server
+   scp local-file.ts root@5.231.108.226:/opt/mcpanel/path/file.ts
+   # Rebuild + restart on server
+   ssh root@5.231.108.226 "cd /opt/mcpanel && npx tsc && systemctl restart mcpanel-backend"
+   # or for frontend:
+   ssh root@5.231.108.226 "cd /opt/mcpanel/frontend && npx next build && systemctl restart mcpanel-frontend"
+   # Then commit + push
+   git add -A && git commit -m "..." && git push origin main
+   ```
+
+3. **Frontend uses relative API URLs.** `NEXT_PUBLIC_API_URL` must NOT be set during build. The `next.config.ts` rewrites proxy `/api/*` and `/socket.io/*` to the backend internally. This avoids the `127.0.0.1` hardcoding bug where remote browsers couldn't reach the backend.
+
+4. **Auth flow:** JWT-based. `authMiddleware` validates tokens AND sets `_authOk = true` so the API-key fallback middleware doesn't reject the request. Default credentials: `admin / admin`.
+
+5. **No speculative changes.** Touch only what's needed. Don't refactor unrelated code. Match existing code style.
+
+---
+
+## Session Log
+
+### 2026-07-18 — Bug fixes + UI improvements
+
+**Fixes:**
+- **`ERR_CONNECTION_REFUSED` on login:** `install.sh` was baking `NEXT_PUBLIC_API_URL=http://127.0.0.1:3000` into the frontend build. Remote browsers resolved `127.0.0.1` to their own machine. Removed the env var from the build command — frontend now uses relative URLs + Next.js rewrites.
+- **`401 Unauthorized` after login:** `authMiddleware` validated JWT but didn't set `_authOk`. The API-key fallback middleware then rejected the request. Added `(req as any)._authOk = true` in `auth.ts`.
+- **Frontend systemd service** now has `EnvironmentFile=/opt/mcpanel/.env` so `BACKEND_URL` is available.
+- **`resolveJavaImage`:** Short-form versions ("26.2" → 1.26.2) now normalised. Added Java 25 for MC 1.26+. Commits `33c977c`, `296ea56`.
+- **`startContainer` 500 on already-running:** Docker returns 304 when container is already started, now caught and treated as no-op. Commit `33c977c`.
+- **WebSocket → Polling:** Next.js production rewrites don't proxy WebSocket upgrades. Changed Socket.IO to polling-only transport. Commit `e0724bb`.
+
+**Added:**
+- **Logout button** in dashboard header (page.tsx) — clears token, reloads to login screen. (Logout also exists in sidebar footer.)
+- **Dark `<option>` styling** in CreateServerDialog — all `<select>` dropdowns now use `bg-[#0a0a0a] text-white` instead of browser default blue.
+
+**Git:** Frontend was incorrectly tracked as a gitlink/submodule without a remote. Converted to regular tracked directory in commit `7fddf80`.
+
+**Cleanup:** Removed 10 orphaned data directories + 7 stale backup tarballs from `/opt/mcpanel/data/`.
+
+---
+
+### 2026-07-19 — UX Polish, 120% Zoom, JVM Args, Disk Usage, Bugfixes
+
+**Bugfixes (continued from 07-18):**
+- **Socket.IO 404 after 401 fix:** Next.js strips trailing slashes (`/socket.io/` → `/socket.io`), but Socket.IO only matches `/socket.io/`. Fix: `httpServer.prependListener` (placed AFTER `setupWebSocket` so it runs BEFORE Socket.IO's own prependListener) rewrites `/socket.io` → `/socket.io/` internally. Commit `0bc7529`.
+- **ConsoleTab freeze after stop/start:** Console only attached on mount, never re-attached when server came back online. Added `useEffect` watching `serverStatus` — re-emits `console:attach`/`stats:subscribe` when status transitions to "running", detaches when leaving "running". Commit `b268460`.
+- **FileManagerTab download corrupted binary files:** Same root cause as server icon — fetched JSON instead of raw binary. Fixed to `?raw=true` + `res.blob()`. Commit `bc7da45`.
+
+**Features:**
+- **JVM Start Arguments:** Custom `javaArgs` field in `ServerConfig`/`CreateServerRequest`. Stored in `servers.json`. When creating a container, `javaArgs` replaces the Aikar GC flags (but `-Xms`/`-Xmx` always auto-derived from RAM). Frontend: expandable "Advanced: JVM Arguments" textarea in CreateServerDialog + EditServerDialog. Commit `7840d76`.
+- **Disk Usage:** `GET /api/servers/:id/disk` returns `du -sb` output in bytes. Frontend polls every 60s, shows on dashboard cards + server detail header. Commit `c1b6ec0`.
+- **Backup Progress:** Backup button now shows loading spinner + "Backing up…" while tar is being created. Commit `7840d76`.
+
+**UX Polish — Dashboard Cards (commit `c1b6ec0`):**
+- Color-coded server type badges (Paper=blue, Fabric=amber, Velocity=purple)
+- Pulsing green dot animation for running servers
+- Specs row with icons + dot separators (instead of text blob)
+- Live stats in bordered stat bar with vertical dividers
+- Hover-revealed icon-only action buttons
+- Disk usage display on cards
+
+**UX Polish — Server Detail Header (commit `89ecb1b`):**
+- Action buttons grouped: Power (Start/Stop/Restart) | Management (Backup/Restore/Edit) | Delete
+- Type badge + pulsing status dot matching dashboard style
+- Disk usage in header info row
+- Removed duplicate logout button (already in sidebar)
+- Tab switching with fade-in animation (`tab-content` class)
+
+**UX Polish — ConsoleTab Redesign (commits `f6d357d`, `536a84a`):**
+- Single unified card instead of 3 separate elements
+- Stats as compact header bar inside the card (CPU | RAM | ● LIVE)
+- Terminal fills container via `absolute inset-0`
+- Command input attached to bottom (no gap)
+- xterm background matches card (`slate-950`) for seamless blend
+- xterm font size 13→14px for 120% zoom
+- Better offline empty state
+
+**Global — 120% Zoom (commit `51d7462`):**
+- `html { font-size: 120% }` scales all rem-based units
+- Container heights converted from px to rem: terminal/editor `h-72`, logs `h-80`, file list `max-h-72`
+- Tab navigation: larger padding, stronger active state, hover on inactive tabs
+
+**CSS additions (globals.css):**
+- `pulse-dot` animation for running server indicators
+- `slide-up` animation for card entry
+- `tab-content` fade-in for tab switching
+- `card-actions` hover-reveal utility
+- Improved `.glass` and `.glass-hover` styles
+
+### 2026-07-19 — Security: RCON port hardening + JWT improvements
+
+**RCON Port Hardening (commit `a2e520f`):**
+- **Problem:** Docker containers bound RCON port to `0.0.0.0` (default), exposing it to the internet. Bots from `194.195.210.47`, `172.236.228.193` were brute-forcing RCON, flooding the Minecraft console with connect/disconnect spam.
+- **Fix:** `HostIp: "127.0.0.1"` in `PortBindings` so RCON is only reachable from the panel backend on localhost.
+- **⚠ Existing containers** were created with the old binding. Recreate them (delete + re-create) for the fix to take effect.
+
+**JWT Improvements (commit `a2e520f`):**
+- Token expiry extended from 12h → 7 days (self-hosted panel, convenience over strict security).
+- `AuthGuard` fetch interceptor now detects `401` responses, clears the token, and reloads the page so the user sees the login screen instead of silently failing API calls.
+
+---
+
+### 2026-07-20 — Major UX Overhaul, Security Hardening, Scheduler, Bugfixes
+
+**Installation UX:**
+- README + install.sh now show both `curl` and `wget` commands since Debian 13 doesn't ship curl by default. Commit `1ccea5b`.
+
+**Password Change Fix:**
+- **Problem:** "Change Password" was on the login screen but required a valid JWT token — impossible since the user is on the login screen because they have no token.
+- **Fix:** Removed from LoginScreen, added `ChangePasswordDialog.tsx` component accessible from the sidebar footer (KeyRound icon between "New Server" and "Logout"). After successful change, auto-logs out after 2s. Commit `b4d8e12`.
+
+**Docker Root-User Hardening:**
+- **Problem:** Containers ran Java as root. If Minecraft process was exploited, attacker had root in the container and potentially on the host via volume mounts.
+- **Fix:** `docker.ts` Cmd now creates `mc` user (UID 1000) via `adduser -D`, chowns `/data`, and runs Java via `exec su mc -c "exec java ..."`. Also sets `TERM=dumb` env to suppress JLine "Advanced terminal features not available" warning. Commits `cb9c22d`, `3891874`.
+- **⚠ Existing containers** need to be deleted + re-created for these fixes to apply.
+
+**Console Rewrite — xterm.js → Div-based:**
+- Removed `@xterm/xterm` + `@xterm/addon-fit` dependencies (~150KB saved).
+- New `ConsoleTab.tsx`: div-based output (`font-mono text-[12.5px] leading-[1.75]`), color-coded lines (stdout=`text-slate-300`, stderr=`text-red-400`, system=`text-slate-600 italic`), `❯` prompt, compact command input bar.
+- Stats sidebar on the right (matching Modpack_Server design): Status, Address (with copy button), Players, Uptime, CPU (with bar), Memory (with bar), RAM Limit, Server Type.
+- Player list polled every 15s from `/api/servers/:id/players`.
+- ANSI cleaning: handles CSI sequences with `?` (JLine), OSC sequences, and proper `\r\n`/`\r` normalization.
+- Commit `cb9c22d`.
+
+**Recreate Container (added then removed):**
+- Added `POST /api/servers/:id/recreate` endpoint + frontend button, but removed in commit `c31393a` — user preferred the existing Restart button.
+
+**Rate-Limit Cleanup:**
+- `express-rate-limit` was imported via `try/require` in `index.ts` despite being in `package.json`. Cleaned up to proper ES import. Commit `439c0b2`.
+
+**Scheduled Tasks (Scheduler):**
+- **Backend:** `src/services/scheduler.ts` — checks every 30s for due tasks. `startScheduler()` called from `index.ts` on startup.
+- **API:** `GET/PUT /api/servers/:id/schedule` — stores `{ restart?: "HH:MM", backup?: "HH:MM" }` per-server in `servers.json`.
+- **Frontend:** SettingsTab "Scheduled Tasks" card with Auto-Restart and Auto-Backup time inputs.
+- Scheduled backups keep the 5 most recent; older are auto-deleted.
+- Commit `439c0b2` (with critical follow-up fix in `a3a9a30`).
+
+**UX Overhaul — Design System Unification (commits `ca4d663`, `98d5094`, `5f9e49f`, `4c9b1b5`, `f354cc4`, `1c8ccad`):**
+
+| Token | Old | New |
+|-------|-----|-----|
+| Background | `#030303` + radial glow | `#0a0c10` flat |
+| Card/surface | `border-white/[0.06] bg-white/[0.02]` | `border-[#1a1f2e] bg-[#0f1119]` |
+| Input background | `bg-white/[0.02]` | `bg-[#0a0c10]` |
+| Accent | `sky-500/600` | `violet-500/600` |
+| Sidebar width | `w-56` | `w-52` |
+| Card border-radius | `rounded-2xl` | `rounded-xl` |
+| Tab style | Pill buttons in box | Underline tabs (`border-b-2`) |
+
+- **globals.css:** Removed body::before glow, added `.surface` + `.surface-hover` utilities.
+- **LoginScreen:** Minimal — no glow, violet accent, compact `surface` card.
+- **ServerSidebar:** Slimmer (w-52), no PanelLeft toggle icon, brand dot + name, consistent footer with violet "New Server" button.
+- **Dashboard (page.tsx):** Cards use `surface surface-hover`, cleaner stats bar, icon-only actions on hover.
+- **Server Detail (servers/[id]/page.tsx):** Compact header with inline info (name · status · type · version · port · disk), icon-only action row (Start/Stop/Restart | Backup/Restore | Delete), underline tabs.
+- **ConsoleTab:** Matched to new palette (`border-[#1a1f2e] bg-[#0f1119]`), console output `bg-[#0a0c10]`, stats sidebar `bg-white/[0.02]`.
+- **LogsTab:** Complete restyle matching Console design — same font, colors, borders. Added Copy-log button and ANSI cleaning.
+- **CreateServerDialog + EditServerDialog:** `surface` style, violet accents, `bg-[#0a0c10]` inputs.
+- **ChangePasswordDialog:** `surface` style, violet KeyRound icon.
+
+**Critical Bugfixes:**
+- **`updateServer` didn't save `containerId` or `schedule`** — the `Partial<Pick<...>>` type only included `name|ram|port|version|javaArgs`. Recreate endpoint silently failed to update the container ID, causing cascading 500s. Added `containerId` + `schedule` to the patch type. Commit `a3a9a30`.
+- **`authMiddleware` blocked API-key fallback** — returned 401 immediately on missing/invalid JWT instead of calling `next()`. The API-key middleware never got a chance to validate the token as an API key. Fixed: authMiddleware now always calls `next()`, letting the fallback middleware decide. Commit `2d2ef35`.
+- **404 console noise on missing server-icon:** `files.ts` now returns `204 No Content` instead of 404 when `raw=true` and file doesn't exist. Commit `4f111d7`.
+
+**UX Polish (commit `b32d314`):**
+- Header actions simplified from 3 bordered groups to one clean icon row.
+- Sidebar mobile: redundant `lg:w-52` removed, collapsed sidebar hides completely on mobile via `-translate-x-full`.
+
+---
+
+## Open / Pending
+
+- [ ] Existing Docker containers need recreation to apply non-root user + RCON `127.0.0.1` + TERM=dumb fixes.
+- [ ] Modpack_Server folder in the repo is reference-only (alternative panel design), not part of MCPanel itself.
+
+---
+
+### 2026-07-22 — Modpack Installer, UX Improvements, Review Fixes
+
+**Schedule Fix:**
+- **Schedule clearing bug:** `updateServer({ schedule: undefined })` was ignored because `patch.schedule !== undefined` was false. Changed to `"schedule" in patch` so explicit undefined values are persisted. Commit `c2ccb72`.
+
+**UX Improvements:**
+- **Delete button removed from dashboard cards** — delete only available from server detail page. Commit `24758c0`.
+- **Stop/Restart confirm dialogs** — dashboard Stop and server-detail Stop/Restart now show "Stop? Yes/No" before executing. Start remains direct. Commits `97699d2`.
+- **Console command history** persists in `localStorage` (keyed by server ID, max 100 entries). Arrow key navigation unchanged. Commit `97699d2`.
+- **Server search/filter** on dashboard — text input filters server cards case-insensitively with match count. Commit `97699d2`.
+- **CPU display capped at 100%** — Docker reports per-core CPU (can exceed 100% on multi-core). `Math.min(100, ...)` in ConsoleTab + dashboard cards. Commit `0929fef`.
+
+**CurseForge Modpack Installer:**
+- **Replaced Modrinth with CurseForge** — Modrinth had too few modpacks. CurseForge supports Forge, NeoForge, Fabric, Quilt. Commit `0a62ae8`.
+- **New files:** `src/services/modpack.ts` (319 lines) — `searchModpacks()`, `getModpackFiles()`, `createModpackServer()` (fast), `runModpackInstall()` (async).
+- **New endpoints:**
+  - `POST /api/servers/curseforge/search` — proxy CF search (apiKey in body, not stored server-side)
+  - `POST /api/servers/curseforge/files` — proxy CF version list
+  - `POST /api/servers/modpack` — responds immediately with server ID, installs async
+  - `GET /api/servers/modpack/progress/:id` — poll install progress (step + percent)
+- **Frontend:** `InstallModpackDialog.tsx` — CF API key input (saved in localStorage), search field, 2-column results grid, version selector, RAM/Port/Name config, progress bar with polling.
+- **Loader support:**
+  - **Forge:** Downloads `forge-<mc>-<ver>-installer.jar` from Maven, runs `--installServer` in Docker. Copies universal JAR → `server.jar` (1.12-1.16) or sets `jarName = "run.sh"` (1.17+).
+  - **NeoForge:** Downloads from neoforged Maven, runs `--installServer` in Docker. Uses `run.sh`.
+  - **Fabric:** Downloads fabric-installer from Maven, runs `server -mcversion <ver> -downloadMinecraft` in Docker. Creates `fabric-server-launch.jar`.
+  - **Quilt:** Downloads quilt-installer from Quilt Maven, runs `install server <ver> --download-server` in Docker.
+  - **Java 8 for old Forge:** MC < 1.13 Forge/NeoForge uses `eclipse-temurin:8-jre-alpine` (URLClassLoader removed in Java 9+).
+
+**Bugfixes during modpack development:**
+- **Missing `User-Agent` header** caused CF to return 403. Added to all CF API calls. Commit `31ed440`.
+- **Forge/NeoForge run.sh containers failed:** `java -jar run.sh` tried to run a shell script as JAR. Fixed in `docker.ts`: when `jarName === "run.sh"`, executes `sh run.sh --nogui` instead. Commit `0ec7fc6`.
+- **ENOBUFS on large modpacks:** `execSync` default maxBuffer 1MB too small for Forge installer output (SkyFactory 5 had ~290 mods). Increased to 100MB for `docker run` and 10MB for `unzip`. Commit `54d2035`.
+- **Auto-start after modpack install:** Added `startContainer()` call after container creation. Commit `0929fef`.
+- **run.sh ignored panel RAM:** `user_jvm_args.txt` now overridden with `-Xms`/`-Xmx` from panel config. Commit `ef8f9ae`.
+- **Double CF API calls per mod:** Merged into single `getModFileInfo()` returning `{url, fileName}`. Commit `ef8f9ae`.
+- **Memory leak:** `installProgress` Map entries now auto-deleted after 60s. Commit `ef8f9ae`.
+- **Streaming downloads:** `downloadFile()` now streams to disk via `ReadableStream` reader instead of buffering in RAM. 5-min timeout on downloads. Commit `bc8835f`.
+- **Docker image inconsistency:** `getJavaDockerImage()` now returns `-alpine` suffix matching `resolveJavaImage()` — prevents duplicate image pulls. Commit `bc8835f`.
+- **Missing CF timeouts:** All `fetch()` calls to CF API now have `AbortSignal.timeout(15_000)`. Commit `bc8835f`.
+
+**Deleted files:**
+- `src/services/modrinth.ts` — replaced by `modpack.ts`
+- `/opt/mcpanel/frontend/page.tsx` — stale duplicate of server detail page causing build errors
+
+---
+
+### 2026-07-23 — Responsive Review & Fixes
+
+**Review:** Vollständiges Mobile-Responsive-Audit aller Frontend-Komponenten. 7 Fixes (commit `67e7765`):
+- **Server-Detail-Header Overflow:** `flex` → `flex flex-wrap` + `gap-x-3 gap-y-1` — verhindert horizontalen Overflow bei vielen Status-Badges auf schmalen Screens.
+- **Tab-Navigation Overflow:** `overflow-x-auto` — 4 Tabs (Console/Files/Logs/Settings) scrollen jetzt horizontal auf <400px Screens.
+- **Dashboard Search:** `w-48` → `w-36 sm:w-48` — schmaleres Suchfeld auf kleinen Handys.
+- **LogsTab Toolbar:** `min-w-[160px]` → `min-w-[120px]` — verhindert Overflow auf <380px.
+- **ConsoleTab/FileManagerTab Höhe:** `h-[calc(100vh-12rem)]` → `h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]` — mehr Platz für Console/Editor auf Mobile.
+- **CardSkeleton Tokens:** Alte `slate-800/slate-900/rounded-2xl` → `[#1a1f2e]/[#0f1119]/rounded-xl`.
+- **ChangePasswordDialog Tokens:** `sky` → `violet` Accent, `border-white/[0.06]` → `border-[#1a1f2e]`.
+
+---
+
+### 2026-07-23 — Audit Fixes + Console Restart Reconnect
+
+**Critical audit fixes (commit `e6ef6b4`):**
+- `execFileSync` → `execFile` (async) in backup, disk-usage, scheduler — no more event-loop blocking.
+- WebSocket auth: JWT/API-key required for Socket.IO connections + `Authorization` header fallback.
+- `rmdirSync` → `rmSync`.
+- AuthGuard spinner: old `#030303`/sky → `#0a0c10`/violet.
+
+**Console restart reconnect (commits `ab036fa`–`0c9e1e2`):**
+- **Problem:** Fast restarts (<3s) completed between status polls → `running→running`, no transition.
+- **Fix:** `restartTick` prop from parent → explicit detach + `reattachPendingRef` → effect re-triggered via deps → re-attach on running. Also: `end` event listener on Docker PassThroughs, `cleaned` guard, `Authorization` header WS auth fallback.
+
+**File Manager (commits `23a5a85`, `ccb5e5f`):**
+- Binary files (.jar, .png, .dat, .mca, etc.) blocked from text editor — grayed out.
+- File size `mr-5` to prevent delete button overlap.
+
+**Mobile nav buttons (commit `684dd19`):**
+- ☰ hamburger on dashboard + server detail, ← back arrow on server detail.
+
+---
+
+---
+
+### 2026-08-09 — Complete Redesign: MCPanel → Obsidian Panel
+
+**Design System — "Deep Violet" (based on Emergent preview):**
+- **Colors:** Background `#0B0914`, Cards `#151221`, Borders `#28223D`, Accent `#9D4EDD`, Cyan `#00F5D4`, Pink `#F15BB5`
+- **Fonts:** Outfit (headings) + JetBrains Mono (code) replacing Geist
+- **Effects:** Grid background with radial fade mask, cyan glow pulse for online status, purple glow shadows on hover
+- **Scrollbar:** Custom dark scrollbar matching the palette
+- **Selection:** `#9D4EDD` highlight
+- **Console:** Black background with subtle purple scanlines
+
+**Token Strategy:** Used `@theme inline` in globals.css to override Tailwind color stops (`violet-*`, `slate-*`, `emerald-*`, `amber-*`, `red-*`, `rose-*`). This means existing `bg-violet-600`, `text-slate-500` etc. automatically use the new palette. Hardcoded hex values were batch-replaced with sed across all 15 component files.
+
+**Renaming:**
+- All `localStorage` keys: `mcpanel-token` → `obsidian-token`, `mcp_cmds_` → `obsidian_cmds_`, `mcp_cf_key` → `obsidian_cf_key`
+- Fetch interceptor guard: `__mcpanelPatched` → `__obsidianPatched`
+- All UI labels: "MCPanel" → "Obsidian Panel"
+- Backend comment updated
+
+**Files changed:** 18 files, 416 insertions, 334 deletions. Commit `651c54b`.
+
+> **Last updated:** 2026-08-10 · Session: Complete redesign, Emergent palette, MCPanel → Obsidian Panel
+
+---
+
+### 2026-08-09/10 — Feature-Upgrades & Redesign
+
+**Server changed to `5.231.108.226` (GA1TznLQBZCG, Debian 13).** Old server `84.234.99.121` decommissioned.
+
+**Complete frontend redesign — Emergent "Deep Violet" palette:**
+- Colors: `#0B0914` bg, `#151221` cards, `#28223D` borders, `#9D4EDD` accent
+- Cyan `#00F5D4` for online/success, Yellow `#FEE440` for warning, Pink `#F15BB5` for destructive
+- Fonts: Outfit (display) + JetBrains Mono (code)
+- Dashboard: 4-column overview stats with live progress bars, redesigned server cards
+- Server Detail: Cleaner breadcrumb, 4-column live stats bar (CPU/RAM/TPS/Players)
+- Sidebar: Left purple accent line with glow on active items
+- All 16 components batch-migrated via Tailwind theme overrides + sed
+
+**Repo cleanup:** 10 sensitive/internal files removed from public GitHub (deploy scripts, session logs, passwords). Git history purged with `filter-branch`.
+
+**TPS Monitor:** RCON polling every 5s via WebSocket, color-coded display (≥19 cyan, ≥15 yellow, <15 pink). Filters RCON connect/disconnect noise + AsyncCatcher stack traces.
+
+**Discord Webhook — Live Status Embed:**
+- Single persistent embed that self-edits every 10s
+- Shows CPU, RAM, TPS, Uptime, Players with emoji indicators
+- Instant on stop (await + generation-based race condition fix)
+- `?wait=true` required for Discord to return message ID
+- Stats stream starts independently of WebSocket (no browser tab needed)
+- Stored in `discord.ts` as shared liveStore between WebSocket and poller
+
+**Bugfixes:**
+- Form inputs being overwritten: EditServerDialog `useEffect` had `server` in deps (re-ran every 3s poll). Changed to `[open]` only.
+- CreateServerDialog: `paperVersion` now reset on open, not overridden on type change
+- Dashboard RAM card: `32768 GB` → `32.0 GB` (wrong GB threshold `1e9` → `1024`)
+
+**Deploy flow now uses ssh2** (password auth, no key needed). Helper script pattern: SFTP upload + remote build.
+
+**README.md** updated with all current features.
+
+**Commits:** `651c54b` through `a0aab23` (12 commits).
+
+> **Last updated:** 2026-08-10 · Session: TPS, Discord live embed, redesign polish, bugfixes
+
+---
+
+### 2026-08-10 — Architecture Audit: Async I/O Migration, Scheduler Fix, Service Extraction
+
+**Audit review:** In-depth analysis of backend architecture, UI/UX, and security. Four critical issues identified and resolved:
+
+**Scheduler double-fire bug (scheduler.ts):**
+- **Problem:** `CHECK_INTERVAL_MS = 30_000` caused each `HH:MM` to match twice (e.g. 03:00:00 and 03:00:30), executing scheduled restarts/backups twice.
+- **Fix:** Added `lastFired` Map tracking the last executed minute per server+task key. Task only fires if `lastFired.get(key) !== currentTime`.
+
+**Modpack installer blocked event loop (modpack.ts):**
+- **Problem:** `execSync(docker run ...)` with 600s timeout and `execFileSync("unzip"...)` were synchronous, freezing the entire panel for minutes during modpack installs.
+- **Fix:** Complete async rewrite — `execSync` → promisified `exec`, `execFileSync` → promisified `execFile`, all `fs.*Sync` → `fs/promises` (`readFile`, `writeFile`, `unlink`, `readdir`, `copyFile`, `mkdir`). `isClientOnlyMod()` now async. `runJavaInDocker()` now async.
+
+**Sync I/O migration (scheduler.ts, servers.ts, config-store.ts):**
+- `scheduler.ts`: `statSync`/`readdirSync`/`unlinkSync` → async `fs/promises` variants.
+- `servers.ts` backup route: `readFileSync` + `res.send(buffer)` → `fs.createReadStream` + `stream.pipe(res)` — no longer buffers entire backup in RAM.
+- `config-store.ts`: All 6 functions (`loadServers`, `saveServers`, `getServer`, `addServer`, `removeServer`, `updateServer`) migrated from `fs.*Sync` to `fs/promises`. All 5 callers updated with `await`.
+- Two `.then(msgId => { await updateServer(...) })` callbacks fixed to `async msgId`.
+
+**Service extraction (Single Responsibility):**
+- `downloadPaperJar()` → `src/services/paper.ts`
+- `downloadFabricJar()` → `src/services/fabric.ts`
+- `downloadVelocityJar()` → `src/services/velocity.ts`
+- `pingMinecraftServer()` → `src/services/minecraft-ping.ts`
+- `servers.ts` reduced from 1360 to ~1100 lines. Removed `net` import (no longer needed).
+
+**install.sh fixes:**
+- **Debian 13 compatibility:** Removed `lsb-release` dependency (not available in trixie). Replaced `$(lsb_release -cs)` with `${VERSION_CODENAME:-bookworm}` from `/etc/os-release`.
+- **Rebrand:** All "MCPanel" → "Obsidian Panel" in installer UI (step headers, systemd descriptions, final screen). Systemd service names (`mcpanel-backend` etc.) preserved for backwards compatibility.
+
+**Commits:** `42c8c12`, `2c7139b`, `76c58f0`.
+
+**Files changed:** 11 files (10 backend, 1 installer). +478/-401 lines net. Zero TypeScript errors.
+
+> **Last updated:** 2026-08-10 · Session: Architecture audit fixes, async I/O migration, scheduler dedup, service extraction, backup streaming, install.sh compatibility
