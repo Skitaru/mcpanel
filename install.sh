@@ -82,13 +82,13 @@ fi
 step 1 $TOTAL_STEPS "Install dependencies"
 info "${PRETTY_NAME:-Debian}"
 run "apt update" apt-get update -qq
-run "curl git tar" apt-get install -y -qq curl wget gnupg ca-certificates lsb-release git unzip tar
+run "curl git tar" apt-get install -y -qq curl wget gnupg ca-certificates git unzip tar
 
 step 2 $TOTAL_STEPS "Install Docker"
 if command -v docker &>/dev/null; then warn "Already installed"
 else
   run "Docker GPG" bash -c 'install -m 0755 -d /etc/apt/keyrings && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && chmod a+r /etc/apt/keyrings/docker.gpg'
-  run "Docker repo" bash -c "echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \$(lsb_release -cs) stable\" > /etc/apt/sources.list.d/docker.list"
+  run "Docker repo" bash -c "echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian ${VERSION_CODENAME:-bookworm} stable\" > /etc/apt/sources.list.d/docker.list"
   run "apt update" apt-get update -qq
   run "docker-ce" apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
   run "Enable Docker" systemctl enable --now docker
