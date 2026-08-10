@@ -12,8 +12,8 @@
 | **Name** | Obsidian Panel — Minecraft Server Panel |
 | **GitHub** | `https://github.com/Skitaru/mcpanel` |
 | **Stack** | Backend: Node.js / Express / TypeScript · Frontend: Next.js 15 / React 19 / Tailwind 4 |
-| **Server IP** | `5.231.108.226` (SSH: `root@5.231.108.226`) |
-| **Server OS** | Debian 13 ("GA1TznLQBZCG") |
+| **Server IP** | `188.214.30.159` (SSH: `root@188.214.30.159`, **Key-Auth** via `~/.ssh/id_ed25519`) |
+| **Server OS** | Debian 13 (trixie) — Hostname `dreary-connection` |
 | **Local Dev** | Windows 11, Git Bash at `C:\Users\bross\Desktop\Claude\deepseek` |
 
 ---
@@ -50,11 +50,11 @@
 2. **Deploy workflow:**
    ```bash
    # Copy changed files to server
-   scp local-file.ts root@5.231.108.226:/opt/mcpanel/path/file.ts
+   scp local-file.ts root@188.214.30.159:/opt/mcpanel/path/file.ts
    # Rebuild + restart on server
-   ssh root@5.231.108.226 "cd /opt/mcpanel && npx tsc && systemctl restart mcpanel-backend"
+   ssh root@188.214.30.159 "cd /opt/mcpanel && npx tsc && systemctl restart mcpanel-backend"
    # or for frontend:
-   ssh root@5.231.108.226 "cd /opt/mcpanel/frontend && npx next build && systemctl restart mcpanel-frontend"
+   ssh root@188.214.30.159 "cd /opt/mcpanel/frontend && npx next build && systemctl restart mcpanel-frontend"
    # Then commit + push
    git add -A && git commit -m "..." && git push origin main
    ```
@@ -405,3 +405,21 @@
 **Files changed:** 11 files (10 backend, 1 installer). +478/-401 lines net. Zero TypeScript errors.
 
 > **Last updated:** 2026-08-10 · Session: Architecture audit fixes, async I/O migration, scheduler dedup, service extraction, backup streaming, install.sh compatibility
+
+---
+
+### 2026-08-10 — Server Migration: 5.231.108.226 → 188.214.30.159
+
+**New server is now the only one in use:**
+- **Server IP:** `188.214.30.159` (SSH: `root@188.214.30.159`, **Key-Auth** via `~/.ssh/id_ed25519` — no password needed)
+- Hostname `dreary-connection`, Debian 13 (trixie)
+- Old servers `5.231.108.226` and `84.234.99.121` decommissioned / no longer used.
+- Panel already deployed & running on the new server (`/opt/mcpanel`, backend + frontend active, hostname `dreary-connection`). The single running Paper container (temurin:25-jre-alpine) already has the RCON hardening (`127.0.0.1:25575`).
+- Plain `ssh`/`scp` work directly — no paramiko/ssh2 password helper needed anymore.
+
+**Local updates:**
+- `AGENTS.md` identity table + deploy workflow → new IP.
+- `deploy.py` (gitignored helper): HOST → `188.214.30.159`, password auth removed → key-based (paramiko `key_filename=~/.ssh/id_ed25519`).
+- Legacy `deploy.ps1` / `update.ps1` / `deploy_second_server.py` still reference decommissioned servers — flagged, not touched (pending user decision).
+
+> **Last updated:** 2026-08-10 · Session: Server migration to 188.214.30.159, key-based SSH
