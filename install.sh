@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║           MCPanel — One-Line Installer                      ║
+# ║     Obsidian Panel — One-Line Installer                      ║
 # ║   curl -fsSL ... | bash   — or —   wget -qO- ... | bash     ║
 # ╚══════════════════════════════════════════════════════════════╝
 set -euo pipefail
@@ -46,7 +46,7 @@ step() {
   for i in $(seq $((filled+1)) 30); do bar="${bar}░"; done
   clear
   echo
-  echo -e "  ${G}▓▒░${N} ${BOLD}${W}MCPANEL${N} ${DIM}·  Installer${N}"
+  echo -e "  ${G}▓▒░${N} ${BOLD}${W}OBSIDIAN PANEL${N} ${DIM}·  Installer${N}"
   echo -e "  ${G}────────────────────────────────${N}"
   echo
   echo -e "  ${G}[${bar}]${N} ${DIM}${pct}%${N}  ${W}${n}/${total}${N}  ${BOLD}${label}${N}"
@@ -72,7 +72,7 @@ case "${ID:-}" in debian|ubuntu) ;; *) fail "Debian or Ubuntu required." ;; esac
 
 if [ -d "$PANEL_DIR" ] && [ -f "$PANEL_DIR/servers.json" ]; then
   clear
-  echo; echo -e "  ${Y}⚠${N}  MCPanel is already installed."; echo
+  echo; echo -e "  ${Y}⚠${N}  Obsidian Panel is already installed."; echo
   printf "  Reinstall? Data stays. [y/N]: "; read -r ans < /dev/tty
   case "$ans" in [yY]) ;; *) echo -e "  ${D}Cancelled.${N}"; exit 0 ;; esac
   systemctl stop mcpanel-backend mcpanel-frontend 2>/dev/null || true
@@ -138,7 +138,7 @@ ok "Config saved"
 
 cat > /etc/systemd/system/mcpanel-backend.service << 'SVC'
 [Unit]
-Description=MCPanel Backend
+Description=Obsidian Panel Backend
 After=network.target docker.service
 Requires=docker.service
 
@@ -159,7 +159,7 @@ SVC
 
 cat > /etc/systemd/system/mcpanel-frontend.service << SVC
 [Unit]
-Description=MCPanel Frontend
+Description=Obsidian Panel Frontend
 After=network.target mcpanel-backend.service
 
 [Service]
@@ -180,7 +180,7 @@ SVC
 run "Reload systemd" systemctl daemon-reload
 run "Enable services" bash -c "systemctl enable mcpanel-backend mcpanel-frontend"
 
-step 8 $TOTAL_STEPS "Start MCPanel"
+step 8 $TOTAL_STEPS "Start Obsidian Panel"
 systemctl start mcpanel-backend; sleep 2
 systemctl start mcpanel-frontend; sleep 3
 systemctl is-active mcpanel-backend --quiet && ok "Backend running" || warn "Backend may need a moment"
@@ -195,7 +195,7 @@ fi
 IP=$(hostname -I | awk '{print $1}')
 clear
 echo
-echo -e "  ${G}▓▒░${N} ${BOLD}${W}MCPANEL${N} ${DIM}·  Installer${N}"
+echo -e "  ${G}▓▒░${N} ${BOLD}${W}OBSIDIAN PANEL${N} ${DIM}·  Installer${N}"
 echo -e "  ${G}────────────────────────────────${N}"
 echo
 echo -e "  ${G}✔${N}  ${BOLD}Installation complete${N}"
