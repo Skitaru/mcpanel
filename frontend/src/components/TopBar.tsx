@@ -97,8 +97,9 @@ export default function TopBar({ servers, activeId, onInstallModpack, onlinePlay
         {/* Right actions */}
         <div className="flex items-center gap-0.5">
           <button onClick={onInstallModpack} title="Install Modpack" aria-label="Install Modpack"
-            className="p-2 rounded-lg text-muted transition hover:text-purple-300 hover:bg-accent/10">
-            <Download className="h-4 w-4" />
+            className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[13px] font-medium text-slate-300 transition hover:border-accent/40 hover:text-purple-200">
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Modpack</span>
           </button>
           <button onClick={() => setPwDialogOpen(true)} title="Change Password" aria-label="Change Password"
             className="p-2 rounded-lg text-muted transition hover:text-purple-300 hover:bg-accent/10">
