@@ -526,3 +526,31 @@
 **Deploy:** Server-Build OK, Service active, Panel 200.
 
 > **Last updated:** 2026-08-10 · Session: Liveliness — ambient glows, breathing card glow, value flash, console line fade
+
+---
+
+### 2026-08-10 — Security Review: alle kritischen/hohen Findings gefixt
+
+**🔴 Kritisch:**
+- **Upload-Pfad-Traversal** (`files.ts`): `file.originalname` wird jetzt per `path.basename` saniert (strip `\\`→`/`, dann basename) + finale Containment-Prüfung + Temp-Cleanup in `finally`. Vorher: `../../etc/crontab` als Dateiname → beliebige Datei als root überschreibbar.
+- **Auth-Bypass ohne `PANEL_API_KEY`** (`auth.ts`): `authMiddleware` reicht Requests ohne gültiges JWT nur noch durch, wenn der API-Key-Fallback registriert ist — sonst **401**. Vorher: komplett offene API bei fehlender Env-Var.
+- **JWT-Secret** (`auth.ts`): unabhängiger 32-Byte-Zufallswert in `panel-config.json` (Feld `jwtSecret`), nicht mehr aus dem Passwort-Salt abgeleitet. Bestands-Configs migrieren automatisch (einmaliges Re-Login). Passwortwechsel rotiert das Secret (Sessions invalidiert). Zusätzlich: `timingSafeEqual`-Hash-Vergleich, Passwort-Minimum 8 Zeichen.
+
+**🟠 Hoch:**
+- **Tar-Slip beim Restore** (`servers.ts`): `tar -tzf`-Pre-Scan vor dem Extrahieren — Archive mit `/`- oder `..`-Einträgen werden abgelehnt (`--no-absolute-filenames` allein schützt nicht gegen `..`).
+- **Config-Store Lost-Update-Race** (`config-store.ts`): alle Writes über eine Promise-Queue serialisiert + atomarer Write (tmp + rename). Neues `mutateServers()`; Modpack-Install & Scheduler nutzen es.
+- **Scheduler-Restart bricht Modpack-Server** (`scheduler.ts`): `jarName` wird für `custom`-Server aus dem Data-Dir geprobt (run.sh → server.jar → quilt/fabric-launch); vorher wurde immer `paper.jar` erstellt → Forge-Server starteten nach Auto-Restart nicht.
+- **javaArgs-Shell-Injection** (`docker.ts` + `servers.ts`): Allowlist-Regex `^[A-Za-z0-9_+\-.:/=% ]*$` + Längenlimit — API-Level (POST/PUT) und defensiv in `createContainer`. Shell-Metazeichen werden abgelehnt.
+
+**🟡 Mittel:**
+- **MIME-Map** (`files.ts`): `.svg/.html/.js/.css/.xml` aus der Raw-Serving-Map entfernt (Stored-XSS-Vektor vom Panel-Origin) → fallen auf `application/octet-stream` zurück.
+- **Backend-Bind** (`index.ts`): `httpServer.listen(PORT, "127.0.0.1")` — API ist nicht mehr extern erreichbar (Override via `PANEL_BIND`). Frontend-Proxy funktioniert weiter.
+- **Properties-Blocklist** (`servers.ts`): `rcon.*`, `query.*`, `server-port`, `server-ip`, `level-name`, `enable-rcon`, `enable-query` + Newline-Injection-Check.
+- **Modpack-Zip-Slip** (`modpack.ts`): `unzip -Z1`-Pre-Scan, `..`/absolute Einträge → Abbruch.
+- **Port-Cap**: Max 65525 (RCON = port+10 muss ≤ 65535 bleiben) — POST /, Modpack-Route, `createModpackServer`.
+
+**🟢 Klein:** ANSI-Buffer in WebSocket jetzt pro Socket (`socket.id:serverId`) statt global; `resolveJavaImageForServer` als gemeinsamer Resolver (dedupliziert Fabric-Fallback aus Scheduler + Create-Route).
+
+**Verifiziert auf Server:** Backend lokal 200/401/200 (ohne/mit Token), Login liefert JWT, Panel extern 200, API-Proxy funktioniert. Backend von außen nicht mehr erreichbar.
+
+> **Last updated:** 2026-08-10 · Session: Security review — upload traversal, auth bypass, JWT secret, tar/zip slip, write races, scheduler restart, javaArgs injection, bind 127.0.0.1

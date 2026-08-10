@@ -316,7 +316,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
         // Pipe demuxed stdout / stderr → socket (cleaned)
         streams.demuxed.stdout.on("data", (chunk: Buffer) => {
-          const text = cleanAnsi(serverId, chunk.toString());
+          const text = cleanAnsi(`${socket.id}:${serverId}`, chunk.toString());
           if (!text) return;
           socket.emit("console:output", {
             serverId,
@@ -326,7 +326,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         });
 
         streams.demuxed.stderr.on("data", (chunk: Buffer) => {
-          const text = cleanAnsi(serverId, chunk.toString());
+          const text = cleanAnsi(`${socket.id}:${serverId}`, chunk.toString());
           if (!text) return;
           socket.emit("console:output", {
             serverId,
@@ -342,7 +342,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
           cleaned = true;
           streams.demuxed.stdout.removeAllListeners();
           streams.demuxed.stderr.removeAllListeners();
-          flushBuffer(serverId);
+          flushBuffer(`${socket.id}:${serverId}`);
           const hadSub = session.consoleSubs.has(serverId);
           session.consoleSubs.delete(serverId);
           streams.close();
@@ -376,7 +376,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         // again when streams are destroyed below.
         streams.demuxed.stdout.removeAllListeners();
         streams.demuxed.stderr.removeAllListeners();
-        flushBuffer(serverId);
+        flushBuffer(`${socket.id}:${serverId}`);
         session.consoleSubs.delete(serverId);
         streams.close();
         socket.emit("console:detached", { serverId });

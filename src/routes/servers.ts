@@ -19,7 +19,8 @@ import {
   stopContainer,
   deleteContainer,
   listManagedContainerStatuses,
-  resolveJavaImage,
+  resolveJavaImageForServer,
+  isValidJavaArgs,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
 import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
@@ -82,11 +83,22 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const port = body.port ?? 25565;
-    if (typeof port !== "number" || port < 1024 || port > 65535) {
+    // Max 65525 — the RCON port is auto-assigned as port + 10 and must stay ≤ 65535.
+    if (typeof port !== "number" || port < 1024 || port > 65525) {
       res
         .status(400)
-        .json({ error: "Field 'port' must be between 1024 and 65535." });
+        .json({ error: "Field 'port' must be between 1024 and 65525." });
       return;
+    }
+
+    // ---- javaArgs validation (prevents shell injection in the container Cmd) ----
+    if (body.javaArgs !== undefined) {
+      if (typeof body.javaArgs !== "string" || !isValidJavaArgs(body.javaArgs)) {
+        res.status(400).json({
+          error: "javaArgs contains unsupported characters. Only JVM flags (letters, digits, +-.:/=%_) are allowed.",
+        });
+        return;
+      }
     }
 
     // ---- port conflict check ----
@@ -127,13 +139,8 @@ router.post("/", async (req: Request, res: Response) => {
     let javaImage: string;
     if (serverType === "velocity") {
       javaImage = "eclipse-temurin:21-jre-alpine";
-    } else if (serverType === "fabric") {
-      javaImage = resolveJavaImage(mcVersion);
-      if (javaImage === "eclipse-temurin:16-jre-alpine" || javaImage === "eclipse-temurin:8-jre-alpine") {
-        javaImage = "eclipse-temurin:17-jre-alpine";
-      }
     } else {
-      javaImage = resolveJavaImage(mcVersion);
+      javaImage = resolveJavaImageForServer(mcVersion, serverType);
     }
     console.log(`[api] ${serverType} ${mcVersion} -> Java image ${javaImage}`);
 
@@ -598,6 +605,36 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
 
     const uploadPath = req.file.path;
 
+    // ---- tar-slip protection: scan archive entries BEFORE extracting ----
+    // `--no-absolute-filenames` only strips leading "/"; "../" entries would
+    // still escape the target dir. Reject any archive with unsafe paths.
+    const { execFile } = await import("node:child_process");
+    try {
+      const listing = await new Promise<string>((resolve, reject) => {
+        execFile("tar", ["-tzf", uploadPath], {
+          timeout: 60_000,
+          maxBuffer: 20 * 1024 * 1024,
+          encoding: "utf-8",
+        }, (err, stdout) => {
+          if (err) reject(err);
+          else resolve(stdout);
+        });
+      });
+      for (const entry of listing.split("\n")) {
+        const e = entry.trim();
+        if (!e) continue;
+        if (e.startsWith("/") || e.split("/").includes("..")) {
+          try { fs.unlinkSync(uploadPath); } catch {}
+          res.status(400).json({ error: "Backup contains unsafe paths (path traversal) and was rejected." });
+          return;
+        }
+      }
+    } catch (err: any) {
+      try { fs.unlinkSync(uploadPath); } catch {}
+      res.status(400).json({ error: "Could not inspect backup archive.", detail: err.message });
+      return;
+    }
+
     // Stop container if running
     if (server.containerId) {
       try {
@@ -611,7 +648,6 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    const { execFile } = await import("node:child_process");
     try {
       // --no-absolute-filenames prevents path-traversal via malicious archive
       await new Promise<void>((resolve, reject) => {
@@ -809,8 +845,8 @@ router.put("/:id", async (req: Request, res: Response) => {
     }
 
     // Validate javaArgs if provided (optional, can be empty to clear)
-    if (javaArgs !== undefined && typeof javaArgs !== "string") {
-      res.status(400).json({ error: "Field 'javaArgs' must be a string." });
+    if (javaArgs !== undefined && (typeof javaArgs !== "string" || !isValidJavaArgs(javaArgs))) {
+      res.status(400).json({ error: "javaArgs contains unsupported characters. Only JVM flags (letters, digits, +-.:/=%_) are allowed." });
       return;
     }
 
@@ -914,6 +950,29 @@ router.put("/:id/properties", async (req: Request, res: Response) => {
     if (!properties || typeof properties !== "object") {
       res.status(400).json({ error: "Field 'properties' (object) is required." });
       return;
+    }
+
+    // Reject security-relevant / panel-breaking keys and property injection
+    // via newlines. (The panel's RCON config and port mapping must not be
+    // changeable through this endpoint.)
+    const BLOCKED_KEYS = [
+      "server-port", "server-ip", "enable-rcon", "rcon.password", "rcon.port",
+      "level-name", "enable-query", "query.port",
+    ];
+    for (const key of Object.keys(properties)) {
+      if (key.startsWith("rcon.") || key.startsWith("query.") || BLOCKED_KEYS.includes(key)) {
+        res.status(400).json({ error: `Property '${key}' cannot be changed via the panel.` });
+        return;
+      }
+      if (key.includes("\n") || key.includes("\r")) {
+        res.status(400).json({ error: "Invalid property key." });
+        return;
+      }
+      const value = String(properties[key]);
+      if (value.includes("\n") || value.includes("\r")) {
+        res.status(400).json({ error: `Property '${key}' contains newlines (property injection).` });
+        return;
+      }
     }
 
     const propsPath = path.join(server.dataPath, "server.properties");
@@ -1078,8 +1137,8 @@ router.post("/modpack", async (req: Request, res: Response) => {
     catch (err: any) { res.status(400).json({ error: err.message }); return; }
 
     const serverPort = port ?? 25565;
-    if (typeof serverPort !== "number" || serverPort < 1024 || serverPort > 65535) {
-      res.status(400).json({ error: "Port must be between 1024 and 65535." });
+    if (typeof serverPort !== "number" || serverPort < 1024 || serverPort > 65525) {
+      res.status(400).json({ error: "Port must be between 1024 and 65525." });
       return;
     }
 

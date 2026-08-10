@@ -64,6 +64,31 @@ export function resolveJavaImage(mcVersion: string): string {
   return "eclipse-temurin:8-jre-alpine";
 }
 
+/**
+ * Resolve the Java image for a server type. Fabric can't run on Java 8/16
+ * launchers in this panel — falls back to Java 17. Shared by the create route,
+ * the scheduler and the modpack installer.
+ */
+export function resolveJavaImageForServer(mcVersion: string, serverType: string): string {
+  const img = resolveJavaImage(mcVersion);
+  if (
+    serverType === "fabric" &&
+    (img === "eclipse-temurin:16-jre-alpine" || img === "eclipse-temurin:8-jre-alpine")
+  ) {
+    return "eclipse-temurin:17-jre-alpine";
+  }
+  return img;
+}
+
+/** Allowlist for custom JVM args — prevents shell injection in the container Cmd. */
+const JAVA_ARGS_ALLOWED = /^[A-Za-z0-9_+\-.:/=% ]*$/;
+
+export function isValidJavaArgs(javaArgs: string | undefined | null): boolean {
+  if (!javaArgs) return true;
+  if (javaArgs.length > 1000) return false;
+  return JAVA_ARGS_ALLOWED.test(javaArgs);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -110,6 +135,12 @@ export async function createContainer(
 
   const jarName = opts?.jarName ?? "paper.jar";
   const nogui = cfg.serverType === "velocity" ? "" : "nogui";
+
+  // Defence-in-depth: reject shell-injectable javaArgs even if the API layer
+  // already validated them.
+  if (!isValidJavaArgs(cfg.javaArgs)) {
+    throw new Error("javaArgs contains unsupported characters (shell metacharacters are not allowed).");
+  }
 
   // Java heap flags: Xms = 512M minimum, Xmx = configured RAM.
   // Aikar's optimized GC flags for Minecraft servers.

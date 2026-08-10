@@ -19,6 +19,8 @@ interface PanelConfig {
   passwordHash: string;
   /** 0 = legacy HMAC-SHA256, 1 = scrypt. Missing = legacy. */
   hashVersion?: number;
+  /** Independent random JWT secret — NOT derived from the password salt. */
+  jwtSecret?: string;
 }
 
 function loadConfig(): PanelConfig {
@@ -26,9 +28,12 @@ function loadConfig(): PanelConfig {
     // First run: create default config
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = hashPasswordScrypt(DEFAULT_PASSWORD, salt);
-    const config: PanelConfig = { username: DEFAULT_USERNAME, salt, passwordHash: hash, hashVersion: 1 };
+    const config: PanelConfig = {
+      username: DEFAULT_USERNAME, salt, passwordHash: hash, hashVersion: 1,
+      jwtSecret: crypto.randomBytes(32).toString("hex"),
+    };
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-    console.log("[auth] Created default credentials: admin / admin");
+    console.log("[auth] Created default credentials: admin / admin — CHANGE THE PASSWORD!");
     return config;
   }
   return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
@@ -36,6 +41,13 @@ function loadConfig(): PanelConfig {
 
 function saveConfig(config: PanelConfig): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+/** Constant-time hex comparison (scrypt verify). */
+function safeEqualHex(a: string, b: string): boolean {
+  const ba = Buffer.from(a, "hex");
+  const bb = Buffer.from(b, "hex");
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
 }
 
 // ---- Legacy HMAC-SHA256 (for migration only) ----
@@ -61,8 +73,8 @@ export function verifyCredentials(username: string, password: string): boolean {
   if (username !== config.username) return false;
 
   if (config.hashVersion === 1) {
-    // Current scrypt format
-    return hashPasswordScrypt(password, config.salt) === config.passwordHash;
+    // Current scrypt format — constant-time compare
+    return safeEqualHex(hashPasswordScrypt(password, config.salt), config.passwordHash);
   }
 
   // Legacy HMAC-SHA256 — try old hash first
@@ -80,19 +92,23 @@ export function verifyCredentials(username: string, password: string): boolean {
   return false;
 }
 
-/** JWT secret — persisted so tokens survive restarts */
+/** JWT secret — independent random value, persisted so tokens survive restarts. */
 let _jwtSecret: string | null = null;
 
 export function getJwtSecret(): string {
   if (!_jwtSecret) {
     const config = loadConfig();
-    // Derive from password salt so it's stable
-    _jwtSecret = crypto.createHmac("sha256", config.salt).update("mcpanel-jwt").digest("hex");
+    // Migrate configs created before the independent secret existed.
+    if (!config.jwtSecret) {
+      config.jwtSecret = crypto.randomBytes(32).toString("hex");
+      saveConfig(config);
+    }
+    _jwtSecret = config.jwtSecret;
   }
   return _jwtSecret;
 }
 
-/** Change the password. Invalidates all existing tokens. */
+/** Change the password. Rotates the JWT secret → invalidates all existing tokens. */
 export function changePassword(currentPassword: string, newPassword: string): { success: true } | { error: string } {
   const config = loadConfig();
 
@@ -100,15 +116,16 @@ export function changePassword(currentPassword: string, newPassword: string): { 
   if (!verifyCredentials(config.username, currentPassword)) {
     return { error: "Current password is incorrect." };
   }
-  if (newPassword.length < 4) {
-    return { error: "New password must be at least 4 characters." };
+  if (newPassword.length < 8) {
+    return { error: "New password must be at least 8 characters." };
   }
   const newSalt = crypto.randomBytes(16).toString("hex");
   config.salt = newSalt;
   config.passwordHash = hashPasswordScrypt(newPassword, newSalt);
   config.hashVersion = 1;
+  config.jwtSecret = crypto.randomBytes(32).toString("hex"); // invalidate all sessions
   saveConfig(config);
-  _jwtSecret = null; // invalidate, will be re-derived
+  _jwtSecret = null;
   return { success: true };
 }
 
@@ -126,17 +143,22 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) {
-    // No Bearer token — let API-key fallback middleware handle it
-    return next();
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7);
+    try {
+      jwt.verify(token, getJwtSecret());
+      (req as any)._authOk = true;
+      return next();
+    } catch {
+      // Invalid JWT — fall through to the API-key check below.
+    }
   }
 
-  const token = auth.slice(7);
-  try {
-    jwt.verify(token, getJwtSecret());
-    (req as any)._authOk = true;
-  } catch {
-    // Invalid JWT — let API-key fallback try the token as raw API key
+  // No valid JWT. Only pass through if an API-key fallback middleware is
+  // registered (i.e. PANEL_API_KEY is set) — otherwise REJECT here so a
+  // misconfigured deployment never runs with an open API.
+  if (process.env.PANEL_API_KEY) {
+    return next(); // the fallback middleware makes the final call
   }
-  next();
+  res.status(401).json({ error: "Unauthorized." });
 }

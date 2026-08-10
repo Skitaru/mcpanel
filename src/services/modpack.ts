@@ -11,7 +11,7 @@ import { exec, execFile } from "node:child_process";
 import { mkdir, readFile, writeFile, unlink, readdir, copyFile } from "node:fs/promises";
 import { v4 as uuid } from "uuid";
 import { ServerConfig, ServerType } from "../types";
-import { addServer, loadServers, saveServers } from "./config-store";
+import { addServer, mutateServers } from "./config-store";
 import { createContainer, startContainer, resolveJavaImage } from "./docker";
 
 const CF_BASE = "https://api.curseforge.com/v1";
@@ -248,6 +248,9 @@ async function runJavaInDocker(jarPath: string, args: string[], dataDir: string,
 // ---------------------------------------------------------------------------
 
 export async function createModpackServer(name: string, ram: number, port: number): Promise<ServerConfig> {
+  if (port < 1024 || port > 65525) {
+    throw new Error("Port must be between 1024 and 65525 (RCON port is +10).");
+  }
   const id = uuid();
   const dataPath = path.join(DATA_ROOT, id);
   await mkdir(dataPath, { recursive: true });
@@ -311,8 +314,23 @@ export async function runModpackInstall(
       if (!found) throw new Error(`Downloaded ${buf.length} bytes but ZIP is incomplete (missing end-of-central-directory). The download may have been interrupted by the CDN.`);
     }
 
-    // 4. Extract (async via execFile)
+    // 4. Extract (async via execFile) — with zip-slip protection
     emitProgress(serverId, "Extracting modpack…", 20);
+    {
+      // Pre-scan archive entries; reject `..`/absolute paths so a malicious
+      // modpack can't write outside the server's data directory.
+      const listing = await execFileAsync("unzip", ["-Z1", zipPath], {
+        timeout: 60_000, maxBuffer: 10 * 1024 * 1024,
+      });
+      for (const entry of listing.split("\n")) {
+        const e = entry.trim();
+        if (!e) continue;
+        if (e.startsWith("/") || e.split("/").includes("..")) {
+          await unlink(zipPath);
+          throw new Error("Modpack archive contains unsafe paths (path traversal) and was rejected.");
+        }
+      }
+    }
     await execFileAsync("unzip", ["-o", zipPath, "-d", dataPath], { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
     await unlink(zipPath);
 
@@ -481,15 +499,15 @@ export async function runModpackInstall(
     emitProgress(serverId, "Creating Docker container…", 95);
     const containerId = await createContainer(config, javaImage, { jarName });
 
-    // 10. Update config
-    const servers = await loadServers();
-    const idx = servers.findIndex(s => s.id === serverId);
-    if (idx !== -1) {
-      servers[idx].containerId = containerId;
-      servers[idx].version = mcVersion;
-      servers[idx].serverType = serverType;
-      await saveServers(servers);
-    }
+    // 10. Update config (serialized — no lost updates)
+    await mutateServers((servers) => {
+      const idx = servers.findIndex(s => s.id === serverId);
+      if (idx !== -1) {
+        servers[idx].containerId = containerId;
+        servers[idx].version = mcVersion;
+        servers[idx].serverType = serverType;
+      }
+    });
 
     // 11. Auto-start the container
     emitProgress(serverId, "Starting server…", 98);

@@ -2,15 +2,16 @@
 // Checks every 30 s whether any server has a scheduled task due.
 // Stores schedule config in servers.json per-server.
 
-import { loadServers, saveServers } from "./config-store";
+import { loadServers, mutateServers } from "./config-store";
 import {
   stopContainer,
   startContainer,
   deleteContainer,
   createContainer,
-  resolveJavaImage,
+  resolveJavaImageForServer,
 } from "./docker";
 import path from "node:path";
+import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { readdir, stat, unlink } from "node:fs/promises";
 
@@ -77,15 +78,23 @@ async function restartContainer(srv: any): Promise<void> {
   try { await stopContainer(containerId); } catch {}
   try { await deleteContainer(containerId); } catch {}
 
-  const javaImage = srv.serverType === "velocity"
-    ? "eclipse-temurin:21-jre-alpine"
-    : (srv.serverType === "fabric"
-      ? resolveJavaImageFallback(srv.version)
-      : resolveJavaImage(srv.version));
+  const ver = srv.version === "pending" ? "1.21.1" : srv.version;
+  const javaImage = resolveJavaImageForServer(ver, srv.serverType);
 
+  // Determine the launch jar. Paper/Fabric/Velocity have fixed names; custom
+  // (modpack) servers are probed from the data directory — a scheduled restart
+  // must NOT recreate them with the default paper.jar.
   let jarName = "paper.jar";
   if (srv.serverType === "fabric") jarName = "fabric-server-launch.jar";
   else if (srv.serverType === "velocity") jarName = "velocity.jar";
+  else if (srv.serverType === "custom") {
+    const has = (p: string) => { try { return fs.existsSync(p); } catch { return false; } };
+    const dir: string = srv.dataPath;
+    if (has(path.join(dir, "run.sh"))) jarName = "run.sh";
+    else if (has(path.join(dir, "server.jar"))) jarName = "server.jar";
+    else if (has(path.join(dir, "quilt-server-launch.jar"))) jarName = "quilt-server-launch.jar";
+    else if (has(path.join(dir, "fabric-server-launch.jar"))) jarName = "fabric-server-launch.jar";
+  }
 
   const newId = await createContainer(srv, javaImage, {
     jarName,
@@ -94,18 +103,11 @@ async function restartContainer(srv: any): Promise<void> {
 
   await startContainer(newId);
 
-  // Update the containerId in servers.json
-  const all = await loadServers();
-  const idx = all.findIndex((s: any) => s.id === srv.id);
-  if (idx >= 0) { all[idx].containerId = newId; await saveServers(all); }
-}
-
-function resolveJavaImageFallback(version: string): string {
-  const img = resolveJavaImage(version);
-  if (img === "eclipse-temurin:16-jre-alpine" || img === "eclipse-temurin:8-jre-alpine") {
-    return "eclipse-temurin:17-jre-alpine";
-  }
-  return img;
+  // Update the containerId in servers.json (serialized — no lost updates).
+  await mutateServers((all: any[]) => {
+    const idx = all.findIndex((s: any) => s.id === srv.id);
+    if (idx >= 0) all[idx].containerId = newId;
+  });
 }
 
 async function performBackup(srv: any): Promise<void> {

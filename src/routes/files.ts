@@ -14,20 +14,18 @@ import path from "node:path";
 import multer from "multer";
 import { getServer } from "../services/config-store";
 
-/** Map file extensions to MIME types for raw file serving. */
+/** Map file extensions to MIME types for raw file serving.
+ *  NOTE: .svg/.html/.js/.css/.xml are intentionally NOT listed — they would be
+ *  rendered/executed from the panel origin (stored-XSS risk). They fall back
+ *  to application/octet-stream → browsers download instead of executing. */
 const MIME_MAP: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
-  ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".webp": "image/webp",
   ".json": "application/json",
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".xml": "application/xml",
   ".txt": "text/plain",
   ".log": "text/plain",
   ".yml": "text/yaml",
@@ -316,13 +314,32 @@ router.post("/:id/upload", upload.array("files"), async (req: Request, res: Resp
     }
 
     const { copyFile, unlink } = await import("node:fs/promises");
-    for (const file of files) {
-      const dest = path.join(resolved.absolutePath, file.originalname);
-      await copyFile(file.path, dest);
-      await unlink(file.path);
-    }
+    try {
+      for (const file of files) {
+        // Sanitize the client-controlled filename — strip any directory
+        // components so `../../etc/passwd` can never escape the data root.
+        const safeName = path.basename((file.originalname || "").replace(/\\/g, "/"));
+        if (!safeName || safeName === "." || safeName === "..") {
+          res.status(400).json({ error: "Invalid file name." });
+          return;
+        }
+        const dest = path.join(resolved.absolutePath, safeName);
+        // Belt-and-braces: final containment check.
+        if (dest !== resolved.dataRoot && !dest.startsWith(resolved.dataRoot + path.sep)) {
+          res.status(403).json({ error: "Path traversal denied." });
+          return;
+        }
+        await copyFile(file.path, dest);
+        await unlink(file.path);
+      }
 
-    res.json({ message: `${files.length} file(s) uploaded.` });
+      res.json({ message: `${files.length} file(s) uploaded.` });
+    } finally {
+      // Never leave multer temp files behind, even on partial failure.
+      for (const file of files) {
+        try { await unlink(file.path); } catch { /* already gone */ }
+      }
+    }
   } catch (err: any) {
     console.error("[files] upload error:", err);
     res.status(500).json({ error: "Failed to upload files." });

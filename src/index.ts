@@ -247,8 +247,9 @@ httpServer.prependListener("request", (req) => {
 });
 
 // ---- start ----
-httpServer.listen(PORT, () => {
-  console.log(`[panel] Daemon listening on http://localhost:${PORT}`);
+const BIND_ADDR = process.env.PANEL_BIND || "127.0.0.1"; // never expose the API publicly by default
+httpServer.listen(PORT, BIND_ADDR, () => {
+  console.log(`[panel] Daemon listening on http://${BIND_ADDR}:${PORT}`);
   console.log(
     `[panel] Store: ${process.cwd()}/servers.json  |  Data root: ${process.cwd()}/data`,
   );
