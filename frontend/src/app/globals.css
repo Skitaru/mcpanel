@@ -156,6 +156,26 @@ select option {
 }
 .card-glow-online { animation: glow-breathe 4s ease-in-out infinite; }
 
+/* ── Server card banner (Pterodactyl-style) ─────────────────── */
+.banner-texture {
+  background:
+    radial-gradient(420px 160px at 80% -30%, rgba(157, 78, 221, 0.28), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px);
+}
+.banner-texture-amber {
+  background:
+    radial-gradient(420px 160px at 80% -30%, rgba(254, 228, 64, 0.20), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px);
+}
+.banner-texture-cyan {
+  background:
+    radial-gradient(420px 160px at 80% -30%, rgba(0, 245, 212, 0.16), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 22px);
+}
+
 /* ── Console line entry ────────────────────────────────────── */
 @keyframes line-in {
   from { opacity: 0; transform: translateY(-2px); }

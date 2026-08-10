@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  Cpu, MemoryStick, TerminalSquare, Server, Users, Activity,
+  TerminalSquare, Users,
 } from "lucide-react";
 import AddressPill from "@/components/AddressPill";
 import { formatBytes, formatRam, typeLabel } from "@/lib/format";
@@ -52,6 +52,8 @@ interface Props {
   startedAt?: string | null;
   /** Incremented by parent on restart — triggers explicit detach + reattach. */
   restartTick?: number;
+  /** Current disk usage in bytes (polled by the detail page). */
+  diskUsage?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +80,7 @@ function formatUptime(seconds: number) {
 // ---------------------------------------------------------------------------
 
 export default function ConsoleTab({
-  serverId, serverStatus, port, ram, serverType, version, startedAt, restartTick,
+  serverId, serverStatus, port, ram, serverType, version, startedAt, restartTick, diskUsage,
 }: Props) {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -427,85 +429,25 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 overflow-hidden rounded-xl border border-edge bg-surface h-[calc(100vh-16rem)] lg:h-[calc(100vh-12rem)]">
-      {/* ── Console panel ── */}
-      <div className="flex flex-1 flex-col min-w-0 min-h-0">
-        {/* ── Live Stats Bar ── */}
-        {isOnline && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-b border-edge bg-void">
-            {/* CPU */}
-            <div className="relative px-4 py-3 border-r border-edge">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Cpu className="h-3 w-3 text-accent" />
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">CPU</span>
-              </div>
-             <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
-                {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
-              </div>
-              <div className="h-1 rounded-full bg-edge overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-700 ease-out ${
-                  (stats?.cpuPercent ?? 0) > 90 ? "bg-danger" : (stats?.cpuPercent ?? 0) > 70 ? "bg-warn" : "bg-online"
-                }`}
-                  style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
-              </div>
-            </div>
-            {/* RAM */}
-            <div className="relative px-4 py-3 border-r border-edge">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <MemoryStick className="h-3 w-3 text-online" />
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">RAM</span>
-              </div>
-             <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
-                {stats ? formatBytes(stats.memoryUsage) : "—"}
-              </div>
-              <div className="h-1 rounded-full bg-edge overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-700 ease-out ${
-                  stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-danger"
-                  : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-warn" : "bg-accent"
-                }`}
-                  style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
-              </div>
-              <div className="text-[10px] text-muted mt-1">{formatRam(ram)} total</div>
-            </div>
-            {/* TPS */}
-            <div className="relative px-4 py-3 border-r border-edge">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Activity className="h-3 w-3 text-warn" />
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">TPS</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                {tps ? (
-                  <>
-                    <span className={`text-lg font-bold tabular-nums leading-none ${tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger"}`}>{tps.tps5s.toFixed(1)}</span>
-                    <span className={`text-sm font-medium tabular-nums ${tps.tps1m >= 19 ? "text-online/70" : tps.tps1m >= 15 ? "text-warn/70" : "text-danger/70"}`}>{tps.tps1m.toFixed(1)}</span>
-                    <span className="text-xs text-muted tabular-nums">{tps.tps5m.toFixed(1)}</span>
-                  </>
-                ) : (
-                  <span className="text-lg font-bold text-ink tabular-nums leading-none">—</span>
-                )}
-              </div>
-              <div className="flex gap-3 mt-1.5 text-[10px] text-muted">
-                <span>5s</span><span>1m</span><span>5m</span>
-              </div>
-            </div>
-            {/* Players */}
-            <div className="relative px-4 py-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Users className="h-3 w-3 text-online" />
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Players</span>
-              </div>
-             <div className="text-lg font-bold text-ink tabular-nums leading-none">
-                {playerCount.online}<span className="text-muted text-sm font-medium">/{playerCount.max}</span>
-              </div>
-              <div className="text-[10px] text-muted mt-1">{playerCount.online > 0 ? `${playerList.length} connected` : "Empty"}</div>
-            </div>
-          </div>
-        )}
-        {/* Output area */}
+    <div className="flex flex-col lg:flex-row gap-4">
+      {/* ════ Console panel ════ */}
+      <div className="flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+        {/* Console header */}
+        <div className="flex items-center gap-3 border-b border-edge bg-surface px-4 py-2.5">
+          <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-online pulse-dot" : "bg-edge"}`} />
+            {isOnline ? "Live" : "Offline"}
+          </span>
+          <span className="text-xs text-muted">{typeLabel(serverType)} {version}</span>
+          <div className="flex-1" />
+          {connected && isOnline && <span className="text-[11px] text-muted">verbunden</span>}
+        </div>
+
+        {/* Output */}
         <div
           ref={outputRef}
           onScroll={handleOutputScroll}
-          className="flex-1 overflow-y-auto bg-void p-4 font-mono text-[12.5px] leading-[1.75]"
+          className="h-[420px] lg:h-[calc(100vh-22rem)] overflow-y-auto bg-[#000] p-4 font-mono text-[12.5px] leading-[1.75]"
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -594,27 +536,64 @@ export default function ConsoleTab({
         </form>
       </div>
 
-      {/* ── Stats sidebar (desktop only — console gets full width on mobile) ── */}
-      <div className="hidden lg:flex flex-shrink-0 border-t border-edge lg:border-t-0 lg:border-l lg:w-[232px] bg-accent/[0.04] flex-col overflow-y-auto">
-        {/* Status indicator */}
-        <div className="px-4 py-3 border-b border-edge">
-          <div className="flex items-center gap-2">
-            <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${
-              isOnline ? "bg-emerald-500 pulse-dot" : "bg-amber-500"
-            }`} />
-            <span className={`text-xs font-semibold uppercase tracking-wider ${
-              isOnline ? "text-emerald-400" : "text-amber-400"
-            }`}>
-              {isOnline ? "Online" : "Offline"}
-            </span>
+      {/* ════ Right stats column (desktop) ════ */}
+      <div className="hidden lg:flex lg:w-[290px] shrink-0 flex-col gap-4">
+        {/* ── Auslastung (thick bars) ── */}
+        <div className="rounded-xl border border-edge bg-surface p-4">
+          <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Auslastung</h4>
+
+          <div className="mb-4">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs text-muted">CPU</span>
+              <span className={`text-base font-extrabold tabular-nums ${isOnline && (stats?.cpuPercent ?? 0) >= 90 ? "text-danger" : isOnline && (stats?.cpuPercent ?? 0) >= 70 ? "text-warn" : isOnline ? "text-online" : "text-slate-600"}`}>
+                {isOnline && stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
+              </span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full transition-all duration-700 ease-out ${(stats?.cpuPercent ?? 0) >= 90 ? "bg-danger" : (stats?.cpuPercent ?? 0) >= 70 ? "bg-warn" : "bg-online"}`}
+                style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs text-muted">RAM</span>
+              <span className={`text-base font-extrabold tabular-nums ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "text-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "text-warn" : "text-white"}`}>
+                {stats ? `${formatBytes(stats.memoryUsage)}` : "—"}
+              </span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full transition-all duration-700 ease-out ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-warn" : "bg-accent"}`}
+                style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
+            </div>
+            <div className="mt-1 text-right text-[10px] text-muted">von {formatRam(ram)}</div>
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs text-muted">TPS</span>
+              <span className={`text-base font-extrabold tabular-nums ${tps ? (tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger") : "text-slate-600"}`}>
+                {tps ? tps.tps5s.toFixed(1) : "—"}
+              </span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full transition-all duration-700 ease-out ${tps && tps.tps5s >= 19 ? "bg-online" : tps && tps.tps5s >= 15 ? "bg-warn" : "bg-danger"}`}
+                style={{ width: `${tps ? Math.min(100, (tps.tps5s / 20) * 100) : 0}%` }} />
+            </div>
+            {tps && <div className="mt-1 text-right text-[10px] text-muted">1m {tps.tps1m.toFixed(1)} · 5m {tps.tps5m.toFixed(1)}</div>}
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs text-muted">Disk</span>
+              <span className="text-base font-extrabold tabular-nums text-white">{isOnline && diskUsage ? formatBytes(diskUsage) : "—"}</span>
+            </div>
           </div>
         </div>
 
-        {/* Address */}
-        <div className="px-4 py-3 border-b border-edge">
-          <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-            Address
-          </div>
+        {/* ── Server ── */}
+        <div className="rounded-xl border border-edge bg-surface p-4">
+          <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Server</h4>
           <div className="group">
             <AddressPill
               hostname={typeof window !== "undefined" ? window.location.hostname : "—"}
@@ -622,71 +601,42 @@ export default function ConsoleTab({
               hoverReveal
             />
           </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-xs text-muted">Uptime</span>
+            <span className="text-sm font-bold tabular-nums text-white">{formatUptime(upSeconds)}</span>
+          </div>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xs text-muted">Typ</span>
+            <span className="text-sm font-semibold text-slate-200">{typeLabel(serverType)}</span>
+          </div>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xs text-muted">Version</span>
+            <span className="font-mono text-xs text-slate-300">{version}</span>
+          </div>
         </div>
 
-        {/* Players */}
-        <div className="px-4 py-3 border-b border-edge">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Users className="h-3 w-3 text-slate-500" />
-            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-              Players
-            </span>
-          </div>
-          <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {isOnline ? `${playerCount.online}/${playerCount.max}` : "—"}
-          </div>
+        {/* ── Spieler ── */}
+        <div className="rounded-xl border border-edge bg-surface p-4">
+          <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+            Spieler {isOnline ? `· ${playerCount.online}/${playerCount.max}` : ""}
+          </h4>
           {isOnline && playerList.length > 0 && (
             <>
-              <button
-                onClick={() => setPlayersExpanded(!playersExpanded)}
-                className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition mt-1.5"
-              >
-                <span className={`transition-transform text-[8px] ${playersExpanded ? "rotate-180" : ""}`}>▼</span>
-                {playersExpanded ? "Hide" : "Show"} names
-              </button>
-              {playersExpanded && (
-                <div className="mt-2 space-y-0.5 max-h-40 overflow-y-auto">
-                  {playerList.map((p) => (
-                    <div key={p.id} className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                      <img
-                        src={`https://mc-heads.net/avatar/${p.id}/16`}
-                        alt="" className="h-3.5 w-3.5 rounded-sm"
-                        loading="lazy"
-                      />
-                      <span className="truncate">{p.name}</span>
-                    </div>
-                  ))}
+              {playerList.slice(0, playersExpanded ? undefined : 8).map((p) => (
+                <div key={p.id} className="flex items-center gap-2 py-0.5 text-xs text-slate-300">
+                  <img src={`https://mc-heads.net/avatar/${p.id}/20`} alt="" className="h-5 w-5 rounded-full border border-edge" loading="lazy" />
+                  <span className="truncate">{p.name}</span>
                 </div>
+              ))}
+              {!playersExpanded && playerList.length > 8 && (
+                <button onClick={() => setPlayersExpanded(true)} className="mt-1 text-[11px] text-muted transition hover:text-slate-300">
+                  + {playerList.length - 8} weitere…
+                </button>
               )}
             </>
           )}
-          {isOnline && playerCount.online === 0 && (
-            <div className="text-[11px] text-slate-600 mt-1">No players online</div>
-          )}
-        </div>
-
-        {/* Uptime */}
-        <div className="px-4 py-3 border-b border-edge">
-          <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-            Uptime
-          </div>
-          <div className="text-sm font-medium text-slate-200 tabular-nums">
-            {formatUptime(upSeconds)}
-          </div>
-        </div>
-
-        {/* Server Type */}
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Server className="h-3 w-3 text-slate-500" />
-            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-              Type
-            </span>
-          </div>
-          <div className="text-sm font-medium text-slate-200">
-            {typeLabel(serverType)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{version}</div>
+          {isOnline && playerCount.online === 0 && <p className="text-xs text-muted">Keine Spieler online</p>}
+          {!isOnline && <p className="text-xs text-muted">—</p>}
         </div>
       </div>
     </div>

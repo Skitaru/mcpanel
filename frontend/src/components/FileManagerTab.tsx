@@ -5,6 +5,7 @@ import {
   ChevronRight, Download, File, FilePlus, Folder, FolderPlus,
   Save, Loader2, Trash2, Upload, Search, X, ChevronUp, ChevronDown,
 } from "lucide-react";
+import ScheduleCard from "@/components/ScheduleCard";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -438,6 +439,9 @@ export default function FileManagerTab({ serverId }: Props) {
 
       {/* Hidden file input for upload button */}
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+
+      {/* Scheduled tasks (was on the detail page left column) */}
+      <ScheduleCard serverId={serverId} />
     </div>
   );
 }

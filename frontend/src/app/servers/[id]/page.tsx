@@ -5,19 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText, Settings2,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, RefreshCw, Upload, FileText, ArrowLeft,
-  Clock,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, Upload, ArrowLeft,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
-import ScheduleCard from "@/components/ScheduleCard";
-import ServerSidebar from "@/components/ServerSidebar";
-import AddressPill from "@/components/AddressPill";
+import TopBar from "@/components/TopBar";
 import { DetailSkeleton } from "@/components/Skeleton";
-import { formatDisk, formatRam, statusColor, statusLabel, typeLabel } from "@/lib/format";
+import { statusColor, statusLabel } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -60,7 +57,6 @@ export default function ServerDetailPage() {
   const [actionConfirm, setActionConfirm] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [dockerLogs, setDockerLogs] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
@@ -171,14 +167,11 @@ export default function ServerDetailPage() {
     return () => window.removeEventListener("keydown", h);
   }, [setTab]);
 
-  const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
-
   return (
-    <div className="flex min-h-screen">
-      <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
+    <div className="min-h-screen">
+      <TopBar servers={allServers} activeId={serverId} onInstallModpack={() => setModpackDialogOpen(true)} />
 
-      <main className={`flex-1 transition-all duration-200 ${ml}`}>
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
 
           {loading ? <DetailSkeleton /> : error || !server ? (
             <div className="flex flex-col items-center justify-center gap-4 py-20">
@@ -188,174 +181,120 @@ export default function ServerDetailPage() {
             </div>
           ) : (
             <>
-              {/* ── Top Bar: Breadcrumb + Actions ── */}
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-muted hover:text-purple-300 transition text-xs">
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back
+              {/* ── Breadcrumb ── */}
+              <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-muted transition hover:text-purple-300 text-xs">
+                  <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+                </button>
+                <span className="text-edge">/</span>
+                <h1 className="font-display font-bold text-xl text-white tracking-tight">{server.name}</h1>
+                <span key={server.status} className={`ml-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider animate-in ${
+                  server.status === "running" ? "bg-online/10 text-emerald-400 border border-online/20" : "bg-warn/10 text-amber-400 border border-warn/20"
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
+                  {statusLabel(server.status)}
+                </span>
+                <span className="font-mono text-xs text-muted">
+                  {typeof window !== "undefined" ? window.location.hostname : "188.214.30.159"}:{server.port}
+                </span>
+              </div>
+
+              {/* ── Power buttons (large, Pterodactyl-style) ── */}
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                {server.status === "running" ? (
+                  <>
+                    {actionConfirm === "stop" ? (
+                      <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
+                        <span className="text-xs font-bold text-danger">Stop?</span>
+                        <button onClick={() => handleAction("stop")} disabled={acting} className="rounded bg-danger px-2 py-0.5 text-xs font-bold text-white disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                        <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
+                      </div>
+                    ) : (
+                      <button disabled={acting} onClick={() => setActionConfirm("stop")}
+                        className="rounded-xl border border-danger/30 bg-danger/10 px-5 py-2.5 text-[13px] font-bold text-danger transition hover:bg-danger/20 disabled:opacity-50">■ Stop</button>
+                    )}
+                    {actionConfirm === "restart" ? (
+                      <div className="flex items-center gap-1.5 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2.5">
+                        <span className="text-xs font-bold text-warn">Restart?</span>
+                        <button onClick={() => handleAction("restart")} disabled={acting} className="rounded bg-warn px-2 py-0.5 text-xs font-bold text-black disabled:opacity-50">{acting ? "…" : "Yes"}</button>
+                        <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
+                      </div>
+                    ) : (
+                      <button disabled={acting} onClick={() => setActionConfirm("restart")}
+                        className="rounded-xl border border-warn/30 bg-warn/10 px-5 py-2.5 text-[13px] font-bold text-warn transition hover:bg-warn/20 disabled:opacity-50">↻ Restart</button>
+                    )}
+                  </>
+                ) : (
+                  <button disabled={acting} onClick={() => handleAction("start")}
+                    className="rounded-xl border border-online/30 bg-online/10 px-6 py-2.5 text-[13px] font-bold text-online transition hover:bg-online/20 disabled:opacity-50">▶ Start</button>
+                )}
+
+                <button disabled={backingUp} onClick={handleBackup}
+                  className="flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-accent-strong disabled:opacity-50">
+                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={2} />} Backup
+                </button>
+                <label className={`flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup" aria-label="Restore Backup">
+                  <Upload className="h-4 w-4" strokeWidth={1.75} /> Restore
+                  <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestoreSelect} className="hidden" />
+                </label>
+
+                <div className="flex-1" />
+
+                <button onClick={handleDockerLogs} disabled={dockerLogs.loading}
+                  className="flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200 disabled:opacity-50">
+                  {dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScrollText className="h-4 w-4" strokeWidth={1.75} />} Logs
+                </button>
+                <button onClick={() => setEditOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200">
+                  <Settings2 className="h-4 w-4" strokeWidth={1.75} /> Edit
+                </button>
+                {deleteConfirm ? (
+                  <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
+                    <span className="text-xs font-bold text-danger">Delete?</span>
+                    <button onClick={handleDelete} disabled={deleting} className="rounded bg-danger px-2 py-0.5 text-xs font-bold text-white disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
+                    <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setDeleteConfirm(true)}
+                    className="rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-danger/40 hover:text-danger">
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                   </button>
-                  <span className="text-edge">/</span>
-                  <h1 className="font-display font-bold text-xl text-white tracking-tight">{server.name}</h1>
-                  <span key={server.status} className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider animate-in ${
-                    server.status === "running" ? "bg-online/10 text-emerald-400 border border-online/20" : "bg-warn/10 text-amber-400 border border-warn/20"
-                  }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
-                    {statusLabel(server.status)}
-                  </span>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-edge overflow-x-auto max-w-full">
-                  {actionConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-warn/30 bg-warn/10 px-2 py-1">
-                      <span className="text-[11px] font-medium text-amber-400">{actionConfirm === "restart" ? "Restart?" : "Stop?"}</span>
-                      <button onClick={() => handleAction(actionConfirm as "stop" | "restart")} disabled={acting} className="rounded bg-warn px-2 py-0.5 text-[11px] font-medium text-black hover:bg-warn/80 disabled:opacity-50">{acting ? "…" : "Yes"}</button>
-                      <button onClick={() => setActionConfirm(null)} disabled={acting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
-                    </div>
-                  ) : server.status === "running" ? (<>
-                    <button disabled={acting} onClick={() => setActionConfirm("restart")} className="rounded-lg p-2.5 text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Restart" aria-label="Restart"><RefreshCw className="h-4 w-4" /></button>
-                    <button disabled={acting} onClick={() => setActionConfirm("stop")} className="rounded-lg p-2.5 text-rose-400 transition hover:bg-danger/10 disabled:opacity-50" title="Stop" aria-label="Stop"><Square className="h-4 w-4" /></button>
-                  </>) : (
-                    <button disabled={acting} onClick={() => handleAction("start")} className="rounded-lg p-2.5 text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start" aria-label="Start"><Play className="h-4 w-4" /></button>
-                  )}
-                  <span className="w-px h-5 bg-edge mx-0.5" />
-                  <button disabled={backingUp} onClick={handleBackup} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Download Backup" aria-label="Download Backup">{backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <label className={`rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup" aria-label="Restore Backup">
-                    <Upload className="h-4 w-4" strokeWidth={1.75} />
-                    <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestoreSelect} className="hidden" />
-                  </label>
-                  <button onClick={handleDockerLogs} disabled={dockerLogs.loading} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300 disabled:opacity-50" title="Docker Logs" aria-label="Docker Logs">{dockerLogs.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" strokeWidth={1.75} />}</button>
-                  <button onClick={() => setEditOpen(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-accent/10 hover:text-purple-300" title="Edit Server" aria-label="Edit Server"><Settings2 className="h-4 w-4" strokeWidth={1.75} /></button>
-                  <span className="w-px h-5 bg-edge mx-0.5" />
-                  {deleteConfirm ? (
-                    <div className="flex items-center gap-1 rounded-lg border border-danger/30 bg-danger/10 px-2 py-1">
-                      <span className="text-[11px] text-rose-400">Delete?</span>
-                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-danger px-2 py-0.5 text-[11px] font-medium text-white hover:bg-danger/80 disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
-                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-[11px] text-slate-300 hover:bg-accent-deep">No</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setDeleteConfirm(true)} className="rounded-lg p-2.5 text-muted transition hover:bg-danger/10 hover:text-rose-400" title="Delete Server" aria-label="Delete Server"><Trash2 className="h-4 w-4" strokeWidth={1.75} /></button>
-                  )}
-                </div>
+                )}
               </div>
 
-              {/* ── Mobile address bar (desktop: copy lives in the console sidebar) ── */}
-              <div className="lg:hidden flex items-center justify-between gap-2 mb-4 rounded-xl border border-edge bg-surface px-3 py-2">
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Address</span>
-                <AddressPill
-                  hostname={typeof window !== "undefined" ? window.location.hostname : "188.214.30.159"}
-                  port={server.port}
-                />
-              </div>
-
-              {/* ── Mobile tab bar (desktop hides this — left nav takes over) ── */}
-              <div className="lg:hidden flex items-center gap-1 mb-4 overflow-x-auto rounded-xl border border-edge bg-surface p-1">
+              {/* ── Tabs (horizontal, one navigation level) ── */}
+              <div className="mb-5 flex gap-1 overflow-x-auto border-b border-edge">
                 {SUB_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
                   const active = activeTab === id;
                   return (
                     <button
                       key={id}
                       onClick={() => setTab(id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                        active
-                          ? "bg-accent/20 text-purple-200"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-accent/5"
+                      className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-[13px] font-semibold transition ${
+                        active ? "border-accent text-purple-200" : "border-transparent text-muted hover:text-slate-200"
                       }`}
                     >
-                      <Icon className={`h-3.5 w-3.5 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
+                      <Icon className={`h-4 w-4 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
                       {label}
                     </button>
                   );
                 })}
               </div>
 
-              {/* ── 2-COLUMN WORKSPACE LAYOUT ── */}
-              <div className="flex flex-col lg:flex-row gap-6">
+              {/* ── Viewport (ConsoleTab renders its own 2-column layout) ── */}
+              <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
+                <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} diskUsage={diskUsage[server.id]} />
+              </div>
 
-                {/* ── LEFT SUB-SIDEBAR (desktop only) ── */}
-                <div className="hidden lg:block lg:w-60 shrink-0 space-y-4">
-                  {/* Server Details Card */}
-                  <div className="surface p-4 space-y-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-edge pb-2">
-                      SERVER DETAILS
-                    </div>
+              <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>
+                <FileManagerTab serverId={serverId} />
+              </div>
 
-                    <div className="space-y-2 text-xs">
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">Server Name</span>
-                        <span className="font-semibold text-white tracking-tight">{server.name}</span>
-                      </div>
-
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">Server Version</span>
-                        <span className="font-mono text-slate-300">{typeLabel(server.serverType)} {server.version}</span>
-                      </div>
-
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">Memory Alloc</span>
-                        <span className="font-mono text-slate-300">{formatRam(server.ram)}</span>
-                      </div>
-
-                      {diskUsage[server.id] != null && diskUsage[server.id] >= 0 && (
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">Disk Storage</span>
-                          <span className="font-mono text-slate-300">{formatDisk(diskUsage[server.id])}</span>
-                        </div>
-                      )}
-
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">Identifier</span>
-                        <span className="font-mono text-slate-500 text-[11px] uppercase">{server.id.slice(0, 8)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Scheduled Tasks (desktop only — was part of the removed Settings tab) */}
-                  <ScheduleCard serverId={serverId} />
-
-                  {/* Vertical Sub-Navigation */}
-                  <div className="surface p-1.5 space-y-0.5">
-                    {SUB_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-                      const active = activeTab === id;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setTab(id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition font-medium ${
-                            active
-                              ? "bg-accent/20 text-purple-200 border-l-2 border-purple-500 font-semibold"
-                              : "text-slate-400 hover:text-slate-200 hover:bg-accent/5 border-l-2 border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className={`h-4 w-4 ${active ? "text-purple-400" : "text-slate-500"}`} strokeWidth={1.75} />
-                            <span>{label}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* ── RIGHT MAIN VIEWPORT ── */}
-                <div className="flex-1 min-w-0">
-                  <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
-                    <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} />
-                  </div>
-
-                  <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>
-                    <FileManagerTab serverId={serverId} />
-                  </div>
-
-                  <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}>
-                    <LogsTab serverId={serverId} />
-                  </div>
-                </div>
-
+              <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}>
+                <LogsTab serverId={serverId} />
               </div>
             </>
           )}
-        </div>
       </main>
 
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />

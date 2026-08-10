@@ -554,3 +554,42 @@
 **Verifiziert auf Server:** Backend lokal 200/401/200 (ohne/mit Token), Login liefert JWT, Panel extern 200, API-Proxy funktioniert. Backend von außen nicht mehr erreichbar.
 
 > **Last updated:** 2026-08-10 · Session: Security review — upload traversal, auth bypass, JWT secret, tar/zip slip, write races, scheduler restart, javaArgs injection, bind 127.0.0.1
+
+---
+
+### 2026-08-10 — Strukturelles Redesign: Pterodactyl-Stil (Banner-Karten, Topbar, Console-first)
+
+**Ausgangslage:** User war mit dem generischen Admin-Dashboard-Layout unzufrieden. Nach Analyse der etablierten MC-Panels (Pterodactyl/Panelify/AMP/MCSManager) wurde ein statisches HTML-Mockup im Pterodactyl-Stil erstellt (`screenshots/mockup-pterodactyl.html`, gitignored) → vom User abgenickt ("Sieht sehr sehr gut aus").
+
+**Umbau (alles in einem Commit, 5 Dateien):**
+
+1. **`TopBar.tsx` (neu) ersetzt `ServerSidebar.tsx` (gelöscht):**
+   - Schlanke sticky Topbar: Brand-Punkt + Name, Dashboard-Link, **Server-Switch-Dropdown** (Quick Access mit Status-Dots, Ports, Players-Badge), rechts Modpack/Password/Logout-Icons
+   - Mobile: Brand-Text versteckt, Rest kompakt
+   - `ServerSidebar.tsx` war durch die Änderungen Orphan → gelöscht
+
+2. **Dashboard (`page.tsx` + neue `ServerCard.tsx`):**
+   - **Banner-Karten**: 112px-Banner (Gradient nach Typ: Paper=Violett `#2a1a4d→`, Fabric=Amber `#4d3310→`, Velocity=Cyan `#0d3d3a→`, offline=Grau) + Block-Textur (`.banner-texture*` in globals.css) + Name im Banner + Status-Badge (pulsierender Online-Dot) + Typ·Version-Badge
+   - **Große Power-Buttons**: ▸ Open (violett) · ↻ (amber) · ■ (pink) · offline ▶ Start (grün) — mit Inline-Yes/No-Confirm
+   - **Dicke 6px-Balken** für CPU (farbcodiert) + RAM mit Prozent
+   - Metadaten-Zeile: Spieler · Uptime · Port; Online-Cards `card-glow-online border-online/20`, Offline gedimmt (opacity-75)
+   - Entfernt: serverIcons-Fetch (kein Icon mehr nötig), STAGGER, tick-State, sidebarCollapsed
+
+3. **Detailseite (`[id]/page.tsx`):**
+   - **Doppel-Sidebar komplett raus**: keine linke Spalte mehr (Server-Details-Card, ScheduleCard, Vertikal-Nav)
+   - Breadcrumb: ← Dashboard / Name / Status-Badge / **Adresse mono** (auch mobile)
+   - **Große Power-Buttons**: ■ Stop / ↻ Restart / ▶ Start + ⬇ Backup (violett) + Restore + Logs + Edit + 🗑 Delete
+   - **Tabs horizontal** (Console / File Manager / Server Logs) — eine Navigationsebene, mit Border-Active
+   - ConsoleTab rendert sein eigenes 2-Spalten-Layout
+
+4. **`ConsoleTab.tsx` — Console-first:**
+   - Console-Card links (volle Breite): Header (LIVE/Offline-Badge + Typ·Version + "verbunden"), Output schwarz `bg-[#000]` mit `h-[420px] lg:h-[calc(100vh-22rem)]`, Input unten
+   - Rechte Spalte `lg:w-[290px]` (Desktop): **"Auslastung"-Card mit dicken 10px-Balken** (CPU, RAM mit "von X", TPS 5s/1m/5m, Disk-Wert) + "Server"-Card (AddressPill mit Copy, Uptime, Typ, Version) + "Spieler"-Card (Avatare, max 8 + "weitere…")
+   - Top-Stats-Bar (CPU/RAM/TPS/Players oben) entfernt — Werte wandern in die rechte Spalte
+   - Neues Prop `diskUsage` (vom Detail-Page gepollt)
+
+5. **`FileManagerTab.tsx`**: `ScheduleCard` unten eingefügt (war in der linken Detail-Spalte)
+
+**Ergebnis:** Eine Navigationsebene (Topbar), Server mit visueller Identität (Banner), Power-Aktionen prominent, Console als Herzstück. Verifiziert: Build 0 Fehler, Deployed, Panel 200, CSS-Klassen (`banner-texture*`, `card-glow-online`) im Build-Bundle.
+
+> **Last updated:** 2026-08-10 · Session: Pterodactyl-style redesign — banner cards, TopBar, console-first detail page, thick bars

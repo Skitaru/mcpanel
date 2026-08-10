@@ -1,20 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { RefreshCw, AlertTriangle, Plus, Play, Square, RotateCw, Cpu, MemoryStick, Users, HardDrive, Search, Menu, Server, Activity, CheckCircle, XCircle, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { RefreshCw, AlertTriangle, Plus, Users, Search, Server, Clock, HardDrive } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
-import ServerSidebar from "@/components/ServerSidebar";
+import TopBar from "@/components/TopBar";
+import ServerCard from "@/components/ServerCard";
 import { CardSkeleton } from "@/components/Skeleton";
-import { formatBytes, formatDisk, formatRam, formatUptime, statusBadgeColor, statusColor, statusLabel, typeBadgeColor, typeLabel } from "@/lib/format";
+import { formatBytes, formatDisk, formatRam, typeLabel } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const POLL_INTERVAL_MS = 5_000;
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,8 @@ export default function DashboardPage() {
   const [liveStats, setLiveStats] = useState<Record<string, { cpu: number; mem: number; memLimit: number }>>({});
   const [playerCounts, setPlayerCounts] = useState<Record<string, { online: number; max: number; players: { name: string; id: string }[] }>>({});
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
   const [serverMotds, setServerMotds] = useState<Record<string, string>>({});
-  const [tick, setTick] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
@@ -125,19 +124,12 @@ export default function DashboardPage() {
     for (const s of servers) {
       if (fetchedMetaRef.current.has(s.id)) continue;
       fetchedMetaRef.current.add(s.id);
-      fetch(`${API_BASE}/api/servers/${s.id}/file?path=${encodeURIComponent("/server-icon.png")}&raw=true`)
-        .then(async r => { if (r.ok && r.status !== 204) return r.blob(); return null; })
-        .then(blob => { if (blob) setServerIcons(prev => ({ ...prev, [s.id]: URL.createObjectURL(blob) })); })
-        .catch(() => {});
       fetch(`${API_BASE}/api/servers/${s.id}/properties`)
         .then(async r => { if (r.ok) return r.json(); return null; })
         .then(data => { if (data?.motd) setServerMotds(prev => ({ ...prev, [s.id]: data.motd })); })
         .catch(() => {});
     }
   }, [servers]);
-
-  useEffect(() => { const i = setInterval(() => setTick(t => t + 1), 30_000); return () => clearInterval(i); }, []);
-  useEffect(() => { return () => { Object.values(serverIcons).forEach(url => { if (url.startsWith("blob:")) URL.revokeObjectURL(url); }); }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchServers = useCallback(async () => {
     try { const res = await fetch(`${API_BASE}/api/servers`); if (!res.ok) throw new Error(`API returned ${res.status}`); setServers(await res.json()); setError(null); }
@@ -154,16 +146,14 @@ export default function DashboardPage() {
     finally { setActingId(null); }
   }, [fetchServers]);
 
-  const STAGGER = ["stagger-1", "stagger-2", "stagger-3", "stagger-4", "stagger-5", "stagger-6", "stagger-7", "stagger-8", "stagger-9", "stagger-10", "stagger-11", "stagger-12"];
 
   return (
-    <div className="flex min-h-screen">
-      <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={stats.totalPlayers} />
-      <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-13" : "lg:ml-52"}`}>
-        <div className="mx-auto max-w-6xl px-6 sm:px-8 py-6 sm:py-10">
+    <div className="min-h-screen">
+      <TopBar servers={servers} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={stats.totalPlayers} />
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
 
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : error ? (
@@ -176,17 +166,12 @@ export default function DashboardPage() {
             <>
               {/* ── Header ── */}
               <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setSidebarCollapsed(false)} className="lg:hidden rounded-md p-1.5 -ml-1 text-slate-400 hover:text-white hover:bg-accent/5 transition" title="Open menu" aria-label="Open menu">
-                    <Menu className="h-5 w-5" />
-                  </button>
-                  <div>
-                    <h1 className="font-display font-bold text-3xl text-white tracking-tight">Dashboard</h1>
-                    <p className="mt-1 text-xs text-muted">
-                      {servers.length} server{servers.length !== 1 ? "s" : ""}
-                      {searchQuery ? ` · ${filteredServers.length} match${filteredServers.length !== 1 ? "es" : ""}` : ""}
-                    </p>
-                  </div>
+                <div>
+                  <h1 className="font-display font-bold text-3xl text-white tracking-tight">Dashboard</h1>
+                  <p className="mt-1 text-xs text-muted">
+                    {servers.length} server{servers.length !== 1 ? "s" : ""}
+                    {searchQuery ? ` · ${filteredServers.length} match${filteredServers.length !== 1 ? "es" : ""}` : ""}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:flex-initial">
@@ -299,107 +284,31 @@ export default function DashboardPage() {
                   <p className="text-sm font-medium text-slate-500">No servers match "{searchQuery}"</p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredServers.map((s, i) => {
-                    const iconUrl = serverIcons[s.id];
-                    const motd = serverMotds[s.id];
-                    const uptime = formatUptime(s.startedAt);
-                    const isRunning = s.status === "running";
-
-                    return (
-                    <div key={s.id}
-                      className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden ${STAGGER[i] || ""} ${isRunning ? "card-tint-running card-glow-online border-online/20" : "card-tint-stopped"}`}>
-
-                      <div className="p-5 flex flex-col flex-1">
-                        {/* Top: icon + name + actions */}
-                        <div className="flex items-start justify-between gap-3 mb-4">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl overflow-hidden bg-void border border-edge relative">
-                              <Server className="h-5 w-5 text-violet-400 absolute" />
-                              {iconUrl && (
-                                <img src={iconUrl} alt="" className="h-full w-full object-cover relative z-10"
-                                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <h2 className="truncate text-sm font-semibold text-white group-hover:text-violet-400 transition">{s.name}</h2>
-                              {isRunning && motd && <p className="truncate text-[11px] text-muted mt-0.5">{motd}</p>}
-                            </div>
-                          </div>
-                          <div className="btn-group shrink-0 relative z-10" onClick={e => e.preventDefault()}>
-                            {isRunning ? (<>
-                              {stopConfirmId === s.id ? (
-                                <div className="flex items-center gap-1 px-2 py-1">
-                                  <span className="text-[10px] text-amber-400">Stop?</span>
-                                  <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "stop"); }} disabled={actingId === s.id} className="rounded bg-warn px-1.5 py-0.5 text-[10px] font-medium text-black hover:bg-warn/80 disabled:opacity-50">Yes</button>
-                                  <button onClick={e => { e.stopPropagation(); setStopConfirmId(null); }} className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep">No</button>
-                                </div>
-                              ) : (
-                                <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setStopConfirmId(s.id); }}
-                                  className="flex h-9 w-9 items-center justify-center text-amber-400 transition hover:bg-warn/10 disabled:opacity-50" title="Stop" aria-label="Stop"><Square className="h-3.5 w-3.5" /></button>
-                              )}
-                              {restartConfirmId === s.id ? (
-                                <div className="flex items-center gap-1 px-2 py-1">
-                                  <span className="text-[10px] text-amber-400">Restart?</span>
-                                  <button onClick={e => { e.stopPropagation(); handleServerAction(s.id, "restart"); }} disabled={actingId === s.id} className="rounded bg-warn px-1.5 py-0.5 text-[10px] font-medium text-black hover:bg-warn/80 disabled:opacity-50">Yes</button>
-                                  <button onClick={e => { e.stopPropagation(); setRestartConfirmId(null); }} className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep">No</button>
-                                </div>
-                              ) : (
-                                <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); setRestartConfirmId(s.id); }}
-                                  className="flex h-9 w-9 items-center justify-center text-muted transition hover:bg-accent/5 hover:text-amber-400 disabled:opacity-50" title="Restart" aria-label="Restart"><RotateCw className="h-3.5 w-3.5" /></button>
-                              )}
-                            </>) : (
-                              <button disabled={actingId === s.id} onClick={e => { e.stopPropagation(); handleServerAction(s.id, "start"); }}
-                                className="flex h-9 w-9 items-center justify-center text-emerald-400 transition hover:bg-online/10 disabled:opacity-50" title="Start" aria-label="Start"><Play className="h-3.5 w-3.5" /></button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Status + specs */}
-                        <div className="flex items-center gap-2 mb-3 flex-wrap">
-                          <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${statusColor(s.status)} ${isRunning ? "pulse-dot" : ""}`} />
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusBadgeColor(s.status)}`}>{statusLabel(s.status)}</span>
-                          {isRunning && uptime && (
-                            <span className="flex items-center gap-1 text-[10px] text-muted"><Clock className="h-3 w-3" />{uptime}</span>
-                          )}
-                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${typeBadgeColor(s.serverType)}`}>{typeLabel(s.serverType)}</span>
-                          <span className="text-[11px] text-muted">{s.version}</span>
-                        </div>
-
-                        {/* Live metrics */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 mt-auto">
-                          <div className="flex flex-col items-center rounded-lg bg-void px-2 py-2">
-                            <span className="text-[10px] text-muted uppercase tracking-wider mb-0.5">CPU</span>
-                            <span className={`text-xs font-mono font-bold tabular-nums ${
-                              (liveStats[s.id]?.cpu || 0) >= 80 ? "text-danger" : (liveStats[s.id]?.cpu || 0) >= 50 ? "text-warn" : "text-online"
-                            }`}>{Math.min(100, liveStats[s.id]?.cpu || 0).toFixed(0)}%</span>
-                          </div>
-                          <div className="flex flex-col items-center rounded-lg bg-void px-2 py-2">
-                            <span className="text-[10px] text-muted uppercase tracking-wider mb-0.5">RAM</span>
-                            <span className="text-xs font-mono font-bold text-white tabular-nums">
-                              {isRunning && liveStats[s.id]?.mem ? formatBytes(liveStats[s.id].mem) : formatRam(s.ram)}
-                            </span>
-                          </div>
-                          <div className="flex flex-col items-center rounded-lg bg-void px-2 py-2">
-                            <span className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Players</span>
-                            <span className="text-xs font-mono font-bold text-white tabular-nums">{playerCounts[s.id]?.online ?? 0}<span className="text-muted font-normal">/{playerCounts[s.id]?.max ?? 20}</span></span>
-                          </div>
-                          <div className="flex flex-col items-center rounded-lg bg-void px-2 py-2">
-                            <span className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Port</span>
-                            <span className="text-xs font-mono font-bold text-white tabular-nums">:{s.port}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Link href={`/servers/${s.id}`} className="absolute inset-0 z-10" />
-                    </div>
-                    );
-                  })}
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredServers.map((s) => (
+                    <ServerCard
+                      key={s.id}
+                      s={s}
+                      motd={serverMotds[s.id]}
+                      liveCpu={liveStats[s.id]?.cpu}
+                      liveMem={liveStats[s.id]?.mem}
+                      playerCount={playerCounts[s.id]}
+                      acting={actingId === s.id}
+                      stopConfirm={stopConfirmId === s.id}
+                      restartConfirm={restartConfirmId === s.id}
+                      onOpen={() => router.push(`/servers/${s.id}`)}
+                      onStart={() => handleServerAction(s.id, "start")}
+                      onStop={() => handleServerAction(s.id, "stop")}
+                      onRestart={() => handleServerAction(s.id, "restart")}
+                      onStopConfirm={() => setStopConfirmId(s.id)}
+                      onRestartConfirm={() => setRestartConfirmId(s.id)}
+                      onCancelConfirm={() => { setStopConfirmId(null); setRestartConfirmId(null); }}
+                    />
+                  ))}
                 </div>
               )}
             </>
           )}
-        </div>
       </main>
       <CreateServerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => fetchServers()} />
       <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={() => fetchServers()} />
