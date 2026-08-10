@@ -615,7 +615,7 @@ export default function ConsoleTab({
           <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
             Address
           </div>
-          <div className="group/addr">
+          <div className="group">
             <AddressPill
               hostname={typeof window !== "undefined" ? window.location.hostname : "—"}
               port={port}
