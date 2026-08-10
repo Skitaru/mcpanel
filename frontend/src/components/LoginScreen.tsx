@@ -44,8 +44,18 @@ export default function LoginScreen({ onLogin }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-void">
-      <div className="w-full max-w-xs animate-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-void overflow-hidden">
+      {/* Ambient glow behind the form */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(560px 380px at 50% -10%, rgba(157,78,221,0.14), transparent 65%)," +
+            "radial-gradient(480px 320px at 92% 110%, rgba(0,245,212,0.07), transparent 60%)," +
+            "radial-gradient(420px 300px at 6% 100%, rgba(157,78,221,0.08), transparent 60%)",
+        }}
+      />
+      <div className="relative w-full max-w-xs animate-in">
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent-strong shadow-[0_0_30px_rgba(157,78,221,0.35)]">

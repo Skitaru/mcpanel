@@ -439,7 +439,7 @@ export default function ConsoleTab({
                 <Cpu className="h-3 w-3 text-accent" />
                 <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">CPU</span>
               </div>
-              <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
+              <div key={`cpu-${Math.round((stats?.cpuPercent ?? 0) / 2)}`} className="text-lg font-bold text-ink tabular-nums leading-none mb-2 value-flash">
                 {stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
               </div>
               <div className="h-1 rounded-full bg-edge overflow-hidden">
@@ -455,7 +455,7 @@ export default function ConsoleTab({
                 <MemoryStick className="h-3 w-3 text-online" />
                 <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">RAM</span>
               </div>
-              <div className="text-lg font-bold text-ink tabular-nums leading-none mb-2">
+              <div key={`mem-${Math.round((stats?.memoryUsage ?? 0) / 5e7)}`} className="text-lg font-bold text-ink tabular-nums leading-none mb-2 value-flash">
                 {stats ? formatBytes(stats.memoryUsage) : "—"}
               </div>
               <div className="h-1 rounded-full bg-edge overflow-hidden">
@@ -476,7 +476,7 @@ export default function ConsoleTab({
               <div className="flex items-baseline gap-2">
                 {tps ? (
                   <>
-                    <span className={`text-lg font-bold tabular-nums leading-none ${tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger"}`}>{tps.tps5s.toFixed(1)}</span>
+                    <span key={`tps-${Math.round(tps.tps5s * 2)}`} className={`text-lg font-bold tabular-nums leading-none value-flash ${tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger"}`}>{tps.tps5s.toFixed(1)}</span>
                     <span className={`text-sm font-medium tabular-nums ${tps.tps1m >= 19 ? "text-online/70" : tps.tps1m >= 15 ? "text-warn/70" : "text-danger/70"}`}>{tps.tps1m.toFixed(1)}</span>
                     <span className="text-xs text-muted tabular-nums">{tps.tps5m.toFixed(1)}</span>
                   </>
@@ -494,7 +494,7 @@ export default function ConsoleTab({
                 <Users className="h-3 w-3 text-online" />
                 <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Players</span>
               </div>
-              <div className="text-lg font-bold text-ink tabular-nums leading-none">
+              <div key={`players-${playerCount.online}`} className="text-lg font-bold text-ink tabular-nums leading-none value-flash">
                 {playerCount.online}<span className="text-muted text-sm font-medium">/{playerCount.max}</span>
               </div>
               <div className="text-[10px] text-muted mt-1">{playerCount.online > 0 ? `${playerList.length} connected` : "Empty"}</div>
@@ -517,7 +517,7 @@ export default function ConsoleTab({
             lines.map((line, i) => (
               <div
                 key={i}
-                className={`whitespace-pre-wrap break-all ${
+                className={`console-line whitespace-pre-wrap break-all ${
                   line.type === "stderr"
                     ? "text-red-400"
                     : line.type === "system"

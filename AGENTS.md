@@ -503,3 +503,26 @@
 **Deploy:** Server-Build OK, Service active, Panel 200, Health OK.
 
 > **Last updated:** 2026-08-10 · Session: UX review implemented — URL tabs, console autocomplete, mobile address, shortcuts, a11y
+
+---
+
+### 2026-08-10 — Lebendigkeit: Ambient-Glows, Breathing-Glow, Value-Flash, Console-Fade
+
+**Diagnose:** Das Panel war nach der Redesign-Runde zu flach — kein Hintergrund-Glow, Farben nur als Mini-Akzente, keinerlei Bewegung. Design „clean", aber „leblos".
+
+**A — Tiefe & Glow:**
+- `body::before`: Ambient-Radial-Glows (Violett oben-links, Cyan unten-rechts, dezentes Violett oben-rechts, Opacity 0.06–0.10, `z-index:-1`, `pointer-events:none`).
+- Root-Divs von Dashboard + Detailseite transparent gemacht (`bg-void` raus) — Glow ist hinter dem Content sichtbar (Body-Bg bleibt #0B0914).
+- **`card-glow-online`**: Breathing-Glow (4s) für laufende Server-Cards — animierter Cyan-Inset-Ring + weicher Außen-Glow. Plus `border-online/20`-Tint.
+- Login: eigener Ambient-Glow-Layer hinter dem Formular (fixed Overlay deckt body::before ab).
+
+**B — Bewegung & Feedback:**
+- **`value-flash`** (0.45s Pop + Lavendel-Glow): Top-Bar-Werte der Console flashen bei signifikanter Änderung — CPU (quantisiert 2pp), RAM (50MB), TPS (0.5), Players (1). Umsetzung: `key` = quantisierter Wert → Remount → Animation.
+- **`console-line`**: Neue Console-Zeilen faden sanft ein (0.18s, translateY).
+- Status-Badge im Detail-Header: `key={server.status}` + `animate-in` → animiert bei Statuswechsel (offline→online).
+
+**Bewusst dezent:** Alle Effekte Opacity/Glow-schwach, `prefers-reduced-motion` greift weiterhin (globale Animation-Suppression). Kein Backend-Change.
+
+**Deploy:** Server-Build OK, Service active, Panel 200.
+
+> **Last updated:** 2026-08-10 · Session: Liveliness — ambient glows, breathing card glow, value flash, console line fade

@@ -157,7 +157,7 @@ export default function DashboardPage() {
   const STAGGER = ["stagger-1", "stagger-2", "stagger-3", "stagger-4", "stagger-5", "stagger-6", "stagger-7", "stagger-8", "stagger-9", "stagger-10", "stagger-11", "stagger-12"];
 
   return (
-    <div className="flex min-h-screen bg-void">
+    <div className="flex min-h-screen">
       <ServerSidebar servers={servers} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => setDialogOpen(true)} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={stats.totalPlayers} />
       <main className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? "lg:ml-13" : "lg:ml-52"}`}>
         <div className="mx-auto max-w-6xl px-6 sm:px-8 py-6 sm:py-10">
@@ -308,7 +308,7 @@ export default function DashboardPage() {
 
                     return (
                     <div key={s.id}
-                      className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden ${STAGGER[i] || ""} ${isRunning ? "card-tint-running" : "card-tint-stopped"}`}>
+                      className={`group surface surface-hover animate-slide-up relative p-0 flex flex-col overflow-hidden ${STAGGER[i] || ""} ${isRunning ? "card-tint-running card-glow-online border-online/20" : "card-tint-stopped"}`}>
 
                       <div className="p-5 flex flex-col flex-1">
                         {/* Top: icon + name + actions */}

@@ -174,7 +174,7 @@ export default function ServerDetailPage() {
   const ml = sidebarCollapsed ? "lg:ml-13" : "lg:ml-52";
 
   return (
-    <div className="flex min-h-screen bg-void">
+    <div className="flex min-h-screen">
       <ServerSidebar servers={allServers} activeId={serverId} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateClick={() => router.push("/")} onInstallModpack={() => setModpackDialogOpen(true)} />
 
       <main className={`flex-1 transition-all duration-200 ${ml}`}>
@@ -196,7 +196,7 @@ export default function ServerDetailPage() {
                   </button>
                   <span className="text-edge">/</span>
                   <h1 className="font-display font-bold text-xl text-white tracking-tight">{server.name}</h1>
-                  <span className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                  <span key={server.status} className={`ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider animate-in ${
                     server.status === "running" ? "bg-online/10 text-emerald-400 border border-online/20" : "bg-warn/10 text-amber-400 border border-warn/20"
                   }`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
