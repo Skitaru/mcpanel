@@ -49,6 +49,23 @@ export default function FileManagerTab({ serverId }: Props) {
   const [searchMatchLines, setSearchMatchLines] = useState<number[]>([]);
   const [searchIndex, setSearchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Folder search + batch select
+  const [fileSearch, setFileSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const visibleFiles = fileSearch
+    ? files.filter((f) => f.name.toLowerCase().includes(fileSearch.toLowerCase()))
+    : files;
+
+  const toggleSelect = useCallback((name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true); setError(null);
@@ -59,6 +76,23 @@ export default function FileManagerTab({ serverId }: Props) {
     } catch (err: unknown) { setError(err instanceof Error ? err.message : "Failed."); }
     finally { setLoading(false); }
   }, [serverId, currentPath]);
+
+  const batchDelete = useCallback(async () => {
+    if (selected.size === 0) return;
+    setBatchDeleting(true);
+    try {
+      for (const name of selected) {
+        const fp = currentPath === "/" ? `/${name}` : `${currentPath}/${name}`;
+        await fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(fp)}`, { method: "DELETE" });
+      }
+      setSelected(new Set());
+      await fetchFiles();
+    } catch (err) {
+      console.error("Batch delete failed:", err);
+    } finally {
+      setBatchDeleting(false);
+    }
+  }, [selected, currentPath, serverId, fetchFiles]);
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
   useEffect(() => {
@@ -246,6 +280,22 @@ export default function FileManagerTab({ serverId }: Props) {
             <Upload className="h-3.5 w-3.5" />
           </button>
           <span className="flex-1" />
+          <div className="relative mr-1">
+            <Search className="absolute left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-600 pointer-events-none" />
+            <input
+              type="text"
+              value={fileSearch}
+              onChange={(e) => setFileSearch(e.target.value)}
+              placeholder="Durchsuchen…"
+              aria-label="Dateien im Ordner durchsuchen"
+              className="w-28 rounded-md border border-edge bg-void py-1 pl-6 pr-2 text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-accent/40 focus:outline-none sm:w-36"
+            />
+            {fileSearch && (
+              <button onClick={() => setFileSearch("")} className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-600 transition hover:text-slate-300" aria-label="Suche leeren">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
           {uploading && <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400 mx-1" />}
         </div>
 
@@ -297,6 +347,8 @@ export default function FileManagerTab({ serverId }: Props) {
             </div>
           ) : files.length === 0 ? (
             <p className="px-3 py-8 text-center text-xs text-slate-600">Empty directory</p>
+          ) : visibleFiles.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs text-slate-600">Keine Treffer für "{fileSearch}"</p>
           ) : (
             <ul>
               {currentPath !== "/" && (
@@ -307,42 +359,70 @@ export default function FileManagerTab({ serverId }: Props) {
                   </button>
                 </li>
               )}
-              {files.map(f => {
+              {visibleFiles.map(f => {
                 const fp = currentPath === "/" ? `/${f.name}` : `${currentPath}/${f.name}`;
                 const isSelected = selectedFile === fp;
                 const bin = !f.isDirectory && isBinary(f.name);
+                const checked = selected.has(f.name);
                 return (
                   <li key={f.name} className="group relative">
-                    <button onClick={() => {
-                      if (f.isDirectory) { navigateTo(f.name); return; }
-                      if (bin) return; // binary file — don't open in editor
-                      openFile(f.name);
-                    }}
-                      title={bin ? "Binary file — cannot preview" : undefined}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-accent/5 ${isSelected ? "bg-accent/10 text-violet-300" : bin ? "text-muted cursor-default" : "text-slate-300"}`}>
-                      {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-muted" : "text-slate-500"}`} />}
-                      <span className="truncate flex-1">{f.name}</span>
-                      {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0 mr-5">{formatSize(f.size)}</span>}
-                    </button>
-                    {deleteTarget === f.name ? (
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-surface border border-edge px-1.5 py-0.5">
-                        <span className="text-[10px] text-red-400">Delete?</span>
-                        <button onClick={() => confirmDelete(f.name)} disabled={deleting}
-                          className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-danger/80">Yes</button>
-                        <button onClick={() => setDeleteTarget(null)}
-                          className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep">No</button>
-                      </div>
-                    ) : (
-                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(f.name); }}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted transition hover:bg-danger/20 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
-                        title="Delete" aria-label="Delete"><Trash2 className="h-3 w-3" /></button>
-                    )}
+                    <div className={`flex items-center gap-1.5 px-2 py-0.5 transition hover:bg-accent/5 ${isSelected ? "bg-accent/10" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelect(f.name)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`${f.name} auswählen`}
+                        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#9D4EDD]"
+                      />
+                      <button onClick={() => {
+                        if (f.isDirectory) { navigateTo(f.name); return; }
+                        if (bin) return; // binary file — don't open in editor
+                        openFile(f.name);
+                      }}
+                        title={bin ? "Binary file — cannot preview" : undefined}
+                        className={`flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-xs transition ${isSelected ? "text-violet-300" : bin ? "text-muted cursor-default" : "text-slate-300"}`}>
+                        {f.isDirectory ? <Folder className="h-3.5 w-3.5 shrink-0 text-violet-400" /> : <File className={`h-3.5 w-3.5 shrink-0 ${bin ? "text-muted" : "text-slate-500"}`} />}
+                        <span className="truncate flex-1">{f.name}</span>
+                        {!f.isDirectory && f.size > 0 && <span className="text-[10px] text-slate-600 shrink-0 mr-5">{formatSize(f.size)}</span>}
+                      </button>
+                      {deleteTarget === f.name ? (
+                        <div className="flex shrink-0 items-center gap-1 rounded bg-surface border border-edge px-1.5 py-0.5">
+                          <span className="text-[10px] text-red-400">Delete?</span>
+                          <button onClick={() => confirmDelete(f.name)} disabled={deleting}
+                            className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-danger/80">Yes</button>
+                          <button onClick={() => setDeleteTarget(null)}
+                            className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep">No</button>
+                        </div>
+                      ) : (
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(f.name); }}
+                          className="shrink-0 rounded p-0.5 text-muted transition hover:bg-danger/20 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
+                          title="Delete" aria-label="Delete"><Trash2 className="h-3 w-3" /></button>
+                      )}
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
         </div>
+
+        {/* Batch bar */}
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 border-t border-edge bg-accent/10 px-3 py-1.5">
+            <b className="text-[11px] text-purple-200">{selected.size} ausgewählt</b>
+            <div className="flex-1" />
+            <button onClick={batchDelete} disabled={batchDeleting}
+              className="flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-danger/80 disabled:opacity-50">
+              {batchDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+              Löschen
+            </button>
+            <button onClick={() => setSelected(new Set())} disabled={batchDeleting}
+              className="rounded-md bg-edge px-2.5 py-1 text-[11px] text-slate-300 transition hover:bg-accent-deep disabled:opacity-50">
+              Abbruch
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Right: Editor ── */}

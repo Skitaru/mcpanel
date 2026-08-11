@@ -16,4 +16,6 @@ export interface ServerStatus {
   voicePort?: number | null;
   discordWebhook?: string | null;
   startedAt?: string | null;
+  /** Optional grouping label (e.g. "survival", "modded", "proxy") */
+  tag?: string | null;
 }

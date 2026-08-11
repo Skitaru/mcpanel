@@ -6,6 +6,8 @@ import {
   TerminalSquare, Users, Search, X,
 } from "lucide-react";
 import AddressPill from "@/components/AddressPill";
+import QuickCommands from "@/components/QuickCommands";
+import PlayerCard from "@/components/PlayerCard";
 import { formatBytes, formatRam, typeLabel } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
@@ -108,7 +110,6 @@ export default function ConsoleTab({
   const uptimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playerCount, setPlayerCount] = useState<{ online: number; max: number }>({ online: 0, max: 0 });
   const [playerList, setPlayerList] = useState<{ name: string; id: string }[]>([]);
-  const [playersExpanded, setPlayersExpanded] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggIdx, setSuggIdx] = useState(-1);
   // Console filter: free text + output level
@@ -443,8 +444,16 @@ export default function ConsoleTab({
 
   return (
     <div className="flex flex-col lg:flex-row gap-4">
-      {/* ════ Console panel ════ */}
-      <div className="flex h-[540px] max-h-[calc(100vh-200px)] flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+      {/* ════ Left: Quick commands + Console ════ */}
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {isOnline && (
+          <div className="hidden lg:block">
+            <QuickCommands serverId={serverId} />
+          </div>
+        )}
+
+        {/* Console panel */}
+        <div className="flex h-[540px] max-h-[calc(100vh-200px)] min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
         {/* Console header + filter */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-edge bg-surface px-4 py-2">
           <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>
@@ -509,23 +518,31 @@ export default function ConsoleTab({
               </button>
             </div>
           ) : (
-            visibleLines.map((line, i) => (
-              <div
-                key={i}
-                className={`console-line whitespace-pre-wrap break-all ${
-                  line.type === "stderr"
-                    ? "text-red-400"
-                    : line.type === "system"
-                      ? "text-slate-600 italic"
-                      : "text-slate-300"
-                }`}
-              >
+            visibleLines.map((line, i) => {
+              // Content-based highlighting for errors/warnings (modern panel look)
+              const upper = line.text.toUpperCase();
+              const contentCls =
+                line.type === "stderr"
+                  ? "text-red-400"
+                  : line.type === "system"
+                    ? "text-slate-600 italic"
+                    : upper.includes("ERROR") || upper.includes("EXCEPTION")
+                      ? "text-red-300 bg-danger/10 font-semibold"
+                      : upper.includes("WARN")
+                        ? "text-amber-300 bg-warn/5"
+                        : "text-slate-300";
+              return (
+                <div
+                  key={i}
+                  className={`console-line whitespace-pre-wrap break-all ${contentCls}`}
+                >
                 <span className="select-none text-muted mr-3">
                   [{formatTime(line.time)}]
                 </span>
                 {line.text}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -588,6 +605,7 @@ export default function ConsoleTab({
           </button>
         </form>
       </div>
+      </div>{/* /left wrapper */}
 
       {/* ════ Right stats column (desktop) ════ */}
       <div className="hidden lg:flex lg:w-[300px] shrink-0 flex-col gap-4">
@@ -668,29 +686,8 @@ export default function ConsoleTab({
           </div>
         </div>
 
-        {/* ── Spieler ── */}
-        <div className="rounded-xl border border-edge bg-surface p-4">
-          <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
-            Spieler {isOnline ? `· ${playerCount.online}/${playerCount.max}` : ""}
-          </h4>
-          {isOnline && playerList.length > 0 && (
-            <>
-              {playerList.slice(0, playersExpanded ? undefined : 8).map((p) => (
-                <div key={p.id} className="flex items-center gap-2 py-0.5 text-xs text-slate-300">
-                  <img src={`https://mc-heads.net/avatar/${p.id}/20`} alt="" className="h-5 w-5 rounded-full border border-edge" loading="lazy" />
-                  <span className="truncate">{p.name}</span>
-                </div>
-              ))}
-              {!playersExpanded && playerList.length > 8 && (
-                <button onClick={() => setPlayersExpanded(true)} className="mt-1 text-[11px] text-muted transition hover:text-slate-300">
-                  + {playerList.length - 8} weitere…
-                </button>
-              )}
-            </>
-          )}
-          {isOnline && playerCount.online === 0 && <p className="text-xs text-muted">Keine Spieler online</p>}
-          {!isOnline && <p className="text-xs text-muted">—</p>}
-        </div>
+        {/* ── Spieler (management: OP/Kick/Ban + Whitelist) ── */}
+        <PlayerCard serverId={serverId} isOnline={isOnline} playerCount={playerCount} playerList={playerList} />
       </div>
     </div>
   );

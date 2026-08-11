@@ -36,6 +36,8 @@ export interface ServerConfig {
   discordWebhook?: string;
   /** Discord message ID for the live status embed (auto-managed) */
   discordMessageId?: string;
+  /** Optional user label for grouping (e.g. "survival", "modded", "proxy") */
+  tag?: string;
 }
 
 /** Request body for POST /api/servers */
@@ -57,6 +59,8 @@ export interface CreateServerRequest {
   maxPlayers?: number;
   /** UDP port for SimpleVoiceChat (default 24454). Not bound if unset. */
   voicePort?: number;
+  /** Optional user label for grouping (e.g. "survival", "modded", "proxy") */
+  tag?: string;
   /** Hardcore mode — defaults to false */
   hardcore?: boolean;
   /** Difficulty: peaceful, easy, normal, hard — defaults to "normal" */
@@ -79,4 +83,6 @@ export interface ServerStatus {
   discordWebhook?: string | null;
   /** ISO timestamp when the container was started (null if not running) */
   startedAt?: string | null;
+  /** Optional grouping label (e.g. "survival", "modded", "proxy") */
+  tag?: string | null;
 }

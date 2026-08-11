@@ -77,3 +77,27 @@ export function formatUptime(startedAt: string | null | undefined) {
   const m = Math.floor((seconds % 3600) / 60);
   return `${h}h ${m}m`;
 }
+
+const TAG_STYLES: Record<string, string> = {
+  survival: "bg-online/10 text-emerald-300 border-online/25",
+  modded: "bg-warn/10 text-amber-300 border-warn/25",
+  proxy: "bg-accent/15 text-purple-300 border-accent/35",
+  creative: "bg-pink-500/10 text-pink-300 border-pink-500/25",
+  test: "bg-slate-500/10 text-slate-300 border-slate-500/25",
+};
+
+/** Deterministic badge style for a server tag (grouping label). */
+export function tagStyle(tag: string) {
+  const key = tag.toLowerCase();
+  if (TAG_STYLES[key]) return TAG_STYLES[key];
+  const palettes = [
+    "bg-online/10 text-emerald-300 border-online/25",
+    "bg-warn/10 text-amber-300 border-warn/25",
+    "bg-accent/15 text-purple-300 border-accent/35",
+    "bg-pink-500/10 text-pink-300 border-pink-500/25",
+    "bg-sky-500/10 text-sky-300 border-sky-500/25",
+  ];
+  let h = 0;
+  for (const c of tag) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return palettes[h % palettes.length];
+}

@@ -15,8 +15,9 @@ import ScheduleCard from "@/components/ScheduleCard";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
+import AddressPill from "@/components/AddressPill";
 import { DetailSkeleton } from "@/components/Skeleton";
-import { statusColor, statusLabel } from "@/lib/format";
+import { statusColor, statusLabel, tagStyle, typeLabel, formatRam, formatUptime, formatBytes } from "@/lib/format";
 import { waitForBackupJob } from "@/lib/backup";
 import type { ServerStatus } from "@/lib/types";
 
@@ -213,7 +214,7 @@ export default function ServerDetailPage() {
           ) : (
             <>
               {/* ── Breadcrumb ── */}
-              <div className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <button onClick={() => router.push("/")} className="flex items-center gap-1.5 text-muted transition hover:text-purple-300 text-xs">
                   <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
                 </button>
@@ -225,9 +226,34 @@ export default function ServerDetailPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${statusColor(server.status)} ${server.status === "running" ? "pulse-dot" : ""}`} />
                   {statusLabel(server.status)}
                 </span>
-                <span className="font-mono text-xs text-muted">
-                  {typeof window !== "undefined" ? window.location.hostname : "188.214.30.159"}:{server.port}
+              </div>
+
+              {/* ── Key info chips ── */}
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-2 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  Adresse
+                  <AddressPill hostname={typeof window !== "undefined" ? window.location.hostname : "188.214.30.159"} port={server.port} />
                 </span>
+                <span className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  Typ <b className="text-slate-200">{typeLabel(server.serverType)}</b>
+                </span>
+                <span className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  Version <b className="font-mono text-slate-200">{server.version}</b>
+                </span>
+                <span className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  RAM <b className="text-slate-200">{formatRam(server.ram)}</b>
+                </span>
+                <span className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  Uptime <b className="text-slate-200">{formatUptime(server.startedAt) ?? "—"}</b>
+                </span>
+                <span className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[11px] text-muted">
+                  Disk <b className="text-slate-200">{diskUsage[server.id] ? formatBytes(diskUsage[server.id]) : "—"}</b>
+                </span>
+                {server.tag && (
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${tagStyle(server.tag)}`}>
+                    {server.tag}
+                  </span>
+                )}
               </div>
 
               {/* ── Power buttons (large, Pterodactyl-style) ── */}

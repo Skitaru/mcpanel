@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Users, Clock } from "lucide-react";
-import { formatBytes, formatRam, typeLabel } from "@/lib/format";
+import { formatBytes, formatRam, tagStyle, typeLabel } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
 
 interface Props {
@@ -62,10 +62,17 @@ export default function ServerCard({
       {/* ── Banner ── */}
       <div className={`relative flex h-28 items-end p-4 ${bannerClass}`}>
         <div className={`pointer-events-none absolute inset-0 ${textureClass}`} />
-        <span className={`absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-void/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur ${isRunning ? "text-online" : "text-warn"}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? "bg-online pulse-dot" : "bg-warn"}`} />
-          {isRunning ? "Online" : "Offline"}
-        </span>
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5">
+          {s.tag && (
+            <span className={`rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur ${tagStyle(s.tag)}`}>
+              {s.tag}
+            </span>
+          )}
+          <span className={`flex items-center gap-1.5 rounded-full bg-void/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur ${isRunning ? "text-online" : "text-warn"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? "bg-online pulse-dot" : "bg-warn"}`} />
+            {isRunning ? "Online" : "Offline"}
+          </span>
+        </div>
         <h2 className="relative z-10 truncate text-lg font-extrabold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">{s.name}</h2>
         <span className="absolute bottom-3 right-3 z-10 rounded-full border border-white/15 bg-void/50 px-2 py-0.5 text-[10px] font-bold text-purple-200 backdrop-blur">
           {typeLabel(s.serverType)} · {s.version}

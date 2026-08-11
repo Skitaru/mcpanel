@@ -49,6 +49,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
   const [javaArgs, setJavaArgs] = useState("");
   const [voicePort, setVoicePort] = useState<number | null>(null);
   const [discordWebhook, setDiscordWebhook] = useState("");
+  const [tag, setTag] = useState("");
   const [maxRamMB, setMaxRamMB] = useState(16384);
 
   const [submitting, setSubmitting] = useState(false);
@@ -63,6 +64,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
       setJavaArgs(server.javaArgs ?? "");
       setVoicePort(server.voicePort ?? null);
       setDiscordWebhook(server.discordWebhook ?? "");
+      setTag(server.tag ?? "");
       setError(null);
       fetch(`${API_BASE}/api/system/info`)
         .then(r => r.json())
@@ -92,6 +94,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
             javaArgs: javaArgs.trim() || undefined,
             voicePort: voicePort ?? null,
             discordWebhook: discordWebhook.trim() || null,
+            tag: tag.trim() || undefined,
           }),
         });
 
@@ -173,6 +176,25 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={submitting}
+              className="w-full rounded-lg border border-edge bg-void
+                         px-3.5 py-2.5 text-sm text-white
+                         placeholder:text-slate-600
+                         focus:border-accent/40 focus:outline-none
+                         disabled:opacity-50"
+            />
+          </label>
+
+          {/* Tag */}
+          <label className="mb-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+              Tag <span className="ml-1 text-[10px] text-slate-600 font-normal">(optional, z.B. survival / modded / proxy)</span>
+            </span>
+            <input
+              type="text"
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              placeholder="survival"
               disabled={submitting}
               className="w-full rounded-lg border border-edge bg-void
                          px-3.5 py-2.5 text-sm text-white

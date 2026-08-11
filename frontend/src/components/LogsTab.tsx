@@ -14,7 +14,7 @@ export default function LogsTab({ serverId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
-  const preRef = useRef<HTMLPreElement>(null);
+  const preRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
   const fetchLogs = useCallback(async () => {
@@ -96,11 +96,19 @@ export default function LogsTab({ serverId }: Props) {
             </>)}
           </div>
         ) : (
-          <pre ref={preRef} onScroll={handleScroll}
-            className="bg-void p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 overflow-auto"
+          <div ref={preRef} onScroll={handleScroll}
+            className="overflow-auto bg-void p-4 font-mono text-[12.5px] leading-[1.75] text-slate-300 whitespace-pre-wrap"
             style={{ height: "calc(100vh - 14rem)" }}>
-            {filteredLines ? filteredLines.join("\n") : logContent}
-          </pre>
+            {(filteredLines ? filteredLines : (logContent ?? "").split("\n")).map((line, i) => {
+              const up = line.toUpperCase();
+              const cls = up.includes("ERROR") || up.includes("EXCEPTION")
+                ? "text-red-300 bg-danger/10 font-semibold"
+                : up.includes("WARN")
+                  ? "text-amber-300 bg-warn/5"
+                  : "";
+              return <div key={i} className={cls}>{line || " "}</div>;
+            })}
+          </div>
         )}
       </div>
 

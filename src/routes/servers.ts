@@ -64,13 +64,166 @@ function parseRamToMB(ram: string | number): number {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/servers
+// POST /api/servers — starts an async creation job; poll /create-progress/:id
 // ---------------------------------------------------------------------------
+
+export interface CreateJob {
+  jobId: string;
+  step: string;
+  percent: number;
+  status: "running" | "done" | "error";
+  message?: string;
+  serverId?: string;
+}
+
+const createJobs = new Map<string, CreateJob>();
+
+export function getCreateJob(jobId: string): CreateJob | undefined {
+  return createJobs.get(jobId);
+}
+
+async function runCreateJob(body: CreateServerRequest, jobId: string): Promise<void> {
+  const job = createJobs.get(jobId)!;
+  const setStep = (step: string, percent: number) => {
+    job.step = step;
+    job.percent = percent;
+  };
+
+  let dataPath: string | null = null;
+  try {
+    const name = body.name.trim();
+    const ram = parseRamToMB(body.ram ?? "4G");
+    const port = body.port ?? 25565;
+    const voicePort = body.voicePort ?? undefined;
+    const serverType: ServerType = body.serverType ?? "paper";
+    const mcVersion = body.paperVersion ?? "1.21.1";
+
+    const javaImage = serverType === "velocity"
+      ? "eclipse-temurin:21-jre-alpine"
+      : resolveJavaImageForServer(mcVersion, serverType);
+    console.log(`[api] ${serverType} ${mcVersion} -> Java image ${javaImage}`);
+
+    const id = uuid();
+    dataPath = path.join(DATA_ROOT, id);
+
+    setStep("Creating directories…", 3);
+    fs.mkdirSync(dataPath, { recursive: true });
+
+    // ---- download server JAR based on type ----
+    let jarName = "paper.jar";
+    let extraCmd: string[] | undefined;
+    setStep(`Downloading ${serverType} ${mcVersion}…`, 8);
+    try {
+      if (serverType === "fabric") {
+        await downloadFabricJar(mcVersion, dataPath);
+        jarName = "fabric-server-launch.jar";
+      } else if (serverType === "velocity") {
+        await downloadVelocityJar(mcVersion, dataPath);
+        jarName = "velocity.jar";
+        const forwardingSecret = uuid().replace(/-/g, "");
+        const velocityToml = [
+          `config-version = "2.7"`,
+          `bind = "0.0.0.0:${port}"`,
+          `motd = "${name} | Velocity"`,
+          `show-max-players = 500`,
+          `online-mode = true`,
+          `force-key-authentication = true`,
+          `player-info-forwarding-mode = "modern"`,
+          `forwarding-secret = "${forwardingSecret}"`,
+          `announce-forge = false`,
+        ].join("\n");
+        fs.writeFileSync(path.join(dataPath, "velocity.toml"), velocityToml + "\n");
+        fs.writeFileSync(path.join(dataPath, "forwarding.secret"), forwardingSecret);
+      } else {
+        await downloadPaperJar(mcVersion, dataPath);
+      }
+    } catch (err: any) {
+      throw new Error(`Failed to download ${serverType} server JAR: ${err.message}`);
+    }
+
+    // ---- generate RCON credentials and server.properties (not for velocity) ----
+    const rconPort = port + 10;
+    const rconPassword = uuid().replace(/-/g, "").slice(0, 16);
+    const maxPlayers = typeof body.maxPlayers === "number" && body.maxPlayers >= 1 && body.maxPlayers <= 1000
+      ? body.maxPlayers
+      : 20;
+
+    if (serverType !== "velocity") {
+      const typeLabel = serverType === "fabric" ? "Fabric" : "PaperMC";
+      const difficulty = (typeof body.difficulty === "string" && ["peaceful", "easy", "normal", "hard"].includes(body.difficulty))
+        ? body.difficulty : "normal";
+      const hardcore = body.hardcore === true;
+      const serverProps = [
+        `server-port=${port}`,
+        `enable-rcon=true`,
+        `rcon.port=${rconPort}`,
+        `rcon.password=${rconPassword}`,
+        `motd=${name} | ${typeLabel}`,
+        `max-players=${maxPlayers}`,
+        `difficulty=${difficulty}`,
+        `hardcore=${hardcore}`,
+        `gamemode=${hardcore ? "hardcore" : "survival"}`,
+        `online-mode=true`,
+      ].join("\n");
+      fs.writeFileSync(path.join(dataPath, "server.properties"), serverProps + "\n");
+    }
+
+    // ---- persist config ----
+    const config: ServerConfig = {
+      id,
+      name,
+      serverType,
+      ram,
+      port,
+      rconPort,
+      rconPassword,
+      version: mcVersion,
+      containerId: null,
+      dataPath,
+      javaArgs: body.javaArgs?.trim() || undefined,
+      maxPlayers,
+      voicePort,
+      tag: (body as any).tag || undefined,
+    };
+    await addServer(config);
+
+    // ---- create Docker container (pulls the image if needed) ----
+    setStep("Pulling Java image…", 45);
+    const containerId = await createContainer(config, javaImage, { jarName, extraCmd, javaArgs: config.javaArgs });
+
+    // Update config with the real container id.
+    config.containerId = containerId;
+    await removeServer(id);
+    await addServer(config);
+
+    // Auto-start the container
+    setStep("Starting server…", 90);
+    try {
+      await startContainer(containerId);
+      console.log(`[api] Auto-started ${serverType} server "${config.name}"`);
+    } catch (startErr: any) {
+      console.error(`[api] Auto-start failed: ${startErr.message}`);
+    }
+
+    job.status = "done";
+    job.serverId = config.id;
+    setStep("Done", 100);
+    console.log(`[api] Server "${config.name}" created (${config.id.slice(0, 8)})`);
+  } catch (err: any) {
+    if (dataPath) {
+      try { fs.rmSync(dataPath, { recursive: true, force: true }); } catch { /* partial cleanup */ }
+    }
+    job.status = "error";
+    job.message = err?.message ?? "Failed to create server.";
+    console.error("[api] Create job failed:", err?.message);
+  }
+}
+
 router.post("/", async (req: Request, res: Response) => {
   try {
     const body = req.body as CreateServerRequest;
 
-    // ---- validation ----
+    // ---- validation (synchronous — immediate 4xx) ----
     if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
       res.status(400).json({ error: "Field 'name' is required." });
       return;
@@ -88,9 +241,7 @@ router.post("/", async (req: Request, res: Response) => {
     const port = body.port ?? 25565;
     // Max 65525 — the RCON port is auto-assigned as port + 10 and must stay ≤ 65535.
     if (typeof port !== "number" || port < 1024 || port > 65525) {
-      res
-        .status(400)
-        .json({ error: "Field 'port' must be between 1024 and 65525." });
+      res.status(400).json({ error: "Field 'port' must be between 1024 and 65525." });
       return;
     }
 
@@ -104,12 +255,18 @@ router.post("/", async (req: Request, res: Response) => {
       }
     }
 
+    // ---- tag validation ----
+    if (body.tag !== undefined && body.tag !== null) {
+      if (typeof body.tag !== "string" || body.tag.length > 20 || !/^[a-zA-Z0-9 _-]+$/.test(body.tag)) {
+        res.status(400).json({ error: "Invalid tag. Use letters, digits, spaces, _ or - (max 20 chars)." });
+        return;
+      }
+    }
+
     // ---- port conflict check ----
     const existing = await loadServers();
     if (existing.some((s) => s.port === port)) {
-      res
-        .status(409)
-        .json({ error: `Port ${port} is already in use by another server.` });
+      res.status(409).json({ error: `Port ${port} is already in use by another server.` });
       return;
     }
 
@@ -138,137 +295,30 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    // ---- resolve Java image ----
-    let javaImage: string;
-    if (serverType === "velocity") {
-      javaImage = "eclipse-temurin:21-jre-alpine";
-    } else {
-      javaImage = resolveJavaImageForServer(mcVersion, serverType);
-    }
-    console.log(`[api] ${serverType} ${mcVersion} -> Java image ${javaImage}`);
-
-    const id = uuid();
-    const dataPath = path.join(DATA_ROOT, id);
-    fs.mkdirSync(dataPath, { recursive: true });
-
-    // ---- download server JAR based on type ----
-    let jarName = "paper.jar";
-    let extraCmd: string[] | undefined;
-
-    try {
-      if (serverType === "fabric") {
-        await downloadFabricJar(mcVersion, dataPath);
-        jarName = "fabric-server-launch.jar";
-      } else if (serverType === "velocity") {
-        await downloadVelocityJar(mcVersion, dataPath);
-        jarName = "velocity.jar";
-        const forwardingSecret = uuid().replace(/-/g, "");
-        const velocityToml = [
-          `config-version = "2.7"`,
-          `bind = "0.0.0.0:${port}"`,
-          `motd = "${body.name.trim()} | Velocity"`,
-          `show-max-players = 500`,
-          `online-mode = true`,
-          `force-key-authentication = true`,
-          `player-info-forwarding-mode = "modern"`,
-          `forwarding-secret = "${forwardingSecret}"`,
-          `announce-forge = false`,
-        ].join("\n");
-        fs.writeFileSync(path.join(dataPath, "velocity.toml"), velocityToml + "\n");
-        fs.writeFileSync(path.join(dataPath, "forwarding.secret"), forwardingSecret);
-      } else {
-        await downloadPaperJar(mcVersion, dataPath);
-      }
-    } catch (err: any) {
-      try { fs.rmSync(dataPath, { recursive: true, force: true }); } catch {}
-      res.status(400).json({
-        error: `Failed to download ${serverType} server JAR.`,
-        detail: err.message,
-      });
-      return;
-    }
-
-    // ---- generate RCON credentials and server.properties (not for velocity) ----
-    const rconPort = port + 10;
-    const rconPassword = uuid().replace(/-/g, "").slice(0, 16);
-    const maxPlayers = typeof body.maxPlayers === "number" && body.maxPlayers >= 1 && body.maxPlayers <= 1000
-      ? body.maxPlayers
-      : 20;
-
-    if (serverType !== "velocity") {
-      const typeLabel = serverType === "fabric" ? "Fabric" : "PaperMC";
-      const difficulty = (typeof body.difficulty === "string" && ["peaceful","easy","normal","hard"].includes(body.difficulty))
-        ? body.difficulty : "normal";
-      const hardcore = body.hardcore === true;
-      const serverProps = [
-        `server-port=${port}`,
-        `enable-rcon=true`,
-        `rcon.port=${rconPort}`,
-        `rcon.password=${rconPassword}`,
-        `motd=${body.name.trim()} | ${typeLabel}`,
-        `max-players=${maxPlayers}`,
-        `difficulty=${difficulty}`,
-        `hardcore=${hardcore}`,
-        `gamemode=${hardcore ? "hardcore" : "survival"}`,
-        `online-mode=true`,
-      ].join("\n");
-      fs.writeFileSync(path.join(dataPath, "server.properties"), serverProps + "\n");
-    }
-
-    // ---- persist config ----
-    const config: ServerConfig = {
-      id,
-      name: body.name.trim(),
-      serverType,
-      ram,
-      port,
-      rconPort,
-      rconPassword,
-      version: mcVersion,
-      containerId: null,
-      dataPath,
-      javaArgs: body.javaArgs?.trim() || undefined,
-      maxPlayers,
-      voicePort,
-    };
-    await addServer(config);
-
-    // ---- create Docker container ----
-    const containerId = await createContainer(config, javaImage, { jarName, extraCmd, javaArgs: config.javaArgs });
-
-    // Update config with the real container id.
-    config.containerId = containerId;
-    await removeServer(id);
-    await addServer(config);
-
-    // Auto-start the container
-    try {
-      await startContainer(containerId);
-      console.log(`[api] Auto-started ${serverType} server "${config.name}"`);
-    } catch (startErr: any) {
-      console.error(`[api] Auto-start failed: ${startErr.message}`);
-    }
-
-    res.status(201).json({
-      id: config.id,
-      name: config.name,
-      serverType: config.serverType,
-      ram: config.ram,
-      port: config.port,
-      version: config.version,
-      javaImage,
-      containerId: config.containerId,
-      dataPath: config.dataPath,
-      javaArgs: config.javaArgs ?? null,
-      maxPlayers: config.maxPlayers ?? 20,
-      voicePort: config.voicePort ?? null,
-    });
+    // ---- start async creation job ----
+    const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    createJobs.set(jobId, { jobId, step: "Starting…", percent: 0, status: "running" });
+    // Clean up finished jobs after 10 minutes (like modpack install progress).
+    setTimeout(() => createJobs.delete(jobId), 10 * 60_000);
+    runCreateJob(body, jobId);
+    console.log(`[api] Create job started: ${jobId}`);
+    res.status(202).json({ jobId, message: "Server creation started." });
   } catch (err: any) {
     console.error("[api] POST /api/servers error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to create server.", detail: err.message });
+    res.status(500).json({ error: "Failed to start server creation.", detail: err.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/create-progress/:jobId — poll async creation progress
+// ---------------------------------------------------------------------------
+router.get("/create-progress/:jobId", (req: Request, res: Response) => {
+  const job = getCreateJob(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: "Create job not found (finished or expired)." });
+    return;
+  }
+  res.json(job);
 });
 
 // ---------------------------------------------------------------------------
@@ -534,6 +584,7 @@ router.get("/", async (_req: Request, res: Response) => {
         voicePort: s.voicePort ?? null,
         discordWebhook: s.discordWebhook ?? null,
         startedAt: st?.startedAt ?? null,
+        tag: s.tag ?? null,
       };
     });
 
@@ -858,12 +909,20 @@ router.put("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    const { name, ram: ramStr, port, version, javaArgs, voicePort, discordWebhook } = req.body ?? {};
+    const { name, ram: ramStr, port, version, javaArgs, voicePort, discordWebhook, tag } = req.body ?? {};
 
     // Validate name if provided
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
       res.status(400).json({ error: "Field 'name' must be a non-empty string." });
       return;
+    }
+
+    // Validate tag if provided (empty string clears it)
+    if (tag !== undefined && tag !== null) {
+      if (typeof tag !== "string" || tag.length > 20 || !/^[a-zA-Z0-9 _-]*$/.test(tag)) {
+        res.status(400).json({ error: "Invalid tag. Use letters, digits, spaces, _ or - (max 20 chars)." });
+        return;
+      }
     }
 
     // Validate RAM if provided
@@ -924,6 +983,7 @@ router.put("/:id", async (req: Request, res: Response) => {
       ...(javaArgs !== undefined ? { javaArgs: javaArgs?.trim() || (undefined as any) } : {}),
       ...(voicePort !== undefined ? { voicePort: voicePort ?? (undefined as any) } : {}),
       ...(discordWebhook !== undefined ? { discordWebhook: discordWebhook || undefined } : {}),
+      ...(tag !== undefined ? { tag: (tag as string)?.trim() || undefined } : {}),
     });
 
     console.log("[api] Updated server " + (updated?.name ?? "?") + " config");

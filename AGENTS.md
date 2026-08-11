@@ -715,3 +715,50 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 **Nachtrag (Commit `b73510e`):** Area-Charts auf Nutzerwunsch wieder entfernt — "Graphen raus, nur Balken". Auslastung-Card zeigt nur noch große Zahlen (text-lg) + dicke Verlaufs-Balken (h-1.5 gradient). AreaChart-Komponente, History-Sampling und Resets komplett entfernt (toter Code). Console-Höhe + Filter-im-Header aus `47e6c44` bleiben.
 
 > **Last updated:** 2026-08-11 · Session: Console-Redesign moderner Panel-Stil, Area-Charts, feste Console-Höhe
+
+---
+
+### 2026-08-11 — Feature-Mockup umgesetzt: Tags, Host-Metriken, Templates, Quick-Commands, Player-Management, File-Batch
+
+Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`) implementiert:
+
+**1. Server-Gruppen/Tags (Backend + Frontend):**
+- `tag?: string` in `ServerConfig`, `CreateServerRequest`, `ServerStatus` (Backend + Frontend-Typen).
+- Create/PUT validieren: max 20 Zeichen, nur `[a-zA-Z0-9 _-]`. Empty string löscht den Tag.
+- Dashboard: dynamische Tag-Chips (mit Count, kombinierbar mit Status-Filter + Suche + Reset-Button), Tag-Badge auf den Server-Cards.
+- EditServerDialog: Tag-Feld. `tagStyle()` Helper in `lib/format.ts` (deterministische Farbpalette + spezifische Styles für survival/modded/proxy/creative/test).
+
+**2. Host-Metriken (Dashboard):**
+- Neu `GET /api/system/stats`: CPU % (2×`os.cpus()`-Delta, 300 ms), RAM (used/total), Disk (`df -k /`). Poll alle 5 s.
+- Die 4 Overview-Karten ersetzt: **Host CPU / Host RAM / Host Disk / Servers** (alle mit dicken 6px-Balken, farbcodiert). `stats`-Objekt (Server-Aggregate) entfernt.
+
+**3. Echter Create-Fortschritt:**
+- `POST /api/servers` validiert synchron (4xx sofort), startet dann einen **async Job** → `202 { jobId }`. `GET /api/servers/create-progress/:jobId` pollt `{ step, percent, status }` (Cleanup nach 10 min).
+- `runCreateJob()` macht Directory → JAR-Download (8%) → Image-Pull (45%) → Container (75%) → Start (90%) → Done (100%). Fehler → `status: "error"` + Data-Dir-Cleanup.
+- CreateServerDialog: 4-Step-Leiste (Download/Pull/Container/Start) + Gradient-Bar + % + Step-Text statt der alten Zeit-Schätzung.
+
+**4. Templates (CreateServerDialog):**
+- 3 Cards: **Paper Vanilla** (4G), **Modpack** (öffnet InstallModpackDialog via neuem `onOpenModpack`-Prop), **Velocity Proxy** (2G/25577/tag=proxy). Vorbefüllen das Formular, alles bleibt editierbar.
+
+**5. Header-Kerninfo-Chips (Detailseite):**
+- Unter dem Breadcrumb: Adresse (AddressPill mit Copy), Typ, Version, RAM, Uptime (echt, aus `startedAt`), Disk, Tag-Badge.
+
+**6. Quick-Commands (neu, ConsoleTab Desktop):**
+- `QuickCommands.tsx`: 11 Buttons (Say/Op/Deop/Gamemode/Whitelist±/save-all/list/Kick/Ban/Restart 60s) via `POST /:id/command` (RCON). Parameter-Commands öffnen ein Mini-Modal, Antworten als Toast. "Restart 60s" sagt Countdown + startet Restart per `setTimeout(60 s)`.
+
+**7. Player-Management (neu, ConsoleTab-Sidebar):**
+- `PlayerCard.tsx` ersetzt die reine Spielerliste: OP/Kick/Ban-Buttons pro Online-Spieler (RCON) + **Whitelist** (Liste via `whitelist list`-Parsing, Add per Input, Remove per Klick, Auto-Reload bei Statuswechsel).
+
+**8. File Manager: Ordner-Suche + Batch:**
+- Suchfeld in der Toolbar (filtert Einträge clientseitig), Checkboxen pro Zeile + Batch-Leiste ("N ausgewählt → Löschen/Abbruch", Löscht sequenziell via DELETE /file).
+
+**9. Fehler-Highlighting (Console + Logs):**
+- Console: Zeilen mit ERROR/EXCEPTION → rot + `bg-danger/10` + semibold, WARN → amber + `bg-warn/5`. stderr/system-Logik bleibt.
+- LogsTab: von `<pre>`-Join auf Zeilen-Divs umgebaut (gleiches Highlighting, `preRef` → `HTMLDivElement`).
+
+**Deploy + Verifikation (188.214.30.159):**
+- Beide Builds OK (Backend `tsc`, Frontend `next build`), Services active, Panel 200.
+- Smoke-Tests: `/api/system/stats` liefert Werte, `/create-progress` 404 sauber, **End-to-End-Create-Job** (202 → 45% Pull → 100% Done mit serverId), Tag-Persistenz, Delete mit Auto-Backup. Testserver + Backup-Artefakt wieder entfernt.
+- ⚠ Beim SCP-Sammelbefehl landeten `servers.ts`/`config-store.ts` fälschlich als Strays unter `/src/` — auf dem Server gelöscht (Build-Fehler TS2307/TS7006 behoben).
+
+> **Last updated:** 2026-08-11 · Session: Feature-Mockup umgesetzt — Tags, Host-Metriken, Create-Job-Progress, Templates, Quick-Commands, Player-Management, File-Suche/Batch, Log-Highlighting

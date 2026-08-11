@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, AlertTriangle, Plus, Users, Search, Server, Clock, HardDrive } from "lucide-react";
+import { RefreshCw, AlertTriangle, Plus, Search, Server } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import CreateServerDialog from "@/components/CreateServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
 import ServerCard from "@/components/ServerCard";
 import { CardSkeleton } from "@/components/Skeleton";
-import { formatBytes, formatDisk, formatRam, typeLabel } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -35,13 +35,27 @@ export default function DashboardPage() {
   serversRef.current = servers;
 
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "stopped">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"name" | "status" | "ram">("name");
+  const [hostStats, setHostStats] = useState<{ cpuPercent: number; memory: { used: number; total: number }; disk: { used: number; total: number } } | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [stopAllConfirm, setStopAllConfirm] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredServers = servers.filter(s =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (statusFilter === "all" ||
-      (statusFilter === "running" ? s.status === "running" : s.status !== "running"))
-  );
+  const uniqueTags = Array.from(new Set(servers.map((s) => s.tag).filter((t): t is string => !!t)));
+
+  const filteredServers = servers
+    .filter(s =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (statusFilter === "all" ||
+        (statusFilter === "running" ? s.status === "running" : s.status !== "running")) &&
+      (tagFilter === null || s.tag === tagFilter)
+    )
+    .sort((a, b) => {
+      if (sortBy === "ram") return b.ram - a.ram;
+      if (sortBy === "status") return (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
+      return a.name.localeCompare(b.name);
+    });
 
   // ---- keyboard shortcut: "/" focuses the search (skip when typing) ----
   useEffect(() => {
@@ -60,22 +74,18 @@ export default function DashboardPage() {
     { id: "stopped", label: "Stopped", count: servers.filter(s => s.status !== "running").length },
   ];
 
-  const stats = {
-    total: servers.length,
-    running: servers.filter(s => s.status === "running").length,
-    stopped: servers.filter(s => s.status === "exited" || s.status === "created").length,
-    error: servers.filter(s => s.status !== "running" && s.status !== "exited" && s.status !== "created" && s.status !== "paused").length,
-    totalRam: servers.reduce((a, s) => a + (s.ram || 0), 0),
-    usedRam: servers.filter(s => s.status === "running").reduce((a, s) => a + (liveStats[s.id]?.mem || 0), 0),
-    totalPlayers: servers.filter(s => s.status === "running").reduce((a, s) => a + (playerCounts[s.id]?.online || 0), 0),
-    totalMaxPlayers: servers.reduce((a, s) => a + (playerCounts[s.id]?.max || 0), 0),
-    totalDisk: servers.reduce((a, s) => a + (diskUsage[s.id] || 0), 0),
-    avgCpu: (() => {
-      const runningServers = servers.filter(s => s.status === "running" && liveStats[s.id]?.cpu != null);
-      if (runningServers.length === 0) return 0;
-      return runningServers.reduce((a, s) => a + Math.min(100, liveStats[s.id].cpu), 0) / runningServers.length;
-    })(),
-  };
+  // ---- host metrics (machine-level CPU/RAM/Disk) ----
+  useEffect(() => {
+    const pollHost = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/system/stats`);
+        if (res.ok) setHostStats(await res.json());
+      } catch { /* backend unreachable — keep last values */ }
+    };
+    pollHost();
+    const i = setInterval(pollHost, 5000);
+    return () => clearInterval(i);
+  }, []);
 
   // ---- Socket.IO ----
   useEffect(() => {
@@ -139,6 +149,23 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchServers(); const i = setInterval(fetchServers, POLL_INTERVAL_MS); return () => clearInterval(i); }, [fetchServers]);
 
+  // ---- batch start / stop ----
+  const handleBatch = useCallback(async (action: "start" | "stop") => {
+    setBatchBusy(true);
+    setStopAllConfirm(false);
+    const targets = servers.filter((s) =>
+      action === "start" ? s.status !== "running" : s.status === "running",
+    );
+    try {
+      await Promise.all(targets.map((s) => fetch(`${API_BASE}/api/servers/${s.id}/${action}`, { method: "POST" })));
+      await fetchServers();
+    } catch (err) {
+      console.error(`[panel] batch ${action} failed:`, err);
+    } finally {
+      setBatchBusy(false);
+    }
+  }, [servers, fetchServers]);
+
   const handleServerAction = useCallback(async (id: string, action: "start" | "stop" | "restart") => {
     setStopConfirmId(null); setRestartConfirmId(null); setActingId(id);
     try { await fetch(`${API_BASE}/api/servers/${id}/${action}`, { method: "POST" }); await fetchServers(); }
@@ -149,7 +176,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar servers={servers} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={stats.totalPlayers} />
+      <TopBar servers={servers} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={servers.filter(s => s.status === "running").reduce((a, s) => a + (playerCounts[s.id]?.online || 0), 0)} />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
 
           {loading ? (
@@ -188,57 +215,91 @@ export default function DashboardPage() {
                 </div>
               </header>
 
-              {/* ── Overview Stats ── */}
+              {/* ── Host metrics (machine-level) ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <div className="surface p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Host CPU</span>
+                    <span className={`text-xl font-bold tabular-nums ${hostStats && hostStats.cpuPercent > 80 ? "text-danger" : hostStats && hostStats.cpuPercent > 50 ? "text-warn" : "text-white"}`}>
+                      {hostStats ? `${hostStats.cpuPercent.toFixed(0)}%` : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-edge overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-700 ${hostStats && hostStats.cpuPercent > 80 ? "bg-danger" : hostStats && hostStats.cpuPercent > 50 ? "bg-warn" : "bg-online"}`}
+                      style={{ width: `${hostStats ? Math.min(100, hostStats.cpuPercent) : 0}%` }} />
+                  </div>
+                </div>
+                <div className="surface p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Host RAM</span>
+                    <span className="text-xl font-bold tabular-nums text-white">
+                      {hostStats ? formatBytes(hostStats.memory.used) : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-edge overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-800 to-accent transition-all duration-700"
+                      style={{ width: `${hostStats ? Math.min(100, (hostStats.memory.used / hostStats.memory.total) * 100) : 0}%` }} />
+                  </div>
+                  <div className="mt-1 text-right text-[10px] text-muted">von {hostStats ? formatBytes(hostStats.memory.total) : "—"}</div>
+                </div>
+                <div className="surface p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Host Disk</span>
+                    <span className="text-xl font-bold tabular-nums text-white">
+                      {hostStats && hostStats.disk.total > 0 ? formatBytes(hostStats.disk.used) : "—"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-edge overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-teal-700 to-online transition-all duration-700"
+                      style={{ width: `${hostStats && hostStats.disk.total > 0 ? Math.min(100, (hostStats.disk.used / hostStats.disk.total) * 100) : 0}%` }} />
+                  </div>
+                  <div className="mt-1 text-right text-[10px] text-muted">von {hostStats && hostStats.disk.total > 0 ? formatBytes(hostStats.disk.total) : "—"}</div>
+                </div>
+                <div className="surface p-4">
+                  <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Servers</span>
+                  <div className="text-xl font-bold text-white tabular-nums mt-1">
+                    {servers.filter(s => s.status === "running").length}<span className="text-sm font-medium text-muted">/{servers.length}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[11px]">
+                    <span className="flex items-center gap-1 text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{servers.filter(s => s.status === "running").length} up</span>
+                    <span className="text-muted">{servers.filter(s => s.status !== "running").length} down</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Toolbar: sort + batch ── */}
               {servers.length > 0 && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-                  <div className="surface p-4 animate-slide-up stagger-1">
-                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-2">Servers</div>
-                    <div className="text-2xl font-bold text-white tabular-nums">{stats.total}</div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px]">
-                      <span className="flex items-center gap-1 text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{stats.running} up</span>
-                      <span className="text-muted">{stats.stopped} down</span>
+                <div className="mb-4 flex items-center gap-2 flex-wrap">
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "name" | "status" | "ram")}
+                    aria-label="Sort servers"
+                    className="rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-xs text-slate-300 focus:border-accent/40 focus:outline-none">
+                    <option value="name">Sort: Name</option>
+                    <option value="status">Sort: Status</option>
+                    <option value="ram">Sort: RAM</option>
+                  </select>
+                  <div className="flex-1" />
+                  <button onClick={() => handleBatch("start")} disabled={batchBusy}
+                    className="flex items-center gap-1.5 rounded-lg border border-online/30 bg-online/10 px-3 py-1.5 text-xs font-semibold text-online transition hover:bg-online/20 disabled:opacity-50"
+                    title="Start all stopped servers" aria-label="Start all servers">
+                    ▶ Start All
+                  </button>
+                  {stopAllConfirm ? (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-2 py-1.5">
+                      <span className="text-xs font-bold text-danger">Stop all?</span>
+                      <button onClick={() => handleBatch("stop")} disabled={batchBusy} className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white disabled:opacity-50">{batchBusy ? "…" : "Yes"}</button>
+                      <button onClick={() => setStopAllConfirm(false)} className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300">No</button>
                     </div>
-                  </div>
-                  <div className="surface p-4 animate-slide-up stagger-2">
-                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-2">CPU</div>
-                    <div className="text-2xl font-bold text-white tabular-nums">{stats.avgCpu.toFixed(1)}<span className="text-base font-medium text-muted">%</span></div>
-                    <div className="mt-2 h-1 rounded-full bg-edge overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-700 ${
-                        stats.avgCpu > 80 ? "bg-danger" : stats.avgCpu > 50 ? "bg-warn" : "bg-online"
-                      }`} style={{ width: `${Math.min(100, stats.avgCpu)}%` }} />
-                    </div>
-                  </div>
-                  <div className="surface p-4 animate-slide-up stagger-3">
-                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-2">RAM</div>
-                    <div className="text-2xl font-bold text-white tabular-nums">
-                      {stats.usedRam > 0 ? formatBytes(stats.usedRam) : "—"}
-                    </div>
-                    {stats.totalRam > 0 && (
-                      <div className="mt-2 h-1 rounded-full bg-edge overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-700 ${
-                          stats.usedRam / (stats.totalRam * 1e6) > 0.8 ? "bg-danger"
-                          : stats.usedRam / (stats.totalRam * 1e6) > 0.5 ? "bg-warn" : "bg-online"
-                        }`}
-                          style={{ width: `${Math.min(100, (stats.usedRam / (stats.totalRam * 1e6)) * 100)}%` }} />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 mt-1 text-[11px]">
-                      <span className="text-muted">{formatRam(stats.totalRam)} total</span>
-                    </div>
-                  </div>
-                  <div className="surface p-4 animate-slide-up stagger-4">
-                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-2">Players</div>
-                    <div className="text-2xl font-bold text-white tabular-nums">
-                      {stats.totalPlayers}<span className="text-base font-medium text-muted">/{stats.totalMaxPlayers}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted">
-                      <HardDrive className="h-3 w-3" />{formatDisk(stats.totalDisk)}
-                    </div>
-                  </div>
+                  ) : (
+                    <button onClick={() => setStopAllConfirm(true)} disabled={batchBusy}
+                      className="flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger transition hover:bg-danger/20 disabled:opacity-50"
+                      title="Stop all running servers" aria-label="Stop all servers">
+                      ■ Stop All
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* ── Status filter chips ── */}
+              {/* ── Status + Tag filter chips ── */}
               {servers.length > 0 && (
                 <div className="mb-4 flex items-center gap-1.5 flex-wrap">
                   {statusFilterChips.map((chip) => {
@@ -263,6 +324,27 @@ export default function DashboardPage() {
                       </button>
                     );
                   })}
+                  {uniqueTags.length > 0 && <span className="mx-1 h-4 w-px bg-edge" />}
+                  {uniqueTags.map((tag) => {
+                    const active = tagFilter === tag;
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => setTagFilter(active ? null : tag)}
+                        aria-pressed={active}
+                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${active ? "border-accent/50 bg-accent/15 text-purple-200" : "border-edge text-slate-400 hover:border-accent/30 hover:text-slate-200"}`}
+                      >
+                        {tag}
+                        <span className="tabular-nums opacity-70">{servers.filter((s) => s.tag === tag).length}</span>
+                      </button>
+                    );
+                  })}
+                  {(tagFilter !== null || statusFilter !== "all" || searchQuery) && (
+                    <button onClick={() => { setTagFilter(null); setStatusFilter("all"); setSearchQuery(""); }}
+                      className="text-[11px] text-muted transition hover:text-slate-300 underline-offset-2 hover:underline">
+                      Reset
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -310,7 +392,7 @@ export default function DashboardPage() {
             </>
           )}
       </main>
-      <CreateServerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => fetchServers()} />
+      <CreateServerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={() => fetchServers()} onOpenModpack={() => { setDialogOpen(false); setModpackDialogOpen(true); }} />
       <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={() => fetchServers()} />
     </div>
   );

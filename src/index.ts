@@ -187,6 +187,56 @@ app.get("/api/system/info", (_req, res) => {
   res.json({ totalMemoryMB: Math.floor(os.totalmem() / (1024 * 1024)) });
 });
 
+// ---- host metrics (CPU / RAM / Disk of the machine) ----
+app.get("/api/system/stats", async (_req, res) => {
+  try {
+    // CPU % via two samples of os.cpus() deltas (300 ms apart)
+    const sample = () => {
+      const cpus = os.cpus();
+      let idle = 0, total = 0;
+      for (const c of cpus) {
+        idle += c.times.idle;
+        total += c.times.user + c.times.nice + c.times.sys + c.times.idle + c.times.irq;
+      }
+      return { idle, total };
+    };
+    const a = sample();
+    await new Promise((r) => setTimeout(r, 300));
+    const b = sample();
+    const dIdle = b.idle - a.idle;
+    const dTotal = b.total - a.total;
+    const cpu = dTotal > 0 ? Math.min(100, Math.round(((dTotal - dIdle) / dTotal) * 1000) / 10) : 0;
+
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+
+    // Disk usage of the root filesystem (df -k → kilobytes)
+    let disk = { used: 0, total: 0 };
+    const { execFile } = await import("node:child_process");
+    try {
+      const out = await new Promise<string>((resolve, reject) => {
+        execFile("df", ["-k", "/"], { timeout: 5000, encoding: "utf-8" }, (err, stdout) =>
+          err ? reject(err) : resolve(stdout),
+        );
+      });
+      const line = out.split("\n").filter(Boolean)[1];
+      const parts = line?.split(/\s+/);
+      if (parts && parts.length >= 4) {
+        disk = { used: parseInt(parts[2], 10) * 1024, total: parseInt(parts[1], 10) * 1024 };
+      }
+    } catch { /* df unavailable — leave 0 */ }
+
+    res.json({
+      cpuPercent: cpu,
+      memory: { used: usedMem, total: totalMem },
+      disk: { used: disk.used, total: disk.total },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to read host stats.", detail: err.message });
+  }
+});
+
 // ---- Fabric versions proxy ----
 app.get("/api/fabric/versions", async (_req, res) => {
   try {

@@ -99,7 +99,7 @@ export async function removeServer(id: string): Promise<boolean> {
 /** Update an existing server config by id. Returns the updated config or null. */
 export async function updateServer(
   id: string,
-  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs" | "containerId" | "schedule" | "maxPlayers" | "voicePort" | "discordWebhook" | "discordMessageId">>,
+  patch: Partial<Pick<ServerConfig, "name" | "ram" | "port" | "version" | "javaArgs" | "containerId" | "schedule" | "maxPlayers" | "voicePort" | "discordWebhook" | "discordMessageId" | "tag">>,
 ): Promise<ServerConfig | null> {
   return mutateServers((servers) => {
     const s = servers.find((s) => s.id === id);
@@ -115,6 +115,7 @@ export async function updateServer(
     if ("voicePort" in patch) s.voicePort = patch.voicePort;
     if ("discordWebhook" in patch) s.discordWebhook = patch.discordWebhook;
     if ("discordMessageId" in patch) (s as any).discordMessageId = patch.discordMessageId;
+    if ("tag" in patch) s.tag = patch.tag || undefined;
     return s;
   });
 }

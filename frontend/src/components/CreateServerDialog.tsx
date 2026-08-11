@@ -27,13 +27,15 @@ interface Props {
   onClose: () => void;
   /** Called after the server is created so the parent can refresh. */
   onCreated: () => void;
+  /** Opens the modpack installer (used by the "Modpack" template). */
+  onOpenModpack?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function CreateServerDialog({ open, onClose, onCreated }: Props) {
+export default function CreateServerDialog({ open, onClose, onCreated, onOpenModpack }: Props) {
 
   // Form state
   const [name, setName] = useState("");
@@ -47,6 +49,9 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
   const [difficulty, setDifficulty] = useState("normal");
   const [voicePort, setVoicePort] = useState<number | null>(null);
   const [maxRamMB, setMaxRamMB] = useState(16384); // fallback 16 GB
+  const [tag, setTag] = useState("");
+  // Template presets
+  const [template, setTemplate] = useState<"paper" | "modpack" | "velocity">("paper");
 
   // RAM quick-select presets — extended up to 64G
   const RAM_CHIPS = ["512M", "1G", "2G", "4G", "6G", "8G", "12G", "16G", "24G", "32G", "48G", "64G"];
@@ -58,22 +63,28 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
   // Submission
   const [submitting, setSubmitting] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Real creation progress (polled from the backend job)
+  const [jobProgress, setJobProgress] = useState<{ step: string; percent: number; status: string } | null>(null);
 
-  // ---- elapsed timer during submission ----
-  useEffect(() => {
-    if (!submitting) { setElapsed(0); return; }
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [submitting]);
-
-  // phase label based on elapsed time
-  const phase =
-    elapsed < 4 ? "Creating directories…"
-    : elapsed < 15 ? "Downloading server jar…"
-    : elapsed < 25 ? "Pulling Docker image…"
-    : "Creating container…";
+  /** Apply a template preset. */
+  const applyTemplate = useCallback((t: "paper" | "modpack" | "velocity") => {
+    setTemplate(t);
+    if (t === "paper") {
+      setServerType("paper");
+      setRam("4G");
+      setTag("");
+    } else if (t === "velocity") {
+      setServerType("velocity");
+      setRam("2G");
+      setPort(25577);
+      setTag("proxy");
+    } else {
+      // Modpack → open the modpack installer instead
+      onClose();
+      onOpenModpack?.();
+    }
+  }, [onClose, onOpenModpack]);
 
   // ---- fetch versions based on server type ----
 
@@ -127,7 +138,10 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
       setHardcore(false);
       setDifficulty("normal");
       setVoicePort(null);
+      setTag("");
+      setTemplate("paper");
       setError(null);
+      setJobProgress(null);
       // Fetch max system RAM
       fetch(`${API_BASE}/api/system/info`)
         .then(r => r.json())
@@ -146,7 +160,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
     }
   }, [open]);
 
-  // ---- submit ----
+  // ---- submit (async job with real progress) ----
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -155,6 +169,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
       setSubmitting(true);
       setError(null);
+      setJobProgress(null);
 
       try {
         const res = await fetch(`${API_BASE}/api/servers`, {
@@ -169,6 +184,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             javaArgs: javaArgs.trim() || undefined,
             maxPlayers,
             voicePort: voicePort ?? undefined,
+            tag: tag.trim() || undefined,
             ...(serverType !== "velocity" ? { hardcore, difficulty } : {}),
           }),
         });
@@ -177,6 +193,25 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
           const data = await res.json().catch(() => ({}));
           throw new Error(data.detail ?? data.error ?? `HTTP ${res.status}`);
         }
+
+        const { jobId } = await res.json();
+
+        // Poll the creation job until it finishes.
+        const deadline = Date.now() + 10 * 60 * 1000;
+        let job: { step: string; percent: number; status: "running" | "done" | "error"; message?: string } =
+          { step: "Starting…", percent: 0, status: "running" };
+        while (Date.now() < deadline && job.status === "running") {
+          try {
+            const r = await fetch(`${API_BASE}/api/servers/create-progress/${jobId}`);
+            if (r.ok) {
+              job = await r.json();
+              setJobProgress(job);
+            }
+          } catch { /* transient — keep polling */ }
+          if (job.status === "running") await new Promise((res2) => setTimeout(res2, 1000));
+        }
+
+        if (job.status === "error") throw new Error(job.message ?? "Failed to create server.");
 
         onCreated(); // tell the dashboard to refresh
         onClose(); // dismiss the modal
@@ -188,7 +223,7 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
         setSubmitting(false);
       }
     },
-    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, hardcore, difficulty, voicePort, onCreated, onClose],
+    [name, ram, port, serverType, paperVersion, javaArgs, maxPlayers, hardcore, difficulty, voicePort, tag, onCreated, onClose],
   );
 
   // ---- close on backdrop click ----
@@ -254,6 +289,34 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6">
+          {/* ── Templates ── */}
+          <div className="mb-6">
+            <div className="mb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Template</div>
+            <div className="grid grid-cols-3 gap-2.5">
+              {([
+                { id: "paper", icon: "🌍", title: "Paper Vanilla", desc: "Vanilla MC mit Paper-Optimierungen." },
+                { id: "modpack", icon: "🧩", title: "Modpack", desc: "CurseForge-Modpack installieren." },
+                { id: "velocity", icon: "🕸️", title: "Velocity Proxy", desc: "Netzwerk-Proxy für Backend-Server." },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t.id)}
+                  disabled={submitting}
+                  className={`rounded-lg border p-3 text-left transition disabled:opacity-50 ${
+                    template === t.id
+                      ? "border-accent bg-accent/10 shadow-[0_0_0_1px_var(--color-accent)]"
+                      : "border-edge bg-void hover:border-accent/40"
+                  }`}
+                >
+                  <div className="mb-1 text-xl">{t.icon}</div>
+                  <div className="text-xs font-bold text-white">{t.title}</div>
+                  <div className="mt-0.5 text-[10px] leading-snug text-muted">{t.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-6">
             {/* ── Left Column: Basic Information ── */}
             <div>
@@ -279,6 +342,25 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Survival World"
                     required
+                    disabled={submitting}
+                    className="w-full rounded-lg border border-edge bg-void
+                               px-3.5 py-2.5 text-sm text-white
+                               placeholder:text-slate-600
+                               focus:border-accent/40 focus:outline-none
+                               disabled:opacity-50"
+                  />
+                </label>
+
+                {/* Tag (optional grouping label) */}
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    Tag <span className="ml-1 text-[10px] text-slate-600 font-normal">(optional, z.B. survival / modded / proxy)</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    placeholder="survival"
                     disabled={submitting}
                     className="w-full rounded-lg border border-edge bg-void
                                px-3.5 py-2.5 text-sm text-white
@@ -567,24 +649,47 @@ export default function CreateServerDialog({ open, onClose, onCreated }: Props) 
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {phase}
+                {jobProgress?.step ?? "Starting…"}
               </>
             ) : (
               "Create Server"
             )}
           </button>
 
-          {submitting && (
-            <div className="mt-3 space-y-2">
-              <div className="h-1.5 overflow-hidden rounded-full bg-accent/[0.04]">
+          {/* Real creation progress (backend job) */}
+          {submitting && jobProgress && (
+            <div className="mt-4">
+              <div className="mb-2 flex gap-1.5">
+                {["Download", "Pull Image", "Container", "Start"].map((label, i) => {
+                  const pct = jobProgress.percent;
+                  const active = pct < 100 && pct >= i * 25 && pct < (i + 1) * 25;
+                  const done = pct >= (i + 1) * 25;
+                  return (
+                    <div
+                      key={label}
+                      className={`flex-1 rounded-md border px-2 py-1 text-center text-[10px] font-semibold transition ${
+                        done
+                          ? "border-online/40 bg-online/10 text-online"
+                          : active
+                            ? "border-accent bg-accent/10 text-purple-200"
+                            : "border-edge bg-void text-muted"
+                      }`}
+                    >
+                      {done ? "✓ " : active ? "▶ " : ""}{label}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-edge">
                 <div
-                  className="h-full animate-pulse rounded-full bg-violet-500"
-                  style={{ width: `${Math.min(elapsed * 3, 90)}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-purple-800 to-accent transition-all duration-500"
+                  style={{ width: `${Math.max(2, Math.min(100, jobProgress.percent))}%` }}
                 />
               </div>
-              <p className="text-center text-xs text-slate-600">
-                {elapsed}s elapsed — this may take up to 30s
-              </p>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">{jobProgress.step}</span>
+                <span className="text-[11px] font-bold tabular-nums text-purple-300">{jobProgress.percent}%</span>
+              </div>
             </div>
           )}
         </form>
