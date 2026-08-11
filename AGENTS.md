@@ -823,3 +823,19 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert auf Server:** Build OK, Service active, Panel 200. Laufendem Testserver per API Tag "survival" gesetzt (PUT ok).
 
 > **Last updated:** 2026-08-11 · Session: Dashboard-Gruppen-Ansicht (V5) + Create-Wizard, kompakte ServerCard-Zeilen
+
+---
+
+### 2026-08-11 — Live-Spieler-Updates (WebSocket) + einklappbare Quick Commands
+
+**1. Spielerliste jetzt live (Join/Leave ohne Reload):**
+- **Problem:** PlayerCard in der Console-Sidebar aktualisierte nur über den 15s-REST-Poll — zu langsam, fühlte sich an wie "erst bei Reload/Tab-Wechsel".
+- **Fix (Backend `websocket.ts`):** Neuer `players:subscribe`/`players:unsubscribe`-Handler wie beim TPS-Poller. RCON-`list` alle 5 s pro Server; Parser `There are X of a max of Y players online: Namen` (mit `§`-Farbcode-Stripping, Dedupe). Join/Leave-Erkennung via `playerLastNames`-Map (`first || join-Diff` → emit). Kein Spam bei 0 Spielern (has-Check statt length-Check). Cleanup im Disconnect-Handler.
+- **Frontend (`ConsoleTab.tsx`):** Emittet `players:subscribe` beim Connect, lauscht auf `players:data` → `setPlayerCount` + `setPlayerList`. Der 15s-REST-Poll bleibt als Fallback.
+
+**2. Quick Commands einklappbar:**
+- `QuickCommands.tsx`: Card mit Toggle-Header ("⚡ Quick Commands" + ChevronDown, rotiert bei zugeklappt, `aria-expanded`). Default ausgeklappt. Passt optisch zu den Sidebar-Cards (surface + border-edge).
+
+**Verifiziert auf Server:** Beide Builds OK, Services active, Panel 200. RCON `list` liefert exakt das Parse-Format ("There are 0 of a max of 20 players online:").
+
+> **Last updated:** 2026-08-11 · Session: Live-Player-Updates via WS-RCON-Poll, collapsible Quick Commands

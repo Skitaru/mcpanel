@@ -77,6 +77,10 @@ interface SocketSession {
   consoleSubs: Map<string, ContainerStreams>;
   /** serverId → TPS polling interval */
   tpsIntervals: Map<string, ReturnType<typeof setInterval>>;
+  /** serverId → player-list polling interval */
+  playersIntervals: Map<string, ReturnType<typeof setInterval>>;
+  /** serverId → last known player names (join/leave detection) */
+  playerLastNames: Map<string, string[]>;
 }
 
 const sessions = new Map<string, SocketSession>();
@@ -157,6 +161,8 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       statsSubs: new Map(),
       consoleSubs: new Map(),
       tpsIntervals: new Map(),
+      playersIntervals: new Map(),
+      playerLastNames: new Map(),
     };
     sessions.set(socket.id, session);
     console.log(`[ws] Client connected: ${socket.id}`);
@@ -293,6 +299,70 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     });
 
     // ==================================================================
+    // PLAYERS (via RCON polling — live join/leave detection)
+    // ==================================================================
+
+    socket.on("players:subscribe", async (payload: { serverId: string }) => {
+      const { serverId } = payload;
+      if (session.playersIntervals.has(serverId)) return;
+
+      const server = await getServer(serverId);
+      if (!server?.containerId) {
+        socket.emit("players:error", { serverId, message: "Server not found." });
+        return;
+      }
+
+      const pollPlayers = () => {
+        sendRcon("127.0.0.1", server.rconPort, server.rconPassword, "list", 3000)
+          .then((raw) => {
+            // "There are 3 of a max of 20 players online: Steve, Alex, Notch"
+            // eslint-disable-next-line no-control-regex
+            const clean = raw.replace(/§[0-9a-fk-or]/gi, "");
+            const m = clean.match(/There are (\d+) of a max of (\d+) players online:\s*(.*)/);
+            if (!m) return;
+            const online = parseInt(m[1], 10);
+            const max = parseInt(m[2], 10);
+            const names = m[3]
+              ? [...new Set(m[3].split(",").map((s) => s.trim()).filter(Boolean))]
+              : [];
+
+            const first = !session.playerLastNames.has(serverId);
+            const prev = session.playerLastNames.get(serverId) ?? [];
+            session.playerLastNames.set(serverId, names);
+
+            // Emit on the first poll and whenever the player set changed
+            // (i.e. a player joined or left) — so the UI updates live.
+            if (first || prev.join(",") !== names.join(",")) {
+              socket.emit("players:data", {
+                serverId,
+                online,
+                max,
+                players: names.map((name) => ({ name, id: name })),
+              });
+            }
+          })
+          .catch(() => {
+            // RCON not reachable or server not ready — silent fail
+          });
+      };
+
+      pollPlayers(); // immediate first poll
+      const interval = setInterval(pollPlayers, 5000);
+      session.playersIntervals.set(serverId, interval);
+      console.log(`[ws] Players subscription: ${socket.id} → ${serverId}`);
+    });
+
+    socket.on("players:unsubscribe", (payload: { serverId: string }) => {
+      const { serverId } = payload;
+      const interval = session.playersIntervals.get(serverId);
+      if (interval) {
+        clearInterval(interval);
+        session.playersIntervals.delete(serverId);
+        session.playerLastNames.delete(serverId);
+      }
+    });
+
+    // ==================================================================
     // CONSOLE
     // ==================================================================
 
@@ -410,6 +480,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
       for (const stream of session.statsSubs.values()) stream.destroy();
       for (const streams of session.consoleSubs.values()) streams.close();
       for (const interval of session.tpsIntervals.values()) clearInterval(interval);
+      for (const interval of session.playersIntervals.values()) clearInterval(interval);
       sessions.delete(socket.id);
       console.log(`[ws] Client disconnected: ${socket.id}`);
     });

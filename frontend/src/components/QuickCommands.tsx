@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ChevronDown, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -34,6 +34,7 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [active, setActive] = useState<CmdDef | null>(null);
   const [value, setValue] = useState("");
+  const [open, setOpen] = useState(true);
 
   const runRcon = useCallback(async (fullCommand: string, label: string) => {
     setBusy(label);
@@ -88,22 +89,34 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <div className="mb-4">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Quick Commands</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-          {CMDS.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => handleClick(c)}
-              disabled={busy !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-edge bg-void px-2.5 py-1.5 text-[11px] text-slate-300 transition hover:border-accent/40 hover:text-purple-200 disabled:opacity-50"
-              title={`/${c.cmd}`}
-            >
-              {busy === c.label ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>{c.icon}</span>}
-              <span className="truncate">{c.label}</span>
-            </button>
-          ))}
-        </div>
+      <div className="mb-4 overflow-hidden rounded-xl border border-edge bg-surface">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 transition hover:bg-surface2"
+        >
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+            ⚡ Quick Commands
+          </span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? "" : "-rotate-90"}`} />
+        </button>
+        {open && (
+          <div className="grid grid-cols-2 gap-1.5 p-3 pt-0 sm:grid-cols-3">
+            {CMDS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => handleClick(c)}
+                disabled={busy !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-edge bg-void px-2.5 py-1.5 text-[11px] text-slate-300 transition hover:border-accent/40 hover:text-purple-200 disabled:opacity-50"
+                title={`/${c.cmd}`}
+              >
+                {busy === c.label ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>{c.icon}</span>}
+                <span className="truncate">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Input modal for commands with parameters */}

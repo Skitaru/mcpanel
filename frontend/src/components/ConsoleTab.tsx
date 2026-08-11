@@ -223,6 +223,7 @@ export default function ConsoleTab({
       socket.emit("console:attach", { serverId });
       socket.emit("stats:subscribe", { serverId });
       socket.emit("tps:subscribe", { serverId });
+      socket.emit("players:subscribe", { serverId });
     });
 
     socket.on("disconnect", () => {
@@ -279,6 +280,18 @@ export default function ConsoleTab({
     socket.on("tps:data", (payload: { serverId: string; tps5s: number; tps1m: number; tps5m: number }) => {
       if (payload.serverId !== serverId) return;
       setTps({ tps5s: payload.tps5s, tps1m: payload.tps1m, tps5m: payload.tps5m });
+    });
+
+    // ---- players (live join/leave via RCON poll) ----
+    socket.on("players:data", (payload: { serverId: string; online: number; max: number; players: { name: string; id: string }[] }) => {
+      if (payload.serverId !== serverId) return;
+      setPlayerCount({ online: payload.online, max: payload.max });
+      setPlayerList(payload.players ?? []);
+    });
+
+    socket.on("players:error", (payload: { serverId: string; message: string }) => {
+      if (payload.serverId !== serverId) return;
+      console.warn(`[panel] players error: ${payload.message}`);
     });
 
     // ---- load log history ----
