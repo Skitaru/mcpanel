@@ -839,3 +839,17 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert auf Server:** Beide Builds OK, Services active, Panel 200. RCON `list` liefert exakt das Parse-Format ("There are 0 of a max of 20 players online:").
 
 > **Last updated:** 2026-08-11 · Session: Live-Player-Updates via WS-RCON-Poll, collapsible Quick Commands
+
+---
+
+### 2026-08-11 — Console-Höhe fluid (schließt mit PlayerCard ab)
+
+**Problem:** Die Console hatte eine feste Höhe (`h-[540px] max-h-[calc(100vh-200px)]`). Wenn Quick Commands ein-/ausgeklappt wurden, blieb die Console gleich hoch — unten entstand eine Lücke bzw. die Console ragte über die Sidebar hinaus.
+
+**Fix (ConsoleTab.tsx + PlayerCard.tsx):**
+- Console-Card: `h-[540px] max-h-...` → `h-[420px] min-h-0 lg:h-auto lg:min-h-[320px] lg:flex-1`. Desktop: Höhe ist fluid — sie füllt in der linken Spalte (`flex-1` + `align-items:stretch` der Row) den verbleibenden Platz unter den Quick Commands auf. Zugeklappte Quick Commands → Console wächst automatisch. Mobile behält feste 420px (keine Sidebar).
+- PlayerCard: neues optionales `className`-Prop; in ConsoleTab mit `mt-auto` gepinnt → klebt am Boden der Sidebar. Damit schließt die Console links exakt mit der Spieler-Card rechts ab (auch wenn die Sidebar gedehnt wird).
+
+**Verifiziert:** Build OK, Service active, Panel 200.
+
+> **Last updated:** 2026-08-11 · Session: Fluid console height aligned to PlayerCard, collapsible quick commands resize console

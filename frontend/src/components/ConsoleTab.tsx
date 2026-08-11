@@ -465,8 +465,9 @@ export default function ConsoleTab({
           </div>
         )}
 
-        {/* Console panel */}
-        <div className="flex h-[540px] max-h-[calc(100vh-200px)] min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+        {/* Console panel — desktop height is fluid (fills the gap below Quick Commands
+            so it ends flush with the PlayerCard); mobile keeps a fixed height. */}
+        <div className="flex h-[420px] min-h-0 lg:h-auto lg:min-h-[320px] lg:flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
         {/* Console header + filter */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-edge bg-surface px-4 py-2">
           <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>
@@ -699,8 +700,9 @@ export default function ConsoleTab({
           </div>
         </div>
 
-        {/* ── Spieler (management: OP/Kick/Ban + Whitelist) ── */}
-        <PlayerCard serverId={serverId} isOnline={isOnline} playerCount={playerCount} playerList={playerList} />
+        {/* ── Spieler (management: OP/Kick/Ban + Whitelist) — pinned to the bottom so
+             the console on the left ends flush with it ── */}
+        <PlayerCard serverId={serverId} isOnline={isOnline} playerCount={playerCount} playerList={playerList} className="mt-auto" />
       </div>
     </div>
   );

@@ -16,10 +16,12 @@ interface Props {
   isOnline: boolean;
   playerCount: { online: number; max: number };
   playerList: Player[];
+  /** Extra classes (e.g. "mt-auto" to stick to the bottom of a flex column). */
+  className?: string;
 }
 
 /** Player management: online players with OP/Kick/Ban + whitelist via RCON. */
-export default function PlayerCard({ serverId, isOnline, playerCount, playerList }: Props) {
+export default function PlayerCard({ serverId, isOnline, playerCount, playerList, className }: Props) {
   const [whitelist, setWhitelist] = useState<string[]>([]);
   const [wlLoading, setWlLoading] = useState(false);
   const [newPlayer, setNewPlayer] = useState("");
@@ -84,7 +86,7 @@ export default function PlayerCard({ serverId, isOnline, playerCount, playerList
   }, [rcon]);
 
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4">
+    <div className={`rounded-xl border border-edge bg-surface p-4 ${className ?? ""}`}>
       <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
         Spieler {isOnline ? `· ${playerCount.online}/${playerCount.max}` : ""}
       </h4>
