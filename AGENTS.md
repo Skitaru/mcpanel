@@ -645,3 +645,28 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 **Deploy:** Server-Build OK (Backend tsc 0 Fehler, Frontend next build OK), beide Services active, Backend-Health 200, Frontend 200, API-Proxy 200.
 
 > **Last updated:** 2026-08-11 · Session: Recreate-Button, Console-Filter, Sparklines, C10 verifiziert, HTTPS vertagt
+
+---
+
+### 2026-08-11 — Backup/Restore/Auto-Restart neu geplant + Mobile-Delete-Fix
+
+**Auslöser:** Auf dem Handy waren Ordner/Dateien nicht löschbar (hover-only Buttons). Plus: Backup/Restore/Auto-Restart-Logik sollte neu geplant werden.
+
+**Mobile-Fix:** FileManager-Delete-Button `opacity-0 group-hover:opacity-100` → `sm:opacity-0 sm:group-hover:opacity-100` — auf Touch-Geräten (<sm) immer sichtbar, Desktop behält Hover-Reveal. Einziges weiteres hover-only Element war AddressPill `hoverReveal`, aber das wird nur in der Console-Sidebar genutzt (`hidden lg:flex`) → kein Mobile-Problem.
+
+**Neuplanung (User-Entscheidungen):** Backups im Panel verwaltbar + Auto-Backup vor Risiko-Aktionen + Auto-Restart = stop+start + Backups ohne Server-Stop.
+
+**Backend (Commit `fd6c819`):**
+- **Neu `src/services/backups.ts`:** `createBackup` (ohne Stop, kein Download), `listBackups`, `pruneBackups` (behält N neueste pro Kind), `deleteBackup`, `restoreFromArchive` (tar-Slip-Pre-Scan + Temp-Extract + atomarer Swap + Restart falls vorher lief).
+- **Speicherort:** `backups/<serverId>/` statt data-Root. Präfixe: `backup-` (manual), `scheduled-backup-` (scheduled), `auto-` (pre-delete/recreate/restore).
+- **Routen:** `GET /:id/backups`, `GET /:id/backups/:name/download`, `POST /:id/backups/:name/restore`, `DELETE /:id/backups/:name`. `POST /:id/backup` erstellt jetzt nur noch (kein Download-Stream). `POST /:id/restore` (Upload) nutzt den Service.
+- **Auto-Backup** (kind=auto, keep 5) vor Delete, Recreate und Restore (beide Varianten) — best-effort, Fehler blockieren nicht.
+- **Scheduler:** Auto-Restart = stop+start auf demselben Container (kein delete+recreate mehr — das bleibt manueller Recreate-Button). Scheduled-Backup nutzt createBackup + pruneBackups(5).
+
+**Frontend (Commit `fd6c819`):**
+- **Neu `BackupsTab.tsx`** (4. Tab "Backups"): Liste mit Typ-Badges (Manual violett / Scheduled cyan / Auto amber), Datum, Größe, Download / Restore (Confirm-Modal mit "overwrites + Auto-Safety-Backup"-Hinweis) / Delete (Confirm-Modal). Eigener "New Backup"-Button, Poll alle 30s.
+- **Detailseite:** Backup-Button erstellt (kein Download mehr, Icon Archive), URL-Sync `?tab=backups`, Shortcut-Taste 4, `backupsRefreshTick` refresht die Liste nach Erstellen.
+
+**Verifiziert auf Server:** tsc 0 Fehler, next build OK, Services active, Health 200, alle 5 neuen Routen mit Token → 404 auf nonexistent (Routen registriert, Auth ok).
+
+> **Last updated:** 2026-08-11 · Session: Backup-Overhaul (BackupsTab, Auto-Backups, stop+start Auto-Restart), Mobile-Delete-Fix
