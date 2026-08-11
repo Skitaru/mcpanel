@@ -698,3 +698,18 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 **ScheduleCard überarbeitet:** Zwei separate Cards (Auto-Restart amber/RotateCcw, Auto-Backup cyan/Save) mit `type="time"`-Inputs (nativer Time-Picker, mobile-freundlich statt Text HH:MM), Active/Off-Badge im Header, per-Karte Disable-Button (Trash), Save mit Toast statt Inline-Message.
 
 > **Last updated:** 2026-08-11 · Session: Download-Prozent-Fix, Schedule-Tab + Redesign
+
+### 2026-08-11 — Console-Redesign nach modernen Panels (Commit `47e6c44`)
+
+**Auslöser:** Ressourcen-Graphen (dünne Sparklines) sahen schlecht aus; die Console zog sich mit der Eingabezeile bis zum Viewport-Boden.
+
+**Recherche:** MCSManager 10 / Hatch / Bloom / Pelican — moderne Panels machen die Console zu einer **Karte mit fester Höhe** (Input am Kartenrand, nicht Seitenende) und nutzen **Area-Charts mit Verlauf** statt dünner Linien. Mockup in `screenshots/mockup-modern.html` (gitignored) → vom User abgenickt.
+
+**Umsetzung (ConsoleTab.tsx):**
+- Console-Card: `h-[540px] max-h-[calc(100vh-200px)]`, Output `flex-1 min-h-0` — die Eingabezeile klebt am Karten-Unterrand, kein Boden-Stretch mehr.
+- Filter in den Console-Header integriert (Search + Level + Match-Count + Clear), bricht auf Mobile via `flex-wrap` um.
+- `Sparkline` → `AreaChart`: SVG mit Gradient-Fill (CPU cyan `#00F5D4`, RAM violett `#9D4EDD`), Fläche + Linie, `h-10`.
+- Bars `h-2.5` → `h-1.5` mit `bg-gradient-to-r` (teal→cyan, purple→accent; Warn/Danger-Stufen behalten).
+- Werte `text-base` → `text-lg` (größere Zahlen wie im Mockup), Sidebar `w-[290px]` → `w-[300px]`.
+
+> **Last updated:** 2026-08-11 · Session: Console-Redesign moderner Panel-Stil, Area-Charts, feste Console-Höhe
