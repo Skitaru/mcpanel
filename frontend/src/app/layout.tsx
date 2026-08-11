@@ -33,14 +33,14 @@ export default function RootLayout({
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "#151221",
-              color: "#F8F7FF",
-              border: "1px solid #28223D",
+              background: "#15161A",
+              color: "#EDEEF1",
+              border: "1px solid #26292F",
               fontSize: "13px",
               borderRadius: "8px",
             },
-            error:   { iconTheme: { primary: "#F15BB5", secondary: "#151221" } },
-            success: { iconTheme: { primary: "#00F5D4", secondary: "#151221" } },
+            error:   { iconTheme: { primary: "#C2605C", secondary: "#15161A" } },
+            success: { iconTheme: { primary: "#4E9B7A", secondary: "#15161A" } },
           }}
         />
         <AuthGuard>{children}</AuthGuard>

@@ -36,12 +36,12 @@ export default function ServerCard({
   const memPct = liveMem && s.ram ? Math.min(100, (liveMem / (s.ram * 1e6)) * 100) : 0;
 
   const bannerClass = !isRunning
-    ? "bg-[linear-gradient(135deg,#1d1a2a,#12101c_60%,#0c0b13)]"
+    ? "bg-[linear-gradient(135deg,#17181b,#101114_60%,#0a0b0d)]"
     : s.serverType === "fabric"
-      ? "bg-[linear-gradient(135deg,#4d3310,#2c1c07_55%,#120d04)]"
+      ? "bg-[linear-gradient(135deg,#3a2f12,#251c07_55%,#110d04)]"
       : s.serverType === "velocity"
-        ? "bg-[linear-gradient(135deg,#0d3d3a,#072320_55%,#041211)]"
-        : "bg-[linear-gradient(135deg,#2a1a4d,#1c1036_55%,#0e0a1e)]";
+        ? "bg-[linear-gradient(135deg,#12312a,#0a201c_55%,#061311)]"
+        : "bg-[linear-gradient(135deg,#1c2433,#141a26_55%,#0d1119)]";
   const textureClass = !isRunning ? "" : s.serverType === "fabric" ? "banner-texture-amber" : s.serverType === "velocity" ? "banner-texture-cyan" : "banner-texture";
 
   const uptime = (() => {

@@ -762,3 +762,42 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 - ⚠ Beim SCP-Sammelbefehl landeten `servers.ts`/`config-store.ts` fälschlich als Strays unter `/src/` — auf dem Server gelöscht (Build-Fehler TS2307/TS7006 behoben).
 
 > **Last updated:** 2026-08-11 · Session: Feature-Mockup umgesetzt — Tags, Host-Metriken, Create-Job-Progress, Templates, Quick-Commands, Player-Management, File-Suche/Batch, Log-Highlighting
+
+---
+
+### 2026-08-11 — Design-Relift: Graphite (Grau/Schwarz + Stahlblau), Neon raus
+
+**Auslöser:** User wollte keine Neon-Farben mehr, nichts Knalliges, „vielleicht modern Grau/Schwarz einbauen".
+
+**Mockup-Runde:** `screenshots/mockup-colors.html` (6 knallige Varianten — Cyan/Blau/Smaragd/Orange/Rot, alle mit Neon-Glows) **verworfen** auf Nutzerwunsch. `screenshots/mockup-colors-2.html` (5 gedämpfte Varianten: Graphite/Obsidian-Gold/Slate/Stone + aktuelle Referenz, ohne Glows) → **User wählte Graphite**.
+
+**Neue Graphite-Palette (globals.css):**
+
+| Token | Alt (Violett) | Neu (Graphite) |
+|-------|---------------|----------------|
+| void | `#0B0914` | `#0C0D0F` |
+| surface | `#151221` | `#15161A` |
+| edge | `#28223D` | `#26292F` |
+| accent | `#9D4EDD` | `#6A86B8` (Stahlblau) |
+| accent-strong | `#B100E8` | `#54709E` |
+| accent-deep | `#3C096C` | `#20293A` |
+| muted | `#6b6480` | `#878C95` |
+| ink | `#F8F7FF` | `#EDEEF1` |
+| online | `#00F5D4` (Neon-Cyan) | `#4E9B7A` (mattes Grün) |
+| warn | `#FEE440` (Neon-Gelb) | `#C9A227` (mattes Gold) |
+| danger | `#F15BB5` (Neon-Pink) | `#C2605C` (gedecktes Rot) |
+| violet/purple-300+ | `#E0AAFF` | `#9FB4D8` (helles Stahlblau) |
+| slate-400/500 | `#A9A2C2` | `#9AA2AC` |
+
+**Entschärfte Effekte (kein Neon mehr):**
+- `body::before`-Ambient-Glows: Violett/Cyan → dezentere Stahlblau- (#6A86B8) + matt-grüne (#4E9B7A) Glows, Opacity gesenkt.
+- `pulse-dot`, `card-glow-online` (Breathing-Glow): Cyan → mattes Grün, weichere Opacity.
+- `banner-texture*`: violet/amber/cyan → Stahlblau/Gold/Grün, dunkler.
+- `.surface-hover` Box-Shadow, `.subnav-item-active`, `::selection`, `:focus-visible`: → Stahlblau.
+- `text-glow-purple/cyan` deutlich schwächer.
+- ServerCard-Banner-Gradienten: `#2a1a4d`→`#1c2433` (Paper/Blau), `#4d3310`→`#3a2f12` (Fabric/Gold), `#0d3d3a`→`#12312a` (Velocity/Grün), offline `#1d1a2a`→`#17181b` (Grau).
+- Toaster-Theme (layout.tsx), FileManager-Checkbox-Accent, TopBar-Brand-Glow: auf Graphite-Werte.
+
+**Verifiziert auf Server:** Build OK, Service active, Tokens im generierten CSS bestätigt (`.bg-void:#0c0d0f`, `.bg-accent:#6a86b8`, `.text-online:#4e9b7a`).
+
+> **Last updated:** 2026-08-11 · Session: Graphite-Design — Neon raus, gedämpfte Grau/Stahlblau-Palette

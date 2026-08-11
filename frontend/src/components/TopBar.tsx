@@ -29,7 +29,7 @@ export default function TopBar({ servers, activeId, onInstallModpack, onlinePlay
       <header className="sticky top-0 z-50 flex items-center gap-3 sm:gap-5 border-b border-edge bg-void/80 backdrop-blur px-4 sm:px-6 py-3">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="Obsidian Panel">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_10px_#9D4EDD] shrink-0" />
+          <span className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_10px_#6A86B8] shrink-0" />
           <span className="hidden sm:inline text-sm font-bold tracking-tight text-white">Obsidian Panel</span>
         </Link>
 

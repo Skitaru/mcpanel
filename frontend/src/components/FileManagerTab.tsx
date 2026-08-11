@@ -373,7 +373,7 @@ export default function FileManagerTab({ serverId }: Props) {
                         onChange={() => toggleSelect(f.name)}
                         onClick={(e) => e.stopPropagation()}
                         aria-label={`${f.name} auswählen`}
-                        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#9D4EDD]"
+                        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#6A86B8]"
                       />
                       <button onClick={() => {
                         if (f.isDirectory) { navigateTo(f.name); return; }
