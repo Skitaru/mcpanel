@@ -688,3 +688,13 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 **Technischer Hinweis:** Fortschritt basiert auf verarbeiteten Bytes vs. Gesamtgröße — springt am Ende auf 100, wenn die Kompression fertig ist (bei gut komprimierbaren Daten bleibt der Wert länger niedrig, da der Counter auf der unkomprimierten Seite zählt — das ist gewollt: er zeigt echten Arbeitsfortschritt).
 
 > **Last updated:** 2026-08-11 · Session: Backup/Download-Progress-Bars
+
+### 2026-08-11 — Download-% Fix + Schedule als eigener Tab (Commit `0d37a46`)
+
+**Bugfix Download-Prozent:** Beim Backup-Download fehlte die %-Anzeige (nur Spinner). Ursache: Die Download-Route nutzte `createReadStream().pipe(res)` → Node/Express sendet dabei **keinen `Content-Length`-Header** (Chunked Transfer) → Frontend bekam `total = 0` und konnte keinen Prozentsatz berechnen. Fix: `res.set("Content-Length", stat.size)` in `GET /:id/backups/:name/download`.
+
+**Schedule als eigener Tab:** ScheduleCard war unten im File Manager versteckt → jetzt 5. Tab "Schedule" auf der Detailseite (`?tab=schedule`, Shortcut-Taste 5). Aus FileManagerTab entfernt.
+
+**ScheduleCard überarbeitet:** Zwei separate Cards (Auto-Restart amber/RotateCcw, Auto-Backup cyan/Save) mit `type="time"`-Inputs (nativer Time-Picker, mobile-freundlich statt Text HH:MM), Active/Off-Badge im Header, per-Karte Disable-Button (Trash), Save mit Toast statt Inline-Message.
+
+> **Last updated:** 2026-08-11 · Session: Download-Prozent-Fix, Schedule-Tab + Redesign
