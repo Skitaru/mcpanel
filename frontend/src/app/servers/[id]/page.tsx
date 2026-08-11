@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
-  Terminal, FolderOpen, ScrollText, Settings2, Archive,
+  Terminal, FolderOpen, ScrollText, Settings2, Archive, CalendarClock,
   Loader2, AlertTriangle, Trash2, Play, Square, Upload, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import BackupsTab from "@/components/BackupsTab";
+import ScheduleCard from "@/components/ScheduleCard";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
@@ -21,13 +22,14 @@ import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-type Tab = "console" | "files" | "logs" | "backups";
+type Tab = "console" | "files" | "logs" | "backups" | "schedule";
 
 const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
   { id: "files", label: "File Manager", icon: FolderOpen },
   { id: "logs", label: "Server Logs", icon: ScrollText },
   { id: "backups", label: "Backups", icon: Archive },
+  { id: "schedule", label: "Schedule", icon: CalendarClock },
 ];
 
 export default function ServerDetailPage() {
@@ -40,10 +42,10 @@ export default function ServerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("console");
-  // URL sync: ?tab=files|logs|backups survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
+  // URL sync: ?tab=files|logs|backups|schedule survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "files" || t === "logs" || t === "backups") setActiveTab(t);
+    if (t === "files" || t === "logs" || t === "backups" || t === "schedule") setActiveTab(t);
   }, []);
   const setTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
@@ -190,6 +192,7 @@ export default function ServerDetailPage() {
       else if (e.key === "2") setTab("files");
       else if (e.key === "3") setTab("logs");
       else if (e.key === "4") setTab("backups");
+      else if (e.key === "5") setTab("schedule");
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -340,6 +343,10 @@ export default function ServerDetailPage() {
 
               <div className={`tab-content ${activeTab === "backups" ? "" : "hidden"}`}>
                 <BackupsTab serverId={serverId} serverName={server.name} refreshTick={backupsRefreshTick} />
+              </div>
+
+              <div className={`tab-content ${activeTab === "schedule" ? "" : "hidden"}`}>
+                <ScheduleCard serverId={serverId} />
               </div>
             </>
           )}

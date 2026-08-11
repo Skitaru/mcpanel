@@ -655,7 +655,11 @@ router.get("/:id/backups/:name/download", async (req: Request, res: Response) =>
       res.status(404).json({ error: "Backup not found." });
       return;
     }
+    // Explicit Content-Length lets the frontend show a real download
+    // percentage (res.pipe alone would use chunked transfer → no length).
+    const st = fs.statSync(filePath);
     res.set("Content-Type", "application/gzip");
+    res.set("Content-Length", String(st.size));
     res.set("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
     fs.createReadStream(filePath).pipe(res);
   } catch (err: any) {
