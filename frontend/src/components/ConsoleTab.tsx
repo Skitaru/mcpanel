@@ -75,22 +75,30 @@ function formatUptime(seconds: number) {
   return `${s}s`;
 }
 
-/** Minimal SVG sparkline for the CPU/RAM history (no chart dependency). */
-function Sparkline({ values, max, stroke }: { values: number[]; max: number; stroke: string }) {
+/** Minimal SVG area chart (gradient fill + line) for the CPU/RAM history. */
+function AreaChart({ values, max, stroke, id }: { values: number[]; max: number; stroke: string; id: string }) {
   if (values.length < 2) return null;
-  const w = 100;
-  const h = 24;
-  const pts = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * w;
-      const y = h - 1 - Math.min(1, Math.max(0, v / max)) * (h - 2);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
+  const w = 300;
+  const h = 40;
+  const stepX = w / (values.length - 1);
+  const pts = values.map((v, i) => {
+    const x = i * stepX;
+    const y = h - 3 - Math.min(1, Math.max(0, v / max)) * (h - 8);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const line = pts.join(" ");
+  const area = `M0,${h} L${pts.join(" L")} L${w},${h} Z`;
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-6 w-full" aria-hidden="true">
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-1.5 h-10 w-full" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${id})`} />
       <polyline
-        points={pts}
+        points={line}
         fill="none"
         stroke={stroke}
         strokeWidth="1.5"
@@ -490,57 +498,55 @@ export default function ConsoleTab({
   return (
     <div className="flex flex-col lg:flex-row gap-4">
       {/* ════ Console panel ════ */}
-      <div className="flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
-        {/* Console header */}
-        <div className="flex items-center gap-3 border-b border-edge bg-surface px-4 py-2.5">
+      <div className="flex h-[540px] max-h-[calc(100vh-200px)] flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+        {/* Console header + filter */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-edge bg-surface px-4 py-2">
           <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-online pulse-dot" : "bg-edge"}`} />
             {isOnline ? "Live" : "Offline"}
           </span>
           <span className="text-xs text-muted">{typeLabel(serverType)} {version}</span>
           <div className="flex-1" />
+          <div className="flex items-center gap-1.5 rounded-lg border border-edge bg-void px-2 py-1">
+            <Search className="h-3 w-3 shrink-0 text-muted" />
+            <input
+              value={filter.text}
+              onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))}
+              placeholder="Filter console…"
+              aria-label="Filter console output"
+              className="w-24 min-w-0 bg-transparent text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none sm:w-32"
+            />
+            <select
+              value={filter.level}
+              onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value as "all" | "stderr" | "system" }))}
+              aria-label="Filter by output level"
+              className="shrink-0 rounded border border-edge bg-void px-1 py-0.5 text-[10px] text-slate-400 focus:border-accent/40 focus:outline-none"
+            >
+              <option value="all">All</option>
+              <option value="stderr">Errors</option>
+              <option value="system">System</option>
+            </select>
+            {(filter.text || filter.level !== "all") && (
+              <>
+                <span className="shrink-0 text-[10px] tabular-nums text-muted">{visibleLines.length}/{lines.length}</span>
+                <button
+                  onClick={() => setFilter({ text: "", level: "all" })}
+                  className="shrink-0 rounded p-0.5 text-slate-600 transition hover:text-slate-300"
+                  title="Clear filter" aria-label="Clear filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            )}
+          </div>
           {connected && isOnline && <span className="text-[11px] text-muted">verbunden</span>}
-        </div>
-
-        {/* Filter bar */}
-        <div className="flex items-center gap-2 border-b border-edge/60 bg-void/30 px-3 py-1.5">
-          <Search className="h-3 w-3 shrink-0 text-muted" />
-          <input
-            value={filter.text}
-            onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))}
-            placeholder="Filter console…"
-            aria-label="Filter console output"
-            className="min-w-0 flex-1 bg-transparent text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
-          />
-          <select
-            value={filter.level}
-            onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value as "all" | "stderr" | "system" }))}
-            aria-label="Filter by output level"
-            className="shrink-0 rounded border border-edge bg-void px-1.5 py-0.5 text-[10px] text-slate-400 focus:border-accent/40 focus:outline-none"
-          >
-            <option value="all">All</option>
-            <option value="stderr">Errors</option>
-            <option value="system">System</option>
-          </select>
-          {(filter.text || filter.level !== "all") && (
-            <>
-              <span className="shrink-0 text-[10px] tabular-nums text-muted">{visibleLines.length}/{lines.length}</span>
-              <button
-                onClick={() => setFilter({ text: "", level: "all" })}
-                className="shrink-0 rounded p-0.5 text-slate-600 transition hover:text-slate-300"
-                title="Clear filter" aria-label="Clear filter"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          )}
         </div>
 
         {/* Output */}
         <div
           ref={outputRef}
           onScroll={handleOutputScroll}
-          className="h-[420px] lg:h-[calc(100vh-22rem)] overflow-y-auto bg-[#000] p-4 font-mono text-[12.5px] leading-[1.75]"
+          className="min-h-0 flex-1 overflow-y-auto bg-[#000] p-4 font-mono text-[12.5px] leading-[1.75]"
         >
           {!hasOutput && !isOnline ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -638,7 +644,7 @@ export default function ConsoleTab({
       </div>
 
       {/* ════ Right stats column (desktop) ════ */}
-      <div className="hidden lg:flex lg:w-[290px] shrink-0 flex-col gap-4">
+      <div className="hidden lg:flex lg:w-[300px] shrink-0 flex-col gap-4">
         {/* ── Auslastung (thick bars) ── */}
         <div className="rounded-xl border border-edge bg-surface p-4">
           <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Auslastung</h4>
@@ -647,41 +653,41 @@ export default function ConsoleTab({
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between">
               <span className="text-xs text-muted">CPU</span>
-              <span className={`text-base font-extrabold tabular-nums ${isOnline && (stats?.cpuPercent ?? 0) >= 90 ? "text-danger" : isOnline && (stats?.cpuPercent ?? 0) >= 70 ? "text-warn" : isOnline ? "text-online" : "text-slate-600"}`}>
+              <span className={`text-lg font-extrabold tabular-nums ${isOnline && (stats?.cpuPercent ?? 0) >= 90 ? "text-danger" : isOnline && (stats?.cpuPercent ?? 0) >= 70 ? "text-warn" : isOnline ? "text-online" : "text-slate-600"}`}>
                 {isOnline && stats?.cpuPercent != null ? `${Math.min(100, stats.cpuPercent).toFixed(1)}%` : "—"}
               </span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
-              <div className={`h-full rounded-full transition-all duration-700 ease-out ${(stats?.cpuPercent ?? 0) >= 90 ? "bg-danger" : (stats?.cpuPercent ?? 0) >= 70 ? "bg-warn" : "bg-online"}`}
+            <div className="h-1.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${(stats?.cpuPercent ?? 0) >= 90 ? "from-pink-600 to-danger" : (stats?.cpuPercent ?? 0) >= 70 ? "from-yellow-500 to-warn" : "from-teal-700 to-online"}`}
                 style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
             </div>
-            {history.length >= 2 && <Sparkline values={history.map(h => h.cpu)} max={100} stroke="#00F5D4" />}
+            {history.length >= 2 && <AreaChart values={history.map(h => h.cpu)} max={100} stroke="#00F5D4" id="chartCpu" />}
           </div>
 
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between">
               <span className="text-xs text-muted">RAM</span>
-              <span className={`text-base font-extrabold tabular-nums ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "text-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "text-warn" : "text-white"}`}>
+              <span className={`text-lg font-extrabold tabular-nums ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "text-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "text-warn" : "text-white"}`}>
                 {stats ? `${formatBytes(stats.memoryUsage)}` : "—"}
               </span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
-              <div className={`h-full rounded-full transition-all duration-700 ease-out ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-warn" : "bg-accent"}`}
+            <div className="h-1.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "from-pink-600 to-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "from-yellow-500 to-warn" : "from-purple-800 to-accent"}`}
                 style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
             </div>
-            {history.length >= 2 && <Sparkline values={history.map(h => h.mem)} max={stats?.memoryLimit ?? ram * 1024 * 1024} stroke="#9D4EDD" />}
+            {history.length >= 2 && <AreaChart values={history.map(h => h.mem)} max={stats?.memoryLimit ?? ram * 1024 * 1024} stroke="#9D4EDD" id="chartRam" />}
             <div className="mt-1 text-right text-[10px] text-muted">von {formatRam(ram)}</div>
           </div>
 
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between">
               <span className="text-xs text-muted">TPS</span>
-              <span className={`text-base font-extrabold tabular-nums ${tps ? (tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger") : "text-slate-600"}`}>
+              <span className={`text-lg font-extrabold tabular-nums ${tps ? (tps.tps5s >= 19 ? "text-online" : tps.tps5s >= 15 ? "text-warn" : "text-danger") : "text-slate-600"}`}>
                 {tps ? tps.tps5s.toFixed(1) : "—"}
               </span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-edge">
-              <div className={`h-full rounded-full transition-all duration-700 ease-out ${tps && tps.tps5s >= 19 ? "bg-online" : tps && tps.tps5s >= 15 ? "bg-warn" : "bg-danger"}`}
+            <div className="h-1.5 overflow-hidden rounded-full bg-edge">
+              <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${tps && tps.tps5s >= 19 ? "from-teal-700 to-online" : tps && tps.tps5s >= 15 ? "from-yellow-500 to-warn" : "from-pink-600 to-danger"}`}
                 style={{ width: `${tps ? Math.min(100, (tps.tps5s / 20) * 100) : 0}%` }} />
             </div>
             {tps && <div className="mt-1 text-right text-[10px] text-muted">1m {tps.tps1m.toFixed(1)} · 5m {tps.tps5m.toFixed(1)}</div>}
@@ -690,7 +696,7 @@ export default function ConsoleTab({
           <div>
             <div className="mb-1.5 flex items-baseline justify-between">
               <span className="text-xs text-muted">Disk</span>
-              <span className="text-base font-extrabold tabular-nums text-white">{isOnline && diskUsage ? formatBytes(diskUsage) : "—"}</span>
+              <span className="text-lg font-extrabold tabular-nums text-white">{isOnline && diskUsage ? formatBytes(diskUsage) : "—"}</span>
             </div>
           </div>
         </div>
