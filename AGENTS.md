@@ -801,3 +801,25 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert auf Server:** Build OK, Service active, Tokens im generierten CSS bestätigt (`.bg-void:#0c0d0f`, `.bg-accent:#6a86b8`, `.text-online:#4e9b7a`).
 
 > **Last updated:** 2026-08-11 · Session: Graphite-Design — Neon raus, gedämpfte Grau/Stahlblau-Palette
+
+---
+
+### 2026-08-11 — Dashboard & New-Server Redesign (V5 Gruppen-Ansicht)
+
+**Auslöser:** User wollte Dashboard + "New Server" überarbeiten (Design + Button-Ausrichtung), mit rotem Faden im Graphite-Design — "Jede Seite soll nicht willkürlich anders aussehen".
+
+**Mockup-Runde:** `screenshots/mockup-dashboard-create.html` — 6 Varianten (je Dashboard + passender Create-Flow), alle im identischen Graphite-Design-System: V1 Klar & Konsistent (Bloom), V2 Ops-Console (AMP/MCSM-Tabelle), V3 Split Ops, V4 Bloom-Cards, V5 Gruppen-Ansicht, V6 Klassisch Pterodactyl. **User wählte V5 — Gruppen-Ansicht.**
+
+**Dashboard → Gruppen-Ansicht:**
+- **ServerCard.tsx komplett neu:** kompakte Zeilen-Karte statt Banner-Karte — Icon-Tile (Typ-Emoji, farbige Bg), Name + Tag-Badge + Typ-Badge, Meta-Zeile (Port · Spieler · Uptime · MOTD), Status-Dot, Aktionen (Open/Start + ↻/■ mit Inline-Confirm). Kein Banner, keine dicken Bars mehr. `banner-texture*`/`card-glow-online` bleibt für den Online-Glow.
+- **page.tsx:** Status-Filter + Tag-Filter + Sortierung ersetzt durch **Gruppen-Chips** ("Alle Gruppen" + je Tag + "Ohne Tag", mit Counts). Server werden in **Sektionen nach Tag** gruppiert (Header: Name + Count-Badge + Trennlinie + "N online"). Toolbar: Suche + Start All/Stop All + New Server. Such-/Reset-Logik bleibt.
+
+**CreateServerDialog → 2-Schritt-Wizard:**
+- Progress-Bar (2 Segmente) oben.
+- **Schritt 1:** 3 große Kacheln (Paper Vanilla / CurseForge Modpack / Velocity Proxy) mit Beschreibung + Check auf Auswahl. Modpack-Kachel öffnet direkt den Installer (onOpenModpack).
+- **Schritt 2:** Konfiguration (Name, Tag, Type-Select, Version, Port, MaxPlayers, Voice, Difficulty/Hardcore, RAM, JVM) + "← Zurück" + "Create Server" + der echte Job-Progress.
+- `step`-State (Reset auf 1 bei open).
+
+**Verifiziert auf Server:** Build OK, Service active, Panel 200. Laufendem Testserver per API Tag "survival" gesetzt (PUT ok).
+
+> **Last updated:** 2026-08-11 · Session: Dashboard-Gruppen-Ansicht (V5) + Create-Wizard, kompakte ServerCard-Zeilen

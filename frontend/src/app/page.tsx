@@ -34,28 +34,38 @@ export default function DashboardPage() {
   const serversRef = useRef(servers);
   serversRef.current = servers;
 
-  const [statusFilter, setStatusFilter] = useState<"all" | "running" | "stopped">("all");
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"name" | "status" | "ram">("name");
+  const [groupFilter, setGroupFilter] = useState<string>("all"); // "all" | <tag> | "__untagged__"
   const [hostStats, setHostStats] = useState<{ cpuPercent: number; memory: { used: number; total: number }; disk: { used: number; total: number } } | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [stopAllConfirm, setStopAllConfirm] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const uniqueTags = Array.from(new Set(servers.map((s) => s.tag).filter((t): t is string => !!t)));
+  const hasUntagged = servers.some((s) => !s.tag);
 
-  const filteredServers = servers
-    .filter(s =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      (statusFilter === "all" ||
-        (statusFilter === "running" ? s.status === "running" : s.status !== "running")) &&
-      (tagFilter === null || s.tag === tagFilter)
-    )
-    .sort((a, b) => {
-      if (sortBy === "ram") return b.ram - a.ram;
-      if (sortBy === "status") return (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1);
-      return a.name.localeCompare(b.name);
-    });
+  // Group chips (V5: tags are the primary organization layer)
+  const groupChips: { id: string; label: string; count: number }[] = [
+    { id: "all", label: "Alle Gruppen", count: servers.length },
+    ...uniqueTags.map((t) => ({ id: t, label: t, count: servers.filter((s) => s.tag === t).length })),
+    ...(hasUntagged ? [{ id: "__untagged__", label: "Ohne Tag", count: servers.filter((s) => !s.tag).length }] : []),
+  ];
+
+  // Search filter (no status/sort — grouping replaces it)
+  const filteredServers = servers.filter((s) =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  // Build sections: all groups (or a single one when a chip is active)
+  const groups: { key: string; label: string; servers: ServerStatus[] }[] = (() => {
+    if (groupFilter === "all") {
+      return [
+        ...uniqueTags.map((t) => ({ key: t, label: t, servers: filteredServers.filter((s) => s.tag === t) })),
+        ...(hasUntagged ? [{ key: "__untagged__", label: "Ohne Tag", servers: filteredServers.filter((s) => !s.tag) }] : []),
+      ].filter((g) => g.servers.length > 0);
+    }
+    const tag = groupFilter === "__untagged__" ? null : groupFilter;
+    return [{ key: groupFilter, label: tag ?? "Ohne Tag", servers: filteredServers.filter((s) => s.tag === tag) }];
+  })();
 
   // ---- keyboard shortcut: "/" focuses the search (skip when typing) ----
   useEffect(() => {
@@ -67,12 +77,6 @@ export default function DashboardPage() {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
-
-  const statusFilterChips: { id: typeof statusFilter; label: string; count: number }[] = [
-    { id: "all", label: "All", count: servers.length },
-    { id: "running", label: "Online", count: servers.filter(s => s.status === "running").length },
-    { id: "stopped", label: "Stopped", count: servers.filter(s => s.status !== "running").length },
-  ];
 
   // ---- host metrics (machine-level CPU/RAM/Disk) ----
   useEffect(() => {
@@ -201,16 +205,8 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:flex-initial">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
-                    <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Filter… ( / )"
-                      className="w-full sm:w-40 rounded-lg border border-edge bg-surface pl-9 pr-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent/40 focus:outline-none" />
-                  </div>
                   <button onClick={fetchServers} className="rounded-lg border border-edge p-2 text-muted transition hover:border-accent/40 hover:text-slate-400 shrink-0" title="Refresh" aria-label="Refresh">
                     <RefreshCw className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setDialogOpen(true)} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-strong shadow-[0_0_20px_rgba(157,78,221,0.25)] shrink-0">
-                    <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Server</span>
                   </button>
                 </div>
               </header>
@@ -267,16 +263,14 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ── Toolbar: sort + batch ── */}
+              {/* ── Toolbar: search + batch + new ── */}
               {servers.length > 0 && (
-                <div className="mb-4 flex items-center gap-2 flex-wrap">
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "name" | "status" | "ram")}
-                    aria-label="Sort servers"
-                    className="rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-xs text-slate-300 focus:border-accent/40 focus:outline-none">
-                    <option value="name">Sort: Name</option>
-                    <option value="status">Sort: Status</option>
-                    <option value="ram">Sort: RAM</option>
-                  </select>
+                <div className="mb-3 flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[150px] sm:flex-initial">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
+                    <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Server suchen… ( / )"
+                      className="w-full sm:w-56 rounded-lg border border-edge bg-surface pl-9 pr-3 py-2 text-sm text-white placeholder:text-muted focus:border-accent/40 focus:outline-none" />
+                  </div>
                   <div className="flex-1" />
                   <button onClick={() => handleBatch("start")} disabled={batchBusy}
                     className="flex items-center gap-1.5 rounded-lg border border-online/30 bg-online/10 px-3 py-1.5 text-xs font-semibold text-online transition hover:bg-online/20 disabled:opacity-50"
@@ -296,26 +290,25 @@ export default function DashboardPage() {
                       ■ Stop All
                     </button>
                   )}
+                  <button onClick={() => setDialogOpen(true)} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-strong shrink-0">
+                    <Plus className="h-3.5 w-3.5" /> New Server
+                  </button>
                 </div>
               )}
 
-              {/* ── Status + Tag filter chips ── */}
+              {/* ── Group chips (tags as primary organization) ── */}
               {servers.length > 0 && (
-                <div className="mb-4 flex items-center gap-1.5 flex-wrap">
-                  {statusFilterChips.map((chip) => {
-                    const active = statusFilter === chip.id;
+                <div className="mb-5 flex items-center gap-1.5 flex-wrap">
+                  {groupChips.map((chip) => {
+                    const active = groupFilter === chip.id;
                     return (
                       <button
                         key={chip.id}
-                        onClick={() => setStatusFilter(chip.id)}
+                        onClick={() => setGroupFilter(chip.id)}
                         aria-pressed={active}
                         className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
                           active
-                            ? chip.id === "running"
-                              ? "border-online/30 bg-online/10 text-emerald-400"
-                              : chip.id === "stopped"
-                                ? "border-warn/30 bg-warn/10 text-amber-400"
-                                : "border-accent/40 bg-accent/10 text-purple-200"
+                            ? "border-accent/50 bg-accent/15 text-purple-200"
                             : "border-edge text-slate-400 hover:border-accent/30 hover:text-slate-200"
                         }`}
                       >
@@ -324,23 +317,8 @@ export default function DashboardPage() {
                       </button>
                     );
                   })}
-                  {uniqueTags.length > 0 && <span className="mx-1 h-4 w-px bg-edge" />}
-                  {uniqueTags.map((tag) => {
-                    const active = tagFilter === tag;
-                    return (
-                      <button
-                        key={tag}
-                        onClick={() => setTagFilter(active ? null : tag)}
-                        aria-pressed={active}
-                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${active ? "border-accent/50 bg-accent/15 text-purple-200" : "border-edge text-slate-400 hover:border-accent/30 hover:text-slate-200"}`}
-                      >
-                        {tag}
-                        <span className="tabular-nums opacity-70">{servers.filter((s) => s.tag === tag).length}</span>
-                      </button>
-                    );
-                  })}
-                  {(tagFilter !== null || statusFilter !== "all" || searchQuery) && (
-                    <button onClick={() => { setTagFilter(null); setStatusFilter("all"); setSearchQuery(""); }}
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery("")}
                       className="text-[11px] text-muted transition hover:text-slate-300 underline-offset-2 hover:underline">
                       Reset
                     </button>
@@ -348,7 +326,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* ── Server Cards ── */}
+              {/* ── Grouped server sections ── */}
               {servers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-edge py-20">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-accent/20 to-accent/10">
@@ -366,28 +344,41 @@ export default function DashboardPage() {
                   <p className="text-sm font-medium text-slate-500">No servers match "{searchQuery}"</p>
                 </div>
               ) : (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredServers.map((s) => (
-                    <ServerCard
-                      key={s.id}
-                      s={s}
-                      motd={serverMotds[s.id]}
-                      liveCpu={liveStats[s.id]?.cpu}
-                      liveMem={liveStats[s.id]?.mem}
-                      playerCount={playerCounts[s.id]}
-                      acting={actingId === s.id}
-                      stopConfirm={stopConfirmId === s.id}
-                      restartConfirm={restartConfirmId === s.id}
-                      onOpen={() => router.push(`/servers/${s.id}`)}
-                      onStart={() => handleServerAction(s.id, "start")}
-                      onStop={() => handleServerAction(s.id, "stop")}
-                      onRestart={() => handleServerAction(s.id, "restart")}
-                      onStopConfirm={() => setStopConfirmId(s.id)}
-                      onRestartConfirm={() => setRestartConfirmId(s.id)}
-                      onCancelConfirm={() => { setStopConfirmId(null); setRestartConfirmId(null); }}
-                    />
-                  ))}
-                </div>
+                groups.map((group) => {
+                  const online = group.servers.filter((s) => s.status === "running").length;
+                  return (
+                    <section key={group.key} className="mb-7 last:mb-0">
+                      <div className="mb-3 flex items-center gap-2.5">
+                        <h2 className="font-display text-sm font-bold text-white">{group.label}</h2>
+                        <span className="rounded-full border border-edge bg-surface px-2 py-0.5 text-[10px] tabular-nums text-muted">{group.servers.length}</span>
+                        <span className="h-px flex-1 bg-edge" />
+                        {online > 0 && <span className="flex items-center gap-1.5 text-[10px] font-semibold text-online"><span className="h-1.5 w-1.5 rounded-full bg-online pulse-dot" />{online} online</span>}
+                      </div>
+                      <div className="grid gap-2.5 sm:grid-cols-2">
+                        {group.servers.map((s) => (
+                          <ServerCard
+                            key={s.id}
+                            s={s}
+                            motd={serverMotds[s.id]}
+                            liveCpu={liveStats[s.id]?.cpu}
+                            liveMem={liveStats[s.id]?.mem}
+                            playerCount={playerCounts[s.id]}
+                            acting={actingId === s.id}
+                            stopConfirm={stopConfirmId === s.id}
+                            restartConfirm={restartConfirmId === s.id}
+                            onOpen={() => router.push(`/servers/${s.id}`)}
+                            onStart={() => handleServerAction(s.id, "start")}
+                            onStop={() => handleServerAction(s.id, "stop")}
+                            onRestart={() => handleServerAction(s.id, "restart")}
+                            onStopConfirm={() => setStopConfirmId(s.id)}
+                            onRestartConfirm={() => setRestartConfirmId(s.id)}
+                            onCancelConfirm={() => { setStopConfirmId(null); setRestartConfirmId(null); }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })
               )}
             </>
           )}

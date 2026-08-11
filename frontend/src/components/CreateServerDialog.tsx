@@ -52,6 +52,8 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
   const [tag, setTag] = useState("");
   // Template presets
   const [template, setTemplate] = useState<"paper" | "modpack" | "velocity">("paper");
+  // Wizard step
+  const [step, setStep] = useState<1 | 2>(1);
 
   // RAM quick-select presets — extended up to 64G
   const RAM_CHIPS = ["512M", "1G", "2G", "4G", "6G", "8G", "12G", "16G", "24G", "32G", "48G", "64G"];
@@ -140,6 +142,7 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
       setVoicePort(null);
       setTag("");
       setTemplate("paper");
+      setStep(1);
       setError(null);
       setJobProgress(null);
       // Fetch max system RAM
@@ -289,35 +292,65 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6">
-          {/* ── Templates ── */}
-          <div className="mb-6">
-            <div className="mb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Template</div>
-            <div className="grid grid-cols-3 gap-2.5">
-              {([
-                { id: "paper", icon: "🌍", title: "Paper Vanilla", desc: "Vanilla MC mit Paper-Optimierungen." },
-                { id: "modpack", icon: "🧩", title: "Modpack", desc: "CurseForge-Modpack installieren." },
-                { id: "velocity", icon: "🕸️", title: "Velocity Proxy", desc: "Netzwerk-Proxy für Backend-Server." },
-              ] as const).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => applyTemplate(t.id)}
-                  disabled={submitting}
-                  className={`rounded-lg border p-3 text-left transition disabled:opacity-50 ${
-                    template === t.id
-                      ? "border-accent bg-accent/10 shadow-[0_0_0_1px_var(--color-accent)]"
-                      : "border-edge bg-void hover:border-accent/40"
-                  }`}
-                >
-                  <div className="mb-1 text-xl">{t.icon}</div>
-                  <div className="text-xs font-bold text-white">{t.title}</div>
-                  <div className="mt-0.5 text-[10px] leading-snug text-muted">{t.desc}</div>
-                </button>
-              ))}
-            </div>
+          {/* ── Wizard progress (2 steps) ── */}
+          <div className="mb-5 flex gap-1.5">
+            <div className={`h-1 flex-1 rounded-full transition-colors ${step === 1 ? "bg-accent/30" : "bg-accent"}`} />
+            <div className={`h-1 flex-1 rounded-full transition-colors ${step === 1 ? "bg-edge" : "bg-accent"}`} />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          {step === 1 ? (
+            /* ══════ Schritt 1 · Template-Auswahl ══════ */
+            <>
+              <div className="mb-2.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Schritt 1 · Was möchtest du erstellen?</div>
+              <div className="flex flex-col gap-2.5">
+                {([
+                  { id: "paper", icon: "🌍", title: "Paper Vanilla", desc: "Schnell, optimiert, großes Plugin-Ökosystem." },
+                  { id: "modpack", icon: "🧩", title: "CurseForge Modpack", desc: "Über 10.000 Modpacks in wenigen Klicks installieren." },
+                  { id: "velocity", icon: "🕸️", title: "Velocity Proxy", desc: "Netzwerk-Proxy für mehrere Backend-Server." },
+                ] as const).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      if (t.id === "modpack") { onClose(); onOpenModpack?.(); return; }
+                      applyTemplate(t.id);
+                    }}
+                    disabled={submitting}
+                    className={`flex items-center gap-3.5 rounded-lg border p-3.5 text-left transition disabled:opacity-50 ${
+                      template === t.id
+                        ? "border-accent bg-accent/10 shadow-[0_0_0_1px_var(--color-accent)]"
+                        : "border-edge bg-void hover:border-accent/40"
+                    }`}
+                  >
+                    <div className="text-xl">{t.icon}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-bold text-white">{t.title}</div>
+                      <div className="mt-0.5 text-[11px] leading-snug text-muted">{t.desc}</div>
+                    </div>
+                    {template === t.id && <span className="shrink-0 text-accent-soft font-bold">✓</span>}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={submitting || template === "modpack"}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-strong disabled:opacity-50"
+              >
+                Weiter →
+              </button>
+            </>
+          ) : (
+            /* ══════ Schritt 2 · Konfiguration ══════ */
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Schritt 2 · Konfiguration</span>
+                <span className="flex items-center gap-2 text-[11px] text-muted">
+                  Template: <b className="font-semibold text-purple-200">{template === "velocity" ? "Velocity Proxy" : "Paper Vanilla"}</b>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
             {/* ── Left Column: Basic Information ── */}
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -635,26 +668,36 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
             </div>
           )}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={
-              submitting || !name.trim() || !paperVersion || versionsLoading
-            }
-            className="mt-5 flex w-full items-center justify-center gap-2
-                       rounded-lg bg-accent px-4 py-2.5 text-sm font-medium
-                       text-white transition hover:bg-accent-strong hover:scale-[1.02]
-                       disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {jobProgress?.step ?? "Starting…"}
-              </>
-            ) : (
-              "Create Server"
-            )}
-          </button>
+          {/* Submit row (step 2) */}
+          <div className="mt-5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              disabled={submitting}
+              className="shrink-0 rounded-lg border border-edge px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-accent/40 hover:text-slate-200 disabled:opacity-50"
+            >
+              ← Zurück
+            </button>
+            <button
+              type="submit"
+              disabled={
+                submitting || !name.trim() || !paperVersion || versionsLoading
+              }
+              className="flex flex-1 items-center justify-center gap-2
+                         rounded-lg bg-accent px-4 py-2.5 text-sm font-medium
+                         text-white transition hover:bg-accent-strong hover:scale-[1.02]
+                         disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {jobProgress?.step ?? "Starting…"}
+                </>
+              ) : (
+                "Create Server"
+              )}
+            </button>
+          </div>
 
           {/* Real creation progress (backend job) */}
           {submitting && jobProgress && (
@@ -691,6 +734,8 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
                 <span className="text-[11px] font-bold tabular-nums text-purple-300">{jobProgress.percent}%</span>
               </div>
             </div>
+          )}
+            </>
           )}
         </form>
       </div>
