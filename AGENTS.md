@@ -618,3 +618,30 @@ Aktuell existiert NUR der Live-Status-Embed (`discord.ts`: send/edit/buildStatus
 Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — dafür bräuchte es einen echten Bot (Gateway). Webhook = nur reine Benachrichtigungen.
 
 > **Last updated:** 2026-08-10 · Session-Ende: Modpack-Button-Fix, Discord-Ideen vorgeschlagen (Auswahl offen), Mockups in screenshots/
+
+---
+
+### 2026-08-11 — Recreate-Button, Console-Filter, Verlaufskurven
+
+**Bestandsaufnahme 188-Server:** `servers.json` ist leer, keine Docker-Container — der frühere Paper-Container existiert nicht mehr. Einziger Überrest: 226-MB-Orphan-Backup `backup-e0450b75-...tar.gz` im `data/`-Ordner (Frage ans User gestellt, Antwort steht aus). Alle Hardening-Fixes (Non-Root `mc`-User, RCON 127.0.0.1, TERM=dumb) greifen automatisch bei jedem neu erstellten Server.
+
+**A1 — Recreate-Button (Commit `4ac2eb1`):**
+- **Backend:** `POST /api/servers/:id/recreate` — stoppt+löscht den alten Container, baut neu aus der aktuellen Config (Daten bleiben, Bind-Mount), stellt den Laufzustand wieder her (war er an → startet wieder). Löst das "Delete + neu erstellen"-Problem bei Container-Code-Fixes dauerhaft.
+- **Helper-Dedup:** JAR-Probe-Logik aus `scheduler.ts` → `resolveLaunchJar()` in `docker.ts` extrahiert (paper.jar / fabric / velocity / custom-Probe run.sh→server.jar→quilt→fabric). Scheduler + Recreate-Route nutzen denselben Resolver. Unbenutzter `fs`-Import im Scheduler entfernt.
+- **Frontend:** Recreate-Button mit Inline-Yes/No-Confirm in der Detail-Aktionsleiste (zwischen Restore und Spacer), setzt `restartTick` → Console detach/reattach.
+
+**C8 — Console-Filter (Commit `4ac2eb1`):**
+- Filterleiste zwischen Console-Header und Output: Freitext + Level-Dropdown (All/Errors/System), Match-Zähler `N/M`, Clear-Button, "No lines match"-Empty-State.
+- `visibleLines` via `useMemo` — Roh-Lines bleiben fürs Umfiltern intakt, Auto-Scroll folgt den gefilterten Zeilen.
+
+**D12 — Verlaufskurven (Commit `4ac2eb1`):**
+- Client-seitige History: 1 Sample/5s (Throttle via `lastSampleRef`), 360 Samples = 30 Min, Reset bei Stop/Restart.
+- Dependency-freie `Sparkline`-Komponente (SVG-Polyline, `vectorEffect="non-scaling-stroke"`) in der Auslastung-Card unter CPU- (cyan) und RAM-Balken (violett), Label "letzte 30 Min".
+
+**C10 — Drag&Drop-Upload:** War bereits vollständig implementiert (Backend `POST /:id/upload` in `files.ts` + Drop-Handler/Overlay in `FileManagerTab`) — nur verifiziert, nichts geändert.
+
+**A3 — HTTPS:** Vom User auf später verschoben (Caddy/Let's Encrypt braucht eine Domain; keine vorhanden).
+
+**Deploy:** Server-Build OK (Backend tsc 0 Fehler, Frontend next build OK), beide Services active, Backend-Health 200, Frontend 200, API-Proxy 200.
+
+> **Last updated:** 2026-08-11 · Session: Recreate-Button, Console-Filter, Sparklines, C10 verifiziert, HTTPS vertagt
