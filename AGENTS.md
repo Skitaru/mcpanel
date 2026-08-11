@@ -712,4 +712,6 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 - Bars `h-2.5` → `h-1.5` mit `bg-gradient-to-r` (teal→cyan, purple→accent; Warn/Danger-Stufen behalten).
 - Werte `text-base` → `text-lg` (größere Zahlen wie im Mockup), Sidebar `w-[290px]` → `w-[300px]`.
 
+**Nachtrag (Commit `b73510e`):** Area-Charts auf Nutzerwunsch wieder entfernt — "Graphen raus, nur Balken". Auslastung-Card zeigt nur noch große Zahlen (text-lg) + dicke Verlaufs-Balken (h-1.5 gradient). AreaChart-Komponente, History-Sampling und Resets komplett entfernt (toter Code). Console-Höhe + Filter-im-Header aus `47e6c44` bleiben.
+
 > **Last updated:** 2026-08-11 · Session: Console-Redesign moderner Panel-Stil, Area-Charts, feste Console-Höhe
