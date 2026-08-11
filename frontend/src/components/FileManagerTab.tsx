@@ -335,7 +335,7 @@ export default function FileManagerTab({ serverId }: Props) {
                       </div>
                     ) : (
                       <button onClick={e => { e.stopPropagation(); setDeleteTarget(f.name); }}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted opacity-0 transition hover:bg-danger/20 hover:text-red-400 group-hover:opacity-100"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted transition hover:bg-danger/20 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
                         title="Delete" aria-label="Delete"><Trash2 className="h-3 w-3" /></button>
                     )}
                   </li>

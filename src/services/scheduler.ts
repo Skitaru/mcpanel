@@ -1,19 +1,10 @@
-// ---- Minecraft Server Panel: Task Scheduler ----
+// ---- Obsidian Panel: Task Scheduler ----
 // Checks every 30 s whether any server has a scheduled task due.
 // Stores schedule config in servers.json per-server.
 
-import { loadServers, mutateServers } from "./config-store";
-import {
-  stopContainer,
-  startContainer,
-  deleteContainer,
-  createContainer,
-  resolveJavaImageForServer,
-  resolveLaunchJar,
-} from "./docker";
-import path from "node:path";
-import { execFile } from "node:child_process";
-import { readdir, stat, unlink } from "node:fs/promises";
+import { loadServers } from "./config-store";
+import { stopContainer, startContainer } from "./docker";
+import { createBackup, pruneBackups } from "./backups";
 
 const CHECK_INTERVAL_MS = 30_000;
 
@@ -38,7 +29,8 @@ async function tick(): Promise<void> {
     const schedule = srv.schedule;
     if (!schedule) continue;
 
-    // ---- Scheduled restart ----
+    // ---- Scheduled restart (fast stop+start on the SAME container — the
+    // container recreation stays a manual "Recreate" action) ----
     if (schedule.restart && schedule.restart === currentTime && srv.containerId) {
       const key = `${srv.id}:restart`;
       if (lastFired.get(key) !== currentTime) {
@@ -53,15 +45,16 @@ async function tick(): Promise<void> {
       }
     }
 
-    // ---- Scheduled backup ----
+    // ---- Scheduled backup (keeps the 5 most recent) ----
     if (schedule.backup && schedule.backup === currentTime) {
       const key = `${srv.id}:backup`;
       if (lastFired.get(key) !== currentTime) {
         lastFired.set(key, currentTime);
         console.log(`[scheduler] Backing up server "${srv.name}" (scheduled ${schedule.backup})`);
         try {
-          await performBackup(srv);
-          console.log(`[scheduler] Backup of "${srv.name}" completed`);
+          const bk = await createBackup(srv, "scheduled");
+          await pruneBackups(srv.id, ["scheduled"], 5);
+          console.log(`[scheduler] Backup of "${srv.name}" completed: ${bk.name} (${(bk.size / 1e6).toFixed(1)} MB)`);
         } catch (err: any) {
           console.error(`[scheduler] Failed to backup "${srv.name}":`, err.message);
         }
@@ -70,60 +63,10 @@ async function tick(): Promise<void> {
   }
 }
 
+/** Graceful restart without recreating the container. */
 async function restartContainer(srv: any): Promise<void> {
   const containerId = srv.containerId;
   if (!containerId) return;
-
-  // Stop + remove + recreate + start
-  try { await stopContainer(containerId); } catch {}
-  try { await deleteContainer(containerId); } catch {}
-
-  const ver = srv.version === "pending" ? "1.21.1" : srv.version;
-  const javaImage = resolveJavaImageForServer(ver, srv.serverType);
-
-  // Determine the launch jar via the shared resolver (custom/modpack servers
-  // are probed from the data directory — a scheduled restart must NOT
-  // recreate them with the default paper.jar).
-  const jarName = resolveLaunchJar(srv);
-
-  const newId = await createContainer(srv, javaImage, {
-    jarName,
-    javaArgs: srv.javaArgs,
-  });
-
-  await startContainer(newId);
-
-  // Update the containerId in servers.json (serialized — no lost updates).
-  await mutateServers((all: any[]) => {
-    const idx = all.findIndex((s: any) => s.id === srv.id);
-    if (idx >= 0) all[idx].containerId = newId;
-  });
-}
-
-async function performBackup(srv: any): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupName = `scheduled-backup-${srv.id.slice(0, 8)}-${timestamp}.tar.gz`;
-  const backupDir = path.resolve(srv.dataPath, "..");
-  const backupPath = path.join(backupDir, backupName);
-
-  await new Promise<void>((resolve, reject) => {
-    execFile("tar", ["-czf", backupPath, "-C", srv.dataPath, "."], {
-      timeout: 300_000,
-    }, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-
-  const st = await stat(backupPath);
-  console.log(`[scheduler] Backup saved: ${backupName} (${(st.size / 1e6).toFixed(1)} MB)`);
-
-  // Keep only the 5 most recent scheduled backups
-  const backups = (await readdir(backupDir))
-    .filter(f => f.startsWith(`scheduled-backup-${srv.id.slice(0, 8)}-`) && f.endsWith(".tar.gz"))
-    .sort()
-    .reverse();
-  for (const old of backups.slice(5)) {
-    try { await unlink(path.join(backupDir, old)); } catch {}
-  }
+  await stopContainer(containerId);
+  await startContainer(containerId);
 }

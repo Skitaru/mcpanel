@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
-  Terminal, FolderOpen, ScrollText, Settings2,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, Upload, ArrowLeft, RefreshCw,
+  Terminal, FolderOpen, ScrollText, Settings2, Archive,
+  Loader2, AlertTriangle, Trash2, Play, Square, Upload, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
+import BackupsTab from "@/components/BackupsTab";
 import EditServerDialog from "@/components/EditServerDialog";
 import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
@@ -19,12 +20,13 @@ import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-type Tab = "console" | "files" | "logs";
+type Tab = "console" | "files" | "logs" | "backups";
 
 const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
   { id: "files", label: "File Manager", icon: FolderOpen },
   { id: "logs", label: "Server Logs", icon: ScrollText },
+  { id: "backups", label: "Backups", icon: Archive },
 ];
 
 export default function ServerDetailPage() {
@@ -37,10 +39,10 @@ export default function ServerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("console");
-  // URL sync: ?tab=files|logs survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
+  // URL sync: ?tab=files|logs|backups survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "files" || t === "logs") setActiveTab(t);
+    if (t === "files" || t === "logs" || t === "backups") setActiveTab(t);
   }, []);
   const setTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
@@ -60,6 +62,7 @@ export default function ServerDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const [backupsRefreshTick, setBackupsRefreshTick] = useState(0);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [dockerLogs, setDockerLogs] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
   const [restartTick, setRestartTick] = useState(0);
@@ -139,11 +142,11 @@ export default function ServerDetailPage() {
     setBackingUp(true);
     try {
       const res = await fetch(`${API_BASE}/api/servers/${serverId}/backup`, { method: "POST" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob(); const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `backup-${serverId.slice(0,8)}.tar.gz`; a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Backup downloaded");
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? `HTTP ${res.status}`); }
+      const d = await res.json();
+      toast.success(d.message ?? "Backup created");
+      // Let the Backups tab refresh its list.
+      setBackupsRefreshTick(t => t + 1);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Backup failed"); }
     finally { setBackingUp(false); }
   }, [serverId]);
@@ -177,6 +180,7 @@ export default function ServerDetailPage() {
       if (e.key === "1") setTab("console");
       else if (e.key === "2") setTab("files");
       else if (e.key === "3") setTab("logs");
+      else if (e.key === "4") setTab("backups");
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -244,9 +248,9 @@ export default function ServerDetailPage() {
                     className="rounded-xl border border-online/30 bg-online/10 px-6 py-2.5 text-[13px] font-bold text-online transition hover:bg-online/20 disabled:opacity-50">▶ Start</button>
                 )}
 
-                <button disabled={backingUp} onClick={handleBackup}
+                <button disabled={backingUp} onClick={handleBackup} title="Create a backup (see Backups tab)"
                   className="flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-accent-strong disabled:opacity-50">
-                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" strokeWidth={2} />} Backup
+                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" strokeWidth={2} />} Backup
                 </button>
                 <label className={`flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup" aria-label="Restore Backup">
                   <Upload className="h-4 w-4" strokeWidth={1.75} /> Restore
@@ -322,6 +326,10 @@ export default function ServerDetailPage() {
 
               <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}>
                 <LogsTab serverId={serverId} />
+              </div>
+
+              <div className={`tab-content ${activeTab === "backups" ? "" : "hidden"}`}>
+                <BackupsTab serverId={serverId} serverName={server.name} refreshTick={backupsRefreshTick} />
               </div>
             </>
           )}

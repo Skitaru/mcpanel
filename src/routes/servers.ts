@@ -25,6 +25,7 @@ import {
   isValidJavaArgs,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
+import { createBackup, listBackups, deleteBackup, pruneBackups, restoreFromArchive } from "../services/backups";
 import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
 import { downloadPaperJar } from "../services/paper";
 import { downloadFabricJar } from "../services/fabric";
@@ -433,6 +434,15 @@ router.post("/:id/recreate", async (req: Request, res: Response) => {
     const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
+    // Safety snapshot before rebuilding the container.
+    try {
+      const bk = await createBackup(server, "auto");
+      console.log(`[api] Pre-recreate backup: ${bk.name}`);
+      await pruneBackups(server.id, ["auto"], 5);
+    } catch (err: any) {
+      console.error("[api] Pre-recreate backup failed (continuing):", err.message);
+    }
+
     // Remember whether it was running so we can restore the state afterwards.
     let wasRunning = false;
     if (server.containerId) {
@@ -547,6 +557,15 @@ router.delete("/:id", async (req: Request, res: Response) => {
       return;
     }
 
+    // 0. Safety snapshot before deleting — the data dir is gone afterwards.
+    try {
+      const bk = await createBackup(server, "auto");
+      console.log(`[api] Pre-delete backup: ${bk.name}`);
+      await pruneBackups(server.id, ["auto"], 5);
+    } catch (err: any) {
+      console.error("[api] Pre-delete backup failed (continuing):", err.message);
+    }
+
     // 1. Remove Docker container (best-effort).
     if (server.containerId) {
       try { await deleteContainer(server.containerId); } catch (err: any) {
@@ -573,8 +592,15 @@ router.delete("/:id", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/servers/:id/backup
+// Backups — stored on the server under backups/<serverId>/ and managed in the UI
+//   POST   /:id/backup                     create a manual backup (no download)
+//   GET    /:id/backups                    list stored backups
+//   GET    /:id/backups/:name/download     download one backup
+//   POST   /:id/backups/:name/restore      restore from a stored backup
+//   DELETE /:id/backups/:name              delete one backup
+//   POST   /:id/restore                    upload + restore a local .tar.gz
 // ---------------------------------------------------------------------------
+
 router.post("/:id/backup", async (req: Request, res: Response) => {
   try {
     const server = await getServer(req.params.id);
@@ -582,51 +608,100 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
       res.status(404).json({ error: "Server not found." });
       return;
     }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupName = `backup-${server.id.slice(0, 8)}-${timestamp}.tar.gz`;
-    const backupPath = path.join(server.dataPath, "..", backupName);
-
-    // Use system `tar` (Linux, macOS, Git Bash on Windows). execFile avoids
-    // shell injection by passing args as an array, and runs async so the
-    // event loop stays responsive for other requests during backup.
-    const { execFile } = await import("node:child_process");
-    try {
-      await new Promise<void>((resolve, reject) => {
-        execFile("tar", ["-czf", backupPath, "-C", server.dataPath, "."], {
-          timeout: 120_000,
-        }, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        error: "Backup failed — is `tar` installed?",
-        detail: err.message,
-      });
-      return;
-    }
-
-    const st = fs.statSync(backupPath);
-    console.log(`[api] Backup: ${backupName} (${(st.size / 1e6).toFixed(1)} MB)`);
-
-    // Stream the file directly to the response — avoids buffering the
-    // entire backup in RAM. Clean up the temp file after sending.
-    res.set("Content-Type", "application/gzip");
-    res.set("Content-Disposition", `attachment; filename="${backupName}"`);
-    const rs = fs.createReadStream(backupPath);
-    rs.on("error", (err) => {
-      console.error("[api] Backup stream error:", err.message);
-      try { fs.unlinkSync(backupPath); } catch {}
-    });
-    rs.on("end", () => {
-      try { fs.unlinkSync(backupPath); } catch {}
-    });
-    rs.pipe(res);
+    const backup = await createBackup(server, "manual");
+    console.log(`[api] Backup: ${backup.name} (${(backup.size / 1e6).toFixed(1)} MB)`);
+    res.status(201).json({ message: `Backup created (${(backup.size / 1e6).toFixed(1)} MB).`, backup });
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/backup error:", err);
     res.status(500).json({ error: "Failed to create backup.", detail: err.message });
+  }
+});
+
+router.get("/:id/backups", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) {
+      res.status(404).json({ error: "Server not found." });
+      return;
+    }
+    const backups = await listBackups(server.id);
+    res.json(backups);
+  } catch (err: any) {
+    console.error("[api] GET /api/servers/:id/backups error:", err);
+    res.status(500).json({ error: "Failed to list backups.", detail: err.message });
+  }
+});
+
+router.get("/:id/backups/:name/download", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) {
+      res.status(404).json({ error: "Server not found." });
+      return;
+    }
+    const { backupPathFor } = await import("../services/backups");
+    const filePath = backupPathFor(server.id, req.params.name);
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.status(404).json({ error: "Backup not found." });
+      return;
+    }
+    res.set("Content-Type", "application/gzip");
+    res.set("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err: any) {
+    console.error("[api] GET backup download error:", err);
+    res.status(500).json({ error: "Failed to download backup.", detail: err.message });
+  }
+});
+
+router.post("/:id/backups/:name/restore", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) {
+      res.status(404).json({ error: "Server not found." });
+      return;
+    }
+    const { backupPathFor } = await import("../services/backups");
+    const filePath = backupPathFor(server.id, req.params.name);
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.status(404).json({ error: "Backup not found." });
+      return;
+    }
+
+    // Safety snapshot of the current state before overwriting it.
+    try {
+      const bk = await createBackup(server, "auto");
+      console.log(`[api] Pre-restore backup: ${bk.name}`);
+      await pruneBackups(server.id, ["auto"], 5);
+    } catch (err: any) {
+      console.error("[api] Pre-restore backup failed (continuing):", err.message);
+    }
+
+    await restoreFromArchive(server, filePath);
+    console.log(`[api] Restored server "${server.name}" from backup ${req.params.name}`);
+    res.json({ message: `Server "${server.name}" restored from backup.` });
+  } catch (err: any) {
+    console.error("[api] POST backup restore error:", err);
+    res.status(500).json({ error: "Failed to restore backup.", detail: err.message });
+  }
+});
+
+router.delete("/:id/backups/:name", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) {
+      res.status(404).json({ error: "Server not found." });
+      return;
+    }
+    const ok = await deleteBackup(server.id, req.params.name);
+    if (!ok) {
+      res.status(404).json({ error: "Backup not found." });
+      return;
+    }
+    res.json({ message: "Backup deleted." });
+  } catch (err: any) {
+    console.error("[api] DELETE backup error:", err);
+    res.status(500).json({ error: "Failed to delete backup.", detail: err.message });
   }
 });
 
@@ -638,120 +713,38 @@ const restoreUpload = multer({ dest: "/tmp/mcpanel-restores", limits: { fileSize
 try { fs.mkdirSync("/tmp/mcpanel-restores", { recursive: true }); } catch {}
 
 router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request, res: Response) => {
+  const uploadPath = req.file?.path;
   try {
     const server = await getServer(req.params.id);
     if (!server) {
       res.status(404).json({ error: "Server not found." });
       return;
     }
-    if (!req.file) {
+    if (!uploadPath) {
       res.status(400).json({ error: "No backup file uploaded." });
       return;
     }
 
-    const uploadPath = req.file.path;
-
-    // ---- tar-slip protection: scan archive entries BEFORE extracting ----
-    // `--no-absolute-filenames` only strips leading "/"; "../" entries would
-    // still escape the target dir. Reject any archive with unsafe paths.
-    const { execFile } = await import("node:child_process");
+    // Safety snapshot of the current state before overwriting it.
     try {
-      const listing = await new Promise<string>((resolve, reject) => {
-        execFile("tar", ["-tzf", uploadPath], {
-          timeout: 60_000,
-          maxBuffer: 20 * 1024 * 1024,
-          encoding: "utf-8",
-        }, (err, stdout) => {
-          if (err) reject(err);
-          else resolve(stdout);
-        });
-      });
-      for (const entry of listing.split("\n")) {
-        const e = entry.trim();
-        if (!e) continue;
-        if (e.startsWith("/") || e.split("/").includes("..")) {
-          try { fs.unlinkSync(uploadPath); } catch {}
-          res.status(400).json({ error: "Backup contains unsafe paths (path traversal) and was rejected." });
-          return;
-        }
-      }
+      const bk = await createBackup(server, "auto");
+      console.log(`[api] Pre-restore backup: ${bk.name}`);
+      await pruneBackups(server.id, ["auto"], 5);
     } catch (err: any) {
-      try { fs.unlinkSync(uploadPath); } catch {}
-      res.status(400).json({ error: "Could not inspect backup archive.", detail: err.message });
-      return;
+      console.error("[api] Pre-restore backup failed (continuing):", err.message);
     }
 
-    // Stop container if running
-    if (server.containerId) {
-      try {
-        const { stopContainer } = await import("../services/docker");
-        await stopContainer(server.containerId);
-      } catch { /* container might already be stopped */ }
-    }
-
-    // Extract to a temp directory first — only clear data if extraction succeeds
-    const tmpDir = path.join("/tmp/mcpanel-restore", server.id);
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    try {
-      // --no-absolute-filenames prevents path-traversal via malicious archive
-      await new Promise<void>((resolve, reject) => {
-        execFile("tar", ["-xzf", uploadPath, "-C", tmpDir, "--no-absolute-filenames"], {
-          timeout: 300_000,
-        }, (err: Error | null) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    } catch (err: any) {
-      try { fs.unlinkSync(uploadPath); } catch {}
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-      res.status(500).json({ error: "Restore failed — invalid archive?", detail: err.message });
-      return;
-    }
-
-    // Extraction succeeded — now clear data directory and move files
-    try {
-      for (const entry of fs.readdirSync(server.dataPath)) {
-        fs.rmSync(path.join(server.dataPath, entry), { recursive: true, force: true });
-      }
-    } catch { /* dir might be empty or nonexistent */ }
-
-    try {
-      for (const entry of fs.readdirSync(tmpDir)) {
-        const src = path.join(tmpDir, entry);
-        const dst = path.join(server.dataPath, entry);
-        fs.cpSync(src, dst, { recursive: true });  // copyFile+unlink resistant to EXDEV
-        fs.rmSync(src, { recursive: true, force: true });
-      }
-    } catch (err: any) {
-      console.error("[api] Restore move failed:", err.message);
-      res.status(500).json({ error: "Restore failed — could not move files into data directory.", detail: err.message });
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-      try { fs.unlinkSync(uploadPath); } catch {}
-      return;
-    }
-
-    // Clean up
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    try { fs.unlinkSync(uploadPath); } catch {}
-
-    // Start container again
-    if (server.containerId) {
-      try {
-        const { startContainer } = await import("../services/docker");
-        await startContainer(server.containerId);
-      } catch (err: any) {
-        console.error("[api] Restore re-start failed:", err.message);
-      }
-    }
-
-    console.log(`[api] Restored server "${server.name}" from backup`);
+    await restoreFromArchive(server, uploadPath);
+    console.log(`[api] Restored server "${server.name}" from uploaded backup`);
     res.json({ message: `Server "${server.name}" restored and restarted.` });
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/restore error:", err);
     res.status(500).json({ error: "Failed to restore backup.", detail: err.message });
+  } finally {
+    // Never leave multer temp files behind.
+    if (uploadPath) {
+      try { fs.unlinkSync(uploadPath); } catch { /* already gone */ }
+    }
   }
 });
 
