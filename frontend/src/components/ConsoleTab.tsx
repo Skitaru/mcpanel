@@ -114,6 +114,20 @@ export default function ConsoleTab({
   const [suggIdx, setSuggIdx] = useState(-1);
   // Console filter: free text + output level
   const [filter, setFilter] = useState<{ text: string; level: "all" | "stderr" | "system" }>({ text: "", level: "all" });
+  // Desktop: measured height of the right stats column — the console matches it,
+  // so both columns end flush (whatever the Quick Commands state).
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarH, setSidebarH] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+    const measure = () => setSidebarH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ---- filtered view (keeps raw lines intact for re-filtering) ----
   const visibleLines = useMemo(() => {
@@ -456,18 +470,22 @@ export default function ConsoleTab({
   // ==================================================================
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
+    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
       {/* ════ Left: Quick commands + Console ════ */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
+      {/* Desktop: left column height = measured sidebar height, so the console
+          always ends flush with the PlayerCard, whatever the Quick Commands state. */}
+      <div
+        className="flex min-w-0 flex-1 flex-col gap-4"
+        style={sidebarH && sidebarH > 0 ? { height: sidebarH } : undefined}
+      >
         {isOnline && (
           <div className="hidden lg:block">
             <QuickCommands serverId={serverId} />
           </div>
         )}
 
-        {/* Console panel — desktop height is fluid (fills the gap below Quick Commands
-            so it ends flush with the PlayerCard); mobile keeps a fixed height. */}
-        <div className="flex h-[420px] min-h-0 lg:h-auto lg:min-h-[320px] lg:flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+        {/* Console panel — fills the remaining height under Quick Commands */}
+        <div className="flex h-[420px] min-h-0 flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
         {/* Console header + filter */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-edge bg-surface px-4 py-2">
           <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>
@@ -621,8 +639,8 @@ export default function ConsoleTab({
       </div>
       </div>{/* /left wrapper */}
 
-      {/* ════ Right stats column (desktop) ════ */}
-      <div className="hidden lg:flex lg:w-[300px] shrink-0 flex-col gap-4">
+      {/* ════ Right stats column (desktop) — its height drives the console height ════ */}
+      <div ref={sidebarRef} className="hidden lg:flex lg:w-[300px] shrink-0 flex-col gap-4">
         {/* ── Auslastung (thick bars) ── */}
         <div className="rounded-xl border border-edge bg-surface p-4">
           <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Auslastung</h4>
@@ -700,9 +718,8 @@ export default function ConsoleTab({
           </div>
         </div>
 
-        {/* ── Spieler (management: OP/Kick/Ban + Whitelist) — pinned to the bottom so
-             the console on the left ends flush with it ── */}
-        <PlayerCard serverId={serverId} isOnline={isOnline} playerCount={playerCount} playerList={playerList} className="mt-auto" />
+        {/* ── Spieler (management: OP/Kick/Ban + Whitelist) ── */}
+        <PlayerCard serverId={serverId} isOnline={isOnline} playerCount={playerCount} playerList={playerList} />
       </div>
     </div>
   );

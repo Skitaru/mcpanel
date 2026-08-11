@@ -853,3 +853,19 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** Build OK, Service active, Panel 200.
 
 > **Last updated:** 2026-08-11 · Session: Fluid console height aligned to PlayerCard, collapsible quick commands resize console
+
+---
+
+### 2026-08-11 — Console-Höhe: Fix (ResizeObserver statt flex-stretch)
+
+**Problem nach 51a5f4d:** Die Console war "viel zu groß" + große Lücke zwischen Server-Card und PlayerCard. Ursache: `lg:h-auto lg:flex-1` auf der Console ohne definierte Höhe in der Flex-Kette — ohne Höhen-Begrenzung nahm die linke Spalte die **max-content-Höhe** des Console-Outputs an (Log-History explodierte die Spalte auf Tausende Pixel). Die Row wurde riesig, die Sidebar per stretch mitgedehnt → Lücke (mt-auto klebte die PlayerCard unten, die Server-Card oben).
+
+**Fix (ConsoleTab.tsx):**
+- **Sidebar-Höhe wird live gemessen** (`sidebarRef` + `ResizeObserver` → `sidebarH`).
+- Linke Spalte bekommt exakt diese Höhe inline (`style={{ height: sidebarH }}`, nur wenn > 0 → Mobile unverändert fest `h-[420px]`).
+- Console wieder `flex-1 min-h-0` **innerhalb der Spalte mit definierter Höhe** → sie füllt den Platz unter den Quick Commands, der Output scrollt wieder (Logs explodieren nicht mehr), und die Unterkante ist exakt bündig mit der PlayerCard.
+- Row: `lg:items-start` (kein stretch mehr, keine Lücke). PlayerCard `mt-auto` + className-Prop wieder entfernt.
+
+**Verifiziert:** Beide Builds OK, Service active, Panel 200.
+
+> **Last updated:** 2026-08-11 · Session: Console height fix — ResizeObserver-driven sidebar match
