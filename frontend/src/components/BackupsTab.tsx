@@ -5,6 +5,7 @@ import {
   Archive, Download, Loader2, Plus, RotateCcw, Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { waitForBackupJob, type BackupJobProgress } from "@/lib/backup";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -53,6 +54,8 @@ export default function BackupsTab({ serverId, serverName, refreshTick }: Props)
   const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [activeJob, setActiveJob] = useState<BackupJobProgress | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{ name: string; percent: number } | null>(null);
 
   const fetchBackups = useCallback(async () => {
     try {
@@ -78,30 +81,64 @@ export default function BackupsTab({ serverId, serverName, refreshTick }: Props)
 
   const createBackup = useCallback(async () => {
     setCreating(true);
+    setActiveJob(null);
     try {
       const res = await fetch(`${API_BASE}/api/servers/${serverId}/backup`, { method: "POST" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? "Backup failed");
       }
-      const d = await res.json();
-      toast.success(d.message ?? "Backup created");
+      const { jobId } = await res.json();
+      const job = await waitForBackupJob(jobId, setActiveJob);
+      if (job.status === "error") throw new Error(job.message ?? "Backup failed");
+      toast.success("Backup created");
       await fetchBackups();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Backup failed");
     } finally {
       setCreating(false);
+      setActiveJob(null);
     }
   }, [serverId, fetchBackups]);
 
   const downloadBackup = useCallback(async (name: string) => {
     setDownloading(name);
+    setDownloadProgress(null);
     try {
       const res = await fetch(
         `${API_BASE}/api/servers/${serverId}/backups/${encodeURIComponent(name)}/download`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
+      const total = Number(res.headers.get("content-length") ?? 0);
+      const reader = res.body?.getReader();
+
+      if (!reader) {
+        // No streaming body available — fall back to plain blob download.
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Stream the body so we can show a real download percentage.
+      const chunks: BlobPart[] = [];
+      let received = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          received += value.length;
+          if (total > 0) {
+            setDownloadProgress({ name, percent: Math.round((received / total) * 100) });
+          }
+        }
+      }
+      const blob = new Blob(chunks, { type: "application/gzip" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -112,6 +149,7 @@ export default function BackupsTab({ serverId, serverName, refreshTick }: Props)
       toast.error(err instanceof Error ? err.message : "Download failed");
     } finally {
       setDownloading(null);
+      setDownloadProgress(null);
     }
   }, [serverId]);
 
@@ -172,6 +210,38 @@ export default function BackupsTab({ serverId, serverName, refreshTick }: Props)
           {creating ? "Backing up…" : "New Backup"}
         </button>
       </div>
+
+      {/* Progress: active backup job */}
+      {activeJob && activeJob.status === "running" && (
+        <div className="border-b border-edge px-4 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px]">
+            <span className="truncate text-slate-400">Backing up… <span className="font-mono text-slate-500">{activeJob.name}</span></span>
+            <span className="shrink-0 font-bold tabular-nums text-violet-300">{Math.max(0, activeJob.percent)}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-edge">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
+              style={{ width: `${Math.max(2, Math.min(100, activeJob.percent))}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Progress: download */}
+      {downloadProgress && (
+        <div className="border-b border-edge px-4 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px]">
+            <span className="truncate text-slate-400">Downloading… <span className="font-mono text-slate-500">{downloadProgress.name}</span></span>
+            <span className="shrink-0 font-bold tabular-nums text-emerald-300">{downloadProgress.percent}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-edge">
+            <div
+              className="h-full rounded-full bg-online transition-all duration-300 ease-out"
+              style={{ width: `${Math.max(2, Math.min(100, downloadProgress.percent))}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       {loading ? (

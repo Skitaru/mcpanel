@@ -25,7 +25,7 @@ import {
   isValidJavaArgs,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
-import { createBackup, listBackups, deleteBackup, pruneBackups, restoreFromArchive } from "../services/backups";
+import { createBackup, listBackups, deleteBackup, pruneBackups, restoreFromArchive, startBackupJob, getBackupJob } from "../services/backups";
 import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
 import { downloadPaperJar } from "../services/paper";
 import { downloadFabricJar } from "../services/fabric";
@@ -593,13 +593,23 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
 // ---------------------------------------------------------------------------
 // Backups — stored on the server under backups/<serverId>/ and managed in the UI
-//   POST   /:id/backup                     create a manual backup (no download)
+//   POST   /:id/backup                     start a backup job (async, poll progress)
+//   GET    /backups/progress/:jobId        poll backup job progress
 //   GET    /:id/backups                    list stored backups
 //   GET    /:id/backups/:name/download     download one backup
 //   POST   /:id/backups/:name/restore      restore from a stored backup
 //   DELETE /:id/backups/:name              delete one backup
 //   POST   /:id/restore                    upload + restore a local .tar.gz
 // ---------------------------------------------------------------------------
+
+router.get("/backups/progress/:jobId", (req: Request, res: Response) => {
+  const job = getBackupJob(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: "Backup job not found (it may have finished more than a minute ago)." });
+    return;
+  }
+  res.json(job);
+});
 
 router.post("/:id/backup", async (req: Request, res: Response) => {
   try {
@@ -608,12 +618,12 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
       res.status(404).json({ error: "Server not found." });
       return;
     }
-    const backup = await createBackup(server, "manual");
-    console.log(`[api] Backup: ${backup.name} (${(backup.size / 1e6).toFixed(1)} MB)`);
-    res.status(201).json({ message: `Backup created (${(backup.size / 1e6).toFixed(1)} MB).`, backup });
+    const { jobId, name } = startBackupJob(server, "manual");
+    console.log(`[api] Backup job started: ${name} (${jobId})`);
+    res.status(202).json({ message: "Backup started.", jobId, name });
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/backup error:", err);
-    res.status(500).json({ error: "Failed to create backup.", detail: err.message });
+    res.status(500).json({ error: "Failed to start backup.", detail: err.message });
   }
 });
 

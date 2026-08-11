@@ -16,6 +16,7 @@ import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
 import { DetailSkeleton } from "@/components/Skeleton";
 import { statusColor, statusLabel } from "@/lib/format";
+import { waitForBackupJob } from "@/lib/backup";
 import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -62,6 +63,7 @@ export default function ServerDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const [backupPercent, setBackupPercent] = useState<number | null>(null);
   const [backupsRefreshTick, setBackupsRefreshTick] = useState(0);
   const [diskUsage, setDiskUsage] = useState<Record<string, number>>({});
   const [dockerLogs, setDockerLogs] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
@@ -140,15 +142,22 @@ export default function ServerDetailPage() {
 
   const handleBackup = useCallback(async () => {
     setBackingUp(true);
+    setBackupPercent(null);
     try {
       const res = await fetch(`${API_BASE}/api/servers/${serverId}/backup`, { method: "POST" });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? `HTTP ${res.status}`); }
-      const d = await res.json();
-      toast.success(d.message ?? "Backup created");
+      const { jobId } = await res.json();
+      if (jobId) {
+        const job = await waitForBackupJob(jobId, (j) => {
+          if (j.percent >= 0) setBackupPercent(j.percent);
+        });
+        if (job.status === "error") throw new Error(job.message ?? "Backup failed");
+      }
+      toast.success("Backup created");
       // Let the Backups tab refresh its list.
       setBackupsRefreshTick(t => t + 1);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Backup failed"); }
-    finally { setBackingUp(false); }
+    finally { setBackingUp(false); setBackupPercent(null); }
   }, [serverId]);
 
   const restoreInputRef = useRef<HTMLInputElement>(null);
@@ -250,7 +259,8 @@ export default function ServerDetailPage() {
 
                 <button disabled={backingUp} onClick={handleBackup} title="Create a backup (see Backups tab)"
                   className="flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-accent-strong disabled:opacity-50">
-                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" strokeWidth={2} />} Backup
+                  {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" strokeWidth={2} />}
+                  {backingUp ? (backupPercent != null ? `Backup ${backupPercent}%` : "Backing up…") : "Backup"}
                 </button>
                 <label className={`flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200 cursor-pointer ${restoring ? "opacity-50 pointer-events-none" : ""}`} title="Restore Backup" aria-label="Restore Backup">
                   <Upload className="h-4 w-4" strokeWidth={1.75} /> Restore

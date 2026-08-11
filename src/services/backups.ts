@@ -6,7 +6,11 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createGzip } from "node:zlib";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createWriteStream } from "node:fs";
 import { readdir, stat, unlink } from "node:fs/promises";
 import { ServerConfig } from "../types";
 import { inspectContainer, stopContainer, startContainer } from "./docker";
@@ -21,6 +25,25 @@ export interface BackupInfo {
   size: number;
   createdAt: string; // ISO timestamp
   kind: BackupKind;
+}
+
+/** Progress state for an async backup job (polled by the frontend). */
+export interface BackupJob {
+  jobId: string;
+  serverId: string;
+  name: string;
+  percent: number; // 0–100
+  status: "running" | "done" | "error";
+  writtenBytes: number;
+  totalBytes: number;
+  message?: string;
+}
+
+const backupJobs = new Map<string, BackupJob>();
+
+/** Get the current progress of an async backup job. */
+export function getBackupJob(jobId: string): BackupJob | undefined {
+  return backupJobs.get(jobId);
 }
 
 function serverBackupDir(serverId: string): string {
@@ -38,6 +61,57 @@ function run(cmd: string, args: string[], timeout: number): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     execFile(cmd, args, { timeout }, (err) => (err ? reject(err) : resolve()));
   });
+}
+
+/** Total size (bytes) of the data dir — the reference value for backup progress. */
+async function dirSize(dataPath: string): Promise<number> {
+  try {
+    const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+      execFile("du", ["-sb", dataPath], { timeout: 30_000, encoding: "utf-8" }, (err, out) =>
+        err ? reject(err) : resolve({ stdout: out }),
+      );
+    });
+    return parseInt(stdout.trim().split(/\s+/)[0], 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Write a gzipped tar archive of the data dir. `onProgress(percent, written, total)`
+ * is called as raw (uncompressed) bytes flow through — progress compares processed
+ * bytes against the total dir size, so it reflects real work done.
+ */
+async function writeBackupArchive(
+  dataPath: string,
+  backupPath: string,
+  onProgress?: (percent: number, writtenBytes: number, totalBytes: number) => void,
+): Promise<void> {
+  const totalBytes = await dirSize(dataPath);
+  const tar = spawn("tar", ["-cf", "-", "-C", dataPath, "."], {
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  const gzip = createGzip();
+  const out = createWriteStream(backupPath);
+
+  let written = 0;
+  const counter = new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      written += chunk.length;
+      if (onProgress && totalBytes > 0) {
+        onProgress(Math.min(99, Math.round((written / totalBytes) * 100)), written, totalBytes);
+      }
+      cb(null, chunk);
+    },
+  });
+
+  try {
+    await pipeline(tar.stdout, counter, gzip, out);
+  } catch (err) {
+    tar.kill();
+    throw err;
+  }
+  if (onProgress) onProgress(100, written, totalBytes);
 }
 
 /**
@@ -61,10 +135,70 @@ export async function createBackup(server: ServerConfig, kind: BackupKind): Prom
   const name = `${prefix}-${server.id.slice(0, 8)}-${timestamp}.tar.gz`;
   const backupPath = path.join(dir, name);
 
-  await run("tar", ["-czf", backupPath, "-C", server.dataPath, "."], 300_000);
+  await writeBackupArchive(server.dataPath, backupPath);
 
   const st = await stat(backupPath);
   return { name, size: st.size, createdAt: new Date().toISOString(), kind };
+}
+
+/**
+ * Start a backup in the background and return immediately with a job id.
+ * Progress can be polled via {@link getBackupJob}. Job entries are cleaned up
+ * 60 s after completion.
+ */
+export function startBackupJob(server: ServerConfig, kind: BackupKind): { jobId: string; name: string } {
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const dir = serverBackupDir(server.id);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const prefix = kind === "scheduled" ? "scheduled-backup" : kind === "auto" ? "auto" : "backup";
+  const name = `${prefix}-${server.id.slice(0, 8)}-${timestamp}.tar.gz`;
+  const backupPath = path.join(dir, name);
+
+  const job: BackupJob = {
+    jobId,
+    serverId: server.id,
+    name,
+    percent: 0,
+    status: "running",
+    writtenBytes: 0,
+    totalBytes: 0,
+  };
+  backupJobs.set(jobId, job);
+
+  // Fail fast on empty data dirs.
+  try {
+    const entries = fs.readdirSync(server.dataPath);
+    if (entries.length === 0) throw new Error("empty");
+  } catch {
+    job.status = "error";
+    job.message = "Data directory is empty — nothing to back up.";
+    return { jobId, name };
+  }
+
+  writeBackupArchive(server.dataPath, backupPath, (percent, writtenBytes, totalBytes) => {
+    job.percent = percent;
+    job.writtenBytes = writtenBytes;
+    job.totalBytes = totalBytes;
+  })
+    .then(() => {
+      job.percent = 100;
+      job.status = "done";
+      const st = fs.statSync(backupPath);
+      job.writtenBytes = st.size;
+    })
+    .catch((err: any) => {
+      job.status = "error";
+      job.message = err?.message ?? "Backup failed.";
+      try { fs.unlinkSync(backupPath); } catch { /* partial file */ }
+    })
+    .finally(() => {
+      // Clean up job entries after 60 s (like modpack install progress).
+      setTimeout(() => backupJobs.delete(jobId), 60_000);
+    });
+
+  return { jobId, name };
 }
 
 /** List all backups for a server, newest first. */
