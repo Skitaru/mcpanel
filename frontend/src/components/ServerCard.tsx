@@ -57,19 +57,19 @@ export default function ServerCard({
 
   return (
     <div
-      className={`group surface relative flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all duration-200 hover:border-accent hover:bg-surface2 ${
-        isRunning ? "border-online/20 card-glow-online" : "opacity-80"
+      className={`group surface relative flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent hover:bg-surface2 hover:shadow-[0_10px_28px_-10px_rgba(0,0,0,0.7),0_0_18px_rgba(106,134,184,0.12)] ${
+        isRunning ? "border-online/20 card-glow-online" : "opacity-80 hover:opacity-100"
       }`}
     >
       {/* ── Icon tile ── */}
-      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base ${TYPE_TILE_BG[s.serverType] ?? "bg-edge/60"}`}>
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base transition-colors duration-200 group-hover:scale-105 ${TYPE_TILE_BG[s.serverType] ?? "bg-edge/60"}`}>
         {TYPE_ICON[s.serverType] ?? "📦"}
       </div>
 
       {/* ── Name + meta ── */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h3 className="truncate text-[13px] font-bold text-white">{s.name}</h3>
+          <h3 className="truncate text-[13px] font-bold text-white transition-colors duration-200 group-hover:text-accent-soft">{s.name}</h3>
           {s.tag && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${tagStyle(s.tag)}`}>{s.tag}</span>}
           <span className="shrink-0 rounded-full border border-edge bg-void px-2 py-0.5 text-[9px] font-semibold text-muted">
             {typeLabel(s.serverType)}

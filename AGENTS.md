@@ -923,3 +923,17 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** SF3-Container neu erstellt (recreate) → "Up", Welt generiert, `Done (24.5s)`, RCON `list` antwortet, `latest.log` 200. TPS-Befehl gibt bei Forge 1.10.2 "Unknown command" (normal, kein Spigot-Befehl).
 
 > **Last updated:** 2026-08-11 · Session: SF3-Startfix — useradd -o (UID-Konflikt Debian) + PATH im su-Kommando
+
+---
+
+### 2026-08-12 — Dashboard: Hover-Effekt auf Server-Zeilen-Karten
+
+**ServerCard.tsx:** Zeilen-Karten im Dashboard bekommen jetzt einen sichtbaren Hover-Effekt (Graphite-Stil, dezent — kein Neon):
+- `hover:-translate-y-0.5` (sanfter Lift)
+- `hover:border-accent` + `hover:bg-surface2`
+- `hover:shadow-[0_10px_28px_-10px_rgba(0,0,0,0.7),0_0_18px_rgba(106,134,184,0.12)]` (weicher Schatten + dezenter Stahlblau-Glow, passend zum Design-System)
+- Gestoppte Karten: `hover:opacity-100` (ausgegraut → voll sichtbar)
+- Icon-Tile: `group-hover:scale-105`
+- Servername: `group-hover:text-accent-soft`
+
+> **Last updated:** 2026-08-12 · Session: Dashboard-Hover-Effekt auf ServerCards
