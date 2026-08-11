@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  TerminalSquare, Users,
+  TerminalSquare, Users, Search, X,
 } from "lucide-react";
 import AddressPill from "@/components/AddressPill";
 import { formatBytes, formatRam, typeLabel } from "@/lib/format";
@@ -75,6 +75,33 @@ function formatUptime(seconds: number) {
   return `${s}s`;
 }
 
+/** Minimal SVG sparkline for the CPU/RAM history (no chart dependency). */
+function Sparkline({ values, max, stroke }: { values: number[]; max: number; stroke: string }) {
+  if (values.length < 2) return null;
+  const w = 100;
+  const h = 24;
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - 1 - Math.min(1, Math.max(0, v / max)) * (h - 2);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-6 w-full" aria-hidden="true">
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -111,6 +138,25 @@ export default function ConsoleTab({
   const [playersExpanded, setPlayersExpanded] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggIdx, setSuggIdx] = useState(-1);
+  // Console filter: free text + output level
+  const [filter, setFilter] = useState<{ text: string; level: "all" | "stderr" | "system" }>({ text: "", level: "all" });
+
+  // ---- stats history for sparklines (1 sample / 5 s, 360 = last 30 min) ----
+  const HISTORY_MAX = 360;
+  const HISTORY_INTERVAL_MS = 5000;
+  const [history, setHistory] = useState<{ cpu: number; mem: number }[]>([]);
+  const lastSampleRef = useRef(0);
+
+  // ---- filtered view (keeps raw lines intact for re-filtering) ----
+  const visibleLines = useMemo(() => {
+    if (!filter.text && filter.level === "all") return lines;
+    const q = filter.text.trim().toLowerCase();
+    return lines.filter((l) => {
+      if (filter.level !== "all" && l.type !== filter.level) return false;
+      if (q && !l.text.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [lines, filter.text, filter.level]);
 
   // ---- auto-scroll ----
   const autoScrollRef = useRef(true);
@@ -127,7 +173,7 @@ export default function ConsoleTab({
     if (autoScrollRef.current && outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [lines]);
+  }, [visibleLines]);
 
   // ---- add a line (capped) ----
   const addLine = useCallback((type: ConsoleLine["type"], text: string) => {
@@ -253,6 +299,15 @@ export default function ConsoleTab({
         memoryUsage: payload.memoryUsage,
         memoryLimit: payload.memoryLimit,
       });
+      // Throttled sample for the history sparklines
+      const now = Date.now();
+      if (now - lastSampleRef.current >= HISTORY_INTERVAL_MS) {
+        lastSampleRef.current = now;
+        setHistory((prev) => {
+          const next = [...prev, { cpu: Math.min(100, payload.cpuPercent), mem: payload.memoryUsage }];
+          return next.length > HISTORY_MAX ? next.slice(next.length - HISTORY_MAX) : next;
+        });
+      }
     });
 
     socket.on("stats:error", (payload: { serverId: string; message: string }) => {
@@ -311,6 +366,8 @@ export default function ConsoleTab({
     socket.emit("tps:unsubscribe", { serverId });
     setStats(null);
     setTps(null);
+    setHistory([]);
+    lastSampleRef.current = 0;
     reattachPendingRef.current = true;
   }, [restartTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -338,6 +395,8 @@ export default function ConsoleTab({
       socket.emit("tps:unsubscribe", { serverId });
       setStats(null);
       setTps(null);
+      setHistory([]);
+      lastSampleRef.current = 0;
     }
   }, [serverStatus, serverId, addLine, restartTick]);
 
@@ -443,6 +502,40 @@ export default function ConsoleTab({
           {connected && isOnline && <span className="text-[11px] text-muted">verbunden</span>}
         </div>
 
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 border-b border-edge/60 bg-void/30 px-3 py-1.5">
+          <Search className="h-3 w-3 shrink-0 text-muted" />
+          <input
+            value={filter.text}
+            onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))}
+            placeholder="Filter console…"
+            aria-label="Filter console output"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
+          />
+          <select
+            value={filter.level}
+            onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value as "all" | "stderr" | "system" }))}
+            aria-label="Filter by output level"
+            className="shrink-0 rounded border border-edge bg-void px-1.5 py-0.5 text-[10px] text-slate-400 focus:border-accent/40 focus:outline-none"
+          >
+            <option value="all">All</option>
+            <option value="stderr">Errors</option>
+            <option value="system">System</option>
+          </select>
+          {(filter.text || filter.level !== "all") && (
+            <>
+              <span className="shrink-0 text-[10px] tabular-nums text-muted">{visibleLines.length}/{lines.length}</span>
+              <button
+                onClick={() => setFilter({ text: "", level: "all" })}
+                className="shrink-0 rounded p-0.5 text-slate-600 transition hover:text-slate-300"
+                title="Clear filter" aria-label="Clear filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          )}
+        </div>
+
         {/* Output */}
         <div
           ref={outputRef}
@@ -455,8 +548,16 @@ export default function ConsoleTab({
               <p className="text-sm font-medium text-slate-500">Server is offline</p>
               <p className="text-xs text-muted">Start the server to view the live console.</p>
             </div>
+          ) : visibleLines.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <Search className="h-6 w-6 text-muted" />
+              <p className="text-xs text-slate-500">No lines match the filter</p>
+              <button onClick={() => setFilter({ text: "", level: "all" })} className="text-[11px] text-violet-400 transition hover:underline">
+                Clear filter
+              </button>
+            </div>
           ) : (
-            lines.map((line, i) => (
+            visibleLines.map((line, i) => (
               <div
                 key={i}
                 className={`console-line whitespace-pre-wrap break-all ${
@@ -541,6 +642,7 @@ export default function ConsoleTab({
         {/* ── Auslastung (thick bars) ── */}
         <div className="rounded-xl border border-edge bg-surface p-4">
           <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Auslastung</h4>
+          {history.length >= 2 && <div className="-mt-1 mb-2 text-right text-[9px] text-slate-700">letzte 30 Min</div>}
 
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between">
@@ -553,6 +655,7 @@ export default function ConsoleTab({
               <div className={`h-full rounded-full transition-all duration-700 ease-out ${(stats?.cpuPercent ?? 0) >= 90 ? "bg-danger" : (stats?.cpuPercent ?? 0) >= 70 ? "bg-warn" : "bg-online"}`}
                 style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
             </div>
+            {history.length >= 2 && <Sparkline values={history.map(h => h.cpu)} max={100} stroke="#00F5D4" />}
           </div>
 
           <div className="mb-4">
@@ -566,6 +669,7 @@ export default function ConsoleTab({
               <div className={`h-full rounded-full transition-all duration-700 ease-out ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "bg-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "bg-warn" : "bg-accent"}`}
                 style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
             </div>
+            {history.length >= 2 && <Sparkline values={history.map(h => h.mem)} max={stats?.memoryLimit ?? ram * 1024 * 1024} stroke="#9D4EDD" />}
             <div className="mt-1 text-right text-[10px] text-muted">von {formatRam(ram)}</div>
           </div>
 

@@ -20,6 +20,8 @@ import {
   deleteContainer,
   listManagedContainerStatuses,
   resolveJavaImageForServer,
+  resolveLaunchJar,
+  inspectContainer,
   isValidJavaArgs,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
@@ -417,6 +419,50 @@ router.post("/:id/restart", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[api] POST /api/servers/:id/restart error:", err);
     res.status(500).json({ error: "Failed to restart server.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/servers/:id/recreate — rebuild the container, keeping all data
+// ---------------------------------------------------------------------------
+// Recreates the Docker container from the current config (data dir is bind-
+// mounted, so the world/plugins survive). Useful after code updates that
+// change container settings (non-root user, RCON binding, TERM, images…).
+router.post("/:id/recreate", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+
+    // Remember whether it was running so we can restore the state afterwards.
+    let wasRunning = false;
+    if (server.containerId) {
+      try { wasRunning = (await inspectContainer(server.containerId)).running; } catch {}
+      try { await stopContainer(server.containerId); } catch {}
+      try { await deleteContainer(server.containerId); } catch (err: any) {
+        console.error("[api] Recreate: failed to delete old container:", err.message);
+      }
+    }
+
+    const ver = server.version === "pending" ? "1.21.1" : server.version;
+    const javaImage = resolveJavaImageForServer(ver, server.serverType);
+    const newId = await createContainer(server, javaImage, {
+      jarName: resolveLaunchJar(server),
+      javaArgs: server.javaArgs,
+    });
+
+    await updateServer(server.id, { containerId: newId } as any);
+
+    if (wasRunning) {
+      try { await startContainer(newId); } catch (err: any) {
+        console.error("[api] Recreate: auto-start failed:", err.message);
+      }
+    }
+
+    console.log(`[api] Recreated container for "${server.name}" (${newId.slice(0, 12)}), running: ${wasRunning}`);
+    res.json({ message: `Container for "${server.name}" recreated.`, containerId: newId, started: wasRunning });
+  } catch (err: any) {
+    console.error("[api] POST /api/servers/:id/recreate error:", err);
+    res.status(500).json({ error: "Failed to recreate container.", detail: err.message });
   }
 });
 

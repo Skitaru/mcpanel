@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   Terminal, FolderOpen, ScrollText, Settings2,
-  Loader2, AlertTriangle, Trash2, Download, Play, Square, Upload, ArrowLeft,
+  Loader2, AlertTriangle, Trash2, Download, Play, Square, Upload, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
 import FileManagerTab from "@/components/FileManagerTab";
@@ -55,6 +55,8 @@ export default function ServerDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [actionConfirm, setActionConfirm] = useState<string | null>(null);
+  const [recreateConfirm, setRecreateConfirm] = useState(false);
+  const [recreating, setRecreating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
@@ -100,6 +102,19 @@ export default function ServerDetailPage() {
       toast.success(`Server ${action}ed`);
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : `${action} failed`); }
     finally { setActing(false); }
+  }, [serverId, fetchServer]);
+
+  const handleRecreate = useCallback(async () => {
+    setRecreateConfirm(false); setRecreating(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/servers/${serverId}/recreate`, { method: "POST" });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error ?? "recreate failed"); }
+      // Container is brand new → force console detach/reattach like a restart
+      setRestartTick(t => t + 1);
+      await fetchServer();
+      toast.success("Container recreated — data kept");
+    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Recreate failed"); }
+    finally { setRecreating(false); }
   }, [serverId, fetchServer]);
 
   const handleDelete = useCallback(async () => {
@@ -237,6 +252,21 @@ export default function ServerDetailPage() {
                   <Upload className="h-4 w-4" strokeWidth={1.75} /> Restore
                   <input ref={restoreInputRef} type="file" accept=".tar.gz,.tgz" onChange={handleRestoreSelect} className="hidden" />
                 </label>
+
+                {recreateConfirm ? (
+                  <div className="flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-3 py-2.5">
+                    <span className="text-xs font-bold text-muted">Recreate?</span>
+                    <button onClick={handleRecreate} disabled={recreating} className="rounded bg-accent px-2 py-0.5 text-xs font-bold text-white disabled:opacity-50">{recreating ? "…" : "Yes"}</button>
+                    <button onClick={() => setRecreateConfirm(false)} disabled={recreating} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setRecreateConfirm(true)} disabled={recreating}
+                    title="Rebuild container, keep data (applies non-root user, RCON binding, TERM fixes)"
+                    aria-label="Recreate container"
+                    className="flex items-center gap-1.5 rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-accent/40 hover:text-purple-200 disabled:opacity-50">
+                    <RefreshCw className={`h-4 w-4 ${recreating ? "animate-spin" : ""}`} strokeWidth={1.75} /> Recreate
+                  </button>
+                )}
 
                 <div className="flex-1" />
 

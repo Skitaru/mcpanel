@@ -3,6 +3,8 @@
 
 import Docker from "dockerode";
 import { PassThrough, Readable, Duplex } from "node:stream";
+import path from "node:path";
+import fs from "node:fs";
 import { ServerConfig } from "../types";
 
 const docker = new Docker({
@@ -78,6 +80,27 @@ export function resolveJavaImageForServer(mcVersion: string, serverType: string)
     return "eclipse-temurin:17-jre-alpine";
   }
   return img;
+}
+
+/**
+ * Determine the launch JAR/script for a server. Paper/Fabric/Velocity have
+ * fixed names; custom (modpack) servers are probed from the data directory —
+ * the launch file may be run.sh (Forge/NeoForge), server.jar, or a
+ * quilt/fabric launcher. Shared by the scheduler and the recreate route so a
+ * recreated container always launches the same file as the original.
+ */
+export function resolveLaunchJar(cfg: ServerConfig): string {
+  if (cfg.serverType === "fabric") return "fabric-server-launch.jar";
+  if (cfg.serverType === "velocity") return "velocity.jar";
+  if (cfg.serverType === "custom") {
+    const has = (p: string) => { try { return fs.existsSync(p); } catch { return false; } };
+    const dir: string = cfg.dataPath;
+    if (has(path.join(dir, "run.sh"))) return "run.sh";
+    if (has(path.join(dir, "server.jar"))) return "server.jar";
+    if (has(path.join(dir, "quilt-server-launch.jar"))) return "quilt-server-launch.jar";
+    if (has(path.join(dir, "fabric-server-launch.jar"))) return "fabric-server-launch.jar";
+  }
+  return "paper.jar";
 }
 
 /** Allowlist for custom JVM args — prevents shell injection in the container Cmd. */

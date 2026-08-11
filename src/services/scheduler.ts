@@ -9,9 +9,9 @@ import {
   deleteContainer,
   createContainer,
   resolveJavaImageForServer,
+  resolveLaunchJar,
 } from "./docker";
 import path from "node:path";
-import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { readdir, stat, unlink } from "node:fs/promises";
 
@@ -81,20 +81,10 @@ async function restartContainer(srv: any): Promise<void> {
   const ver = srv.version === "pending" ? "1.21.1" : srv.version;
   const javaImage = resolveJavaImageForServer(ver, srv.serverType);
 
-  // Determine the launch jar. Paper/Fabric/Velocity have fixed names; custom
-  // (modpack) servers are probed from the data directory — a scheduled restart
-  // must NOT recreate them with the default paper.jar.
-  let jarName = "paper.jar";
-  if (srv.serverType === "fabric") jarName = "fabric-server-launch.jar";
-  else if (srv.serverType === "velocity") jarName = "velocity.jar";
-  else if (srv.serverType === "custom") {
-    const has = (p: string) => { try { return fs.existsSync(p); } catch { return false; } };
-    const dir: string = srv.dataPath;
-    if (has(path.join(dir, "run.sh"))) jarName = "run.sh";
-    else if (has(path.join(dir, "server.jar"))) jarName = "server.jar";
-    else if (has(path.join(dir, "quilt-server-launch.jar"))) jarName = "quilt-server-launch.jar";
-    else if (has(path.join(dir, "fabric-server-launch.jar"))) jarName = "fabric-server-launch.jar";
-  }
+  // Determine the launch jar via the shared resolver (custom/modpack servers
+  // are probed from the data directory — a scheduled restart must NOT
+  // recreate them with the default paper.jar).
+  const jarName = resolveLaunchJar(srv);
 
   const newId = await createContainer(srv, javaImage, {
     jarName,
