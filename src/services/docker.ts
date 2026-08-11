@@ -55,9 +55,10 @@ export function resolveJavaImage(mcVersion: string): string {
   // 1.17 – 1.20.4 → Java 17
   if (major === 1 && minor >= 17) return "eclipse-temurin:17-jre-alpine";
 
-  // 1.16.5 specifically → Java 16
+  // 1.16.5 specifically → Java 11. (Java 16 is EOL — its images were removed
+  // from Docker Hub; 11 is officially supported by Minecraft 1.16.5.)
   if (major === 1 && minor === 16 && patch >= 5)
-    return "eclipse-temurin:16-jre-alpine";
+    return "eclipse-temurin:11-jre-alpine";
 
   // 1.12 – 1.16.4 → Java 11
   if (major === 1 && minor >= 12) return "eclipse-temurin:11-jre-alpine";

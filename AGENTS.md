@@ -886,3 +886,26 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** Forge-1.10.2-Installer (exakt der SF3-Flow) läuft mit dem Debian-Image komplett durch: "The server installed successfully". Backend TSC sauber, Service active.
 
 > **Last updated:** 2026-08-11 · Session: Forge-TLS-Fix — Java-8-Alpine ohne ECDHE → Debian-Image + TLSv1.2
+
+---
+
+### 2026-08-11 — Modpack-Matrix-Check: alle Java-Images getestet, Java 16 → 11
+
+**Frage:** Werden andere Modpacks auch Fehler machen? → Systematischer Test aller Java-Images auf TLS-Cipher-Suites (C.java, per Container):
+
+| Java | Image | ECDHE | Status |
+|------|-------|-------|--------|
+| 8 | `eclipse-temurin:8-jre` (Debian, der Fix von 852d156) | 12/33 | ✅ |
+| 11 | `eclipse-temurin:11-jre-alpine` | 14/31 | ✅ |
+| 16 | alpine **und** Debian | — | ❌ **Tag von Docker Hub entfernt (EOL)** |
+| 17 | `eclipse-temurin:17-jre-alpine` | 14/31 | ✅ |
+| 21 | `eclipse-temurin:21-jre-alpine` | 14/31 | ✅ |
+| 25 | `eclipse-temurin:25-jre-alpine` | 14/31 | ✅ |
+
+**Neuer Fix (docker.ts):** `resolveJavaImage` für MC 1.16.5: Java 16 → **Java 11** (`11-jre-alpine`), da die 16-Images von Docker Hub entfernt wurden und 1.16.5 Java 11 offiziell unterstützt. Betraf jeden 1.16.5-Server (nicht nur Modpacks): Container-Erstellung wäre mit "image not found" gescheitert.
+
+**Fazit Modpack-Support:** Forge <1.13 (Java 8, Debian) ✅ verifiziert; Forge/NeoForge/Fabric/Quilt 1.13+ (Java 11/17/21) ✅ ECDHE ok; 1.16.5 ✅ jetzt Java 11. Einziges Restrisiko: einzelne uralte Modpacks mit toten Download-URLs (nicht vorhersehbar, Einzelfälle).
+
+**Cleanup:** /tmp/ciphertest + JDK-17-Testimage gelöscht. Backend TSC sauber, Service active.
+
+> **Last updated:** 2026-08-11 · Session: Modpack-Matrix-Test — alle Java-Images ECDHE-geprüft, Java 16→11
