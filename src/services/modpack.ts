@@ -229,16 +229,22 @@ function getJavaDockerImage(mcVersion: string): string {
   if (minor >= 21) return "eclipse-temurin:21-jre-alpine";
   if (minor >= 17) return "eclipse-temurin:17-jre-alpine";
   if (minor >= 13) return "eclipse-temurin:11-jre-alpine";
-  return "eclipse-temurin:8-jre-alpine";
+  // Older → Java 8 (Debian image — the alpine Java-8 build lacks ECDHE cipher
+  // suites, causing TLS handshake_failure against Mojang/Forge HTTPS endpoints).
+  return "eclipse-temurin:8-jre";
 }
 
 async function runJavaInDocker(jarPath: string, args: string[], dataDir: string, mcVersion: string): Promise<void> {
   const javaImage = getJavaDockerImage(mcVersion);
   const jarName = path.basename(jarPath);
+  // Java 8 fails the TLS 1.3 handshake against Forge/Mojang/Cloudflare HTTPS
+  // endpoints with "Received fatal alert: handshake_failure". Force TLS 1.2
+  // for Java-8 installer runs so the download steps succeed.
+  const tlsFlag = javaImage.includes(":8-") ? "-Dhttps.protocols=TLSv1.2 " : "";
   // Run as root — this is a one-shot installer container that needs to write
   // files (installer logs, libraries, etc.) to the bind-mounted data directory.
   await execAsync(
-    `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java -jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
+    `docker run --rm -v "${dataDir}:/data" -w /data ${javaImage} java ${tlsFlag}-jar "${jarName}" ${args.map(a => `"${a}"`).join(" ")}`,
     { timeout: 600_000, maxBuffer: 100 * 1024 * 1024 },
   );
 }
@@ -445,7 +451,7 @@ export async function runModpackInstall(
     const mcMinor = parseInt(mcVersion.split(".")[1] || "0") || 0;
     const needsLegacyJava = (loaderId.startsWith("forge-") || loaderId.startsWith("neoforge-")) && mcMinor < 13;
     const javaImage = needsLegacyJava
-      ? "eclipse-temurin:8-jre-alpine"
+      ? "eclipse-temurin:8-jre"
       : resolveJavaImage(mcVersion);
 
     // 7. Download mods

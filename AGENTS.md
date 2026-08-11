@@ -869,3 +869,20 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** Beide Builds OK, Service active, Panel 200.
 
 > **Last updated:** 2026-08-11 · Session: Console height fix — ResizeObserver-driven sidebar match
+
+---
+
+### 2026-08-11 — Forge-Modpack-Fix: Java-8-TLS (ECDHE fehlt im Alpine-Image)
+
+**Symptom:** SkyFactory 3 (Forge 1.10.2, MC 1.10.2) Installation scheiterte mit `javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure` im Forge-Installer (MirrorData + Vanilla-Manifest-Download).
+
+**Diagnose (per SSL-Debug im Container):** Das ClientHello von `eclipse-temurin:8-jre-alpine` (8u492) enthielt **nur DHE/RSA-Cipher-Suites — keine ECDHE**. `SSLContext.getSupportedCipherSuites()` listete 0 ECDHE-Suites, obwohl der SunEC-Provider vorhanden war. Moderne Server (Cloudflare/Mojang/Forge-Maven) akzeptieren nur ECDHE → handshake_failure. Der Java-8-Alpine-Build von Temurin hat diesen Defekt; das Debian-Image hat 13 ECDHE-Suites.
+
+**Fix:**
+- `eclipse-temurin:8-jre-alpine` → **`eclipse-temurin:8-jre` (Debian)** an allen 4 Stellen: `docker.ts resolveJavaImage`, `resolveJavaImageForServer` (Vergleich angepasst), `modpack.ts getJavaDockerImage`, `modpack.ts needsLegacyJava`.
+- Zusätzlich TLS-1.2-Erzwingung: `runJavaInDocker` (modpack.ts) und `createContainer` (docker.ts) setzen für Java-8-Images `-Dhttps.protocols=TLSv1.2` (sicherheitshalber, auch für Mojang-Auth des laufenden Servers).
+- Alte Alpine-Images auf dem Server gelöscht (8-jre-alpine + Test-JDK), Debian-8-jre gepullt.
+
+**Verifiziert:** Forge-1.10.2-Installer (exakt der SF3-Flow) läuft mit dem Debian-Image komplett durch: "The server installed successfully". Backend TSC sauber, Service active.
+
+> **Last updated:** 2026-08-11 · Session: Forge-TLS-Fix — Java-8-Alpine ohne ECDHE → Debian-Image + TLSv1.2

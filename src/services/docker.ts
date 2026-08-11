@@ -62,8 +62,10 @@ export function resolveJavaImage(mcVersion: string): string {
   // 1.12 – 1.16.4 → Java 11
   if (major === 1 && minor >= 12) return "eclipse-temurin:11-jre-alpine";
 
-  // Older → Java 8
-  return "eclipse-temurin:8-jre-alpine";
+  // Older → Java 8. NOTE: Debian-based image, NOT -alpine — the alpine Java-8
+  // build ships without working ECDHE cipher suites (TLS handshake_failure
+  // against Cloudflare/Mojang HTTPS endpoints).
+  return "eclipse-temurin:8-jre";
 }
 
 /**
@@ -75,7 +77,7 @@ export function resolveJavaImageForServer(mcVersion: string, serverType: string)
   const img = resolveJavaImage(mcVersion);
   if (
     serverType === "fabric" &&
-    (img === "eclipse-temurin:16-jre-alpine" || img === "eclipse-temurin:8-jre-alpine")
+    (img === "eclipse-temurin:16-jre-alpine" || img === "eclipse-temurin:8-jre")
   ) {
     return "eclipse-temurin:17-jre-alpine";
   }
@@ -190,13 +192,17 @@ export async function createContainer(
   ].join(" ");
 
   const javaArgs = opts?.javaArgs || aikarFlags;
+  // Java 8 fails the TLS 1.3 handshake against Mojang/Cloudflare HTTPS
+  // endpoints (handshake_failure). Force TLS 1.2 so auth/session lookups work.
+  const tlsFlag = imageName.includes(":8-") ? "-Dhttps.protocols=TLSv1.2 " : "";
+  const finalJavaArgs = `${tlsFlag}${javaArgs}`;
   // Run as non-root user (mc, UID 1000) for security.
   // su forwards signals, and the inner exec makes java the child so it
   // receives SIGTERM cleanly on docker stop.
   // If jarName is a script (run.sh from NeoForge/Forge), execute it directly.
   const startCmd = jarName === "run.sh"
     ? `exec su mc -c "cd /data && exec sh run.sh ${nogui}"`.trim()
-    : `exec su mc -c "exec java -Xms512M -Xmx${javaHeap} ${javaArgs} -jar /data/${jarName} ${nogui}"`.trim();
+    : `exec su mc -c "exec java -Xms512M -Xmx${javaHeap} ${finalJavaArgs} -jar /data/${jarName} ${nogui}"`.trim();
 
   const cmdParts = [`echo "eula=true" > /data/eula.txt`];
   if (opts?.extraCmd) cmdParts.push(...opts.extraCmd);
