@@ -909,3 +909,17 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Cleanup:** /tmp/ciphertest + JDK-17-Testimage gelöscht. Backend TSC sauber, Service active.
 
 > **Last updated:** 2026-08-11 · Session: Modpack-Matrix-Test — alle Java-Images ECDHE-geprüft, Java 16→11
+
+---
+
+### 2026-08-11 — SF3-Startfix: Debian-Image braucht useradd -o + PATH im su
+
+**Symptom:** Nach dem TLS-Fix (Java-8-Debian-Image) startete der Modpack-Server nicht: Container im Restart-Loop mit `chown: invalid user: 'mc:mc'`, danach `exec: java: not found`.
+
+**Zwei weitere Image-Wechsel-Nebeneffekte (docker.ts createContainer):**
+1. **`useradd -o` nötig:** Das Debian-Temurin-8-Image bringt einen `ubuntu`-User mit UID 1000 mit → `useradd -m -u 1000 mc` scheitert ("UID 1000 is not unique") → `chown: invalid user`. Fix: `useradd -o -m -u 1000 mc` (duplizierte UID erlaubt, Host-Ownership bleibt UID 1000).
+2. **`su` setzt PATH zurück:** `su mc -c "exec java ..."` → `java: not found`, weil der mc-User-PATH ohne `/opt/java/openjdk/bin` ist. Fix: `exec env PATH=/opt/java/openjdk/bin:$PATH java ...` (und `sh run.sh` analog). `exec VAR=...` funktioniert nicht (POSIX) — `env` davor ist der Standard-Weg.
+
+**Verifiziert:** SF3-Container neu erstellt (recreate) → "Up", Welt generiert, `Done (24.5s)`, RCON `list` antwortet, `latest.log` 200. TPS-Befehl gibt bei Forge 1.10.2 "Unknown command" (normal, kein Spigot-Befehl).
+
+> **Last updated:** 2026-08-11 · Session: SF3-Startfix — useradd -o (UID-Konflikt Debian) + PATH im su-Kommando

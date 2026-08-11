@@ -199,17 +199,25 @@ export async function createContainer(
   const finalJavaArgs = `${tlsFlag}${javaArgs}`;
   // Run as non-root user (mc, UID 1000) for security.
   // su forwards signals, and the inner exec makes java the child so it
-  // receives SIGTERM cleanly on docker stop.
+  // receives SIGTERM cleanly on docker stop. su resets the PATH, so we
+  // explicitly prepend the Temurin JAVA_HOME/bin (same location in the
+  // Alpine and Debian images).
   // If jarName is a script (run.sh from NeoForge/Forge), execute it directly.
   const startCmd = jarName === "run.sh"
-    ? `exec su mc -c "cd /data && exec sh run.sh ${nogui}"`.trim()
-    : `exec su mc -c "exec java -Xms512M -Xmx${javaHeap} ${finalJavaArgs} -jar /data/${jarName} ${nogui}"`.trim();
+    ? `exec su mc -c "cd /data && exec env PATH=/opt/java/openjdk/bin:$PATH sh run.sh ${nogui}"`.trim()
+    : `exec su mc -c "exec env PATH=/opt/java/openjdk/bin:$PATH java -Xms512M -Xmx${javaHeap} ${finalJavaArgs} -jar /data/${jarName} ${nogui}"`.trim();
 
   const cmdParts = [`echo "eula=true" > /data/eula.txt`];
   if (opts?.extraCmd) cmdParts.push(...opts.extraCmd);
-  // Create non-root user + fix data ownership.  adduser -D creates a
-  // system user on Alpine; 2>/dev/null silences "already exists" errors.
-  cmdParts.push(`adduser -D -u 1000 mc 2>/dev/null; chown -R mc:mc /data`);
+  // Create non-root user + fix data ownership. Alpine images use BusyBox
+  // `adduser -D`, Debian-based images (e.g. the Java-8 `eclipse-temurin:8-jre`)
+  // use `useradd` — detect at runtime so both work. Debian Temurin images ship
+  // a pre-existing "ubuntu" user with UID 1000, so `-o` allows the duplicate
+  // UID (keeps host-side ownership at UID 1000 like before). 2>/dev/null
+  // silences "user already exists" on container restarts.
+  cmdParts.push(
+    `if command -v useradd >/dev/null 2>&1; then useradd -o -m -u 1000 mc 2>/dev/null; else adduser -D -u 1000 mc 2>/dev/null; fi; chown -R mc:mc /data`,
+  );
   cmdParts.push(startCmd);
 
   const container = await docker.createContainer({
