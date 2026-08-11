@@ -670,3 +670,21 @@ Hinweis: Slash-Commands (z.B. `/status`) sind mit Webhooks NICHT möglich — da
 **Verifiziert auf Server:** tsc 0 Fehler, next build OK, Services active, Health 200, alle 5 neuen Routen mit Token → 404 auf nonexistent (Routen registriert, Auth ok).
 
 > **Last updated:** 2026-08-11 · Session: Backup-Overhaul (BackupsTab, Auto-Backups, stop+start Auto-Restart), Mobile-Delete-Fix
+
+### 2026-08-11 — Backup/Download Progress-Bars (Commit `3fa4cc7`)
+
+**Problem:** Backup/Download zeigten nur einen Spinner, kein Fortschritt.
+
+**Backend:**
+- `backups.ts`: Backup-Erstellung jetzt als Stream-Pipeline `tar → counter → gzip → file` (statt `tar -czf`), der Counter zählt die verarbeiteten (unkomprimierten) Bytes gegen die Gesamtgröße (`du -sb`) → ehrlicher Prozentwert (0–99 während des Laufs, 100 am Ende).
+- `startBackupJob()`: asynchroner Job-Store mit `getBackupJob()`, Job-Einträge werden nach 60 s aufgeräumt (wie Modpack-Progress). `POST /:id/backup` antwortet sofort `202 { jobId }`.
+- Neu: `GET /api/servers/backups/progress/:jobId` zum Pollen (kein Konflikt mit `/:id/...`-Routen, da andere Segmentzahl).
+
+**Frontend:**
+- Neu `lib/backup.ts`: `waitForBackupJob(jobId, onProgress)` — pollt alle 1 s bis done/error (Cap 10 min).
+- `BackupsTab`: violette Progress-Bar mit % beim Erstellen (unter dem Header), grüne Bar beim Download — Download streamt den Body via `ReadableStream` und vergleicht gegen `Content-Length` (Fallback: plain Blob, falls kein Body-Stream).
+- Detailseite: Backup-Button zeigt `Backup X%` während der Job läuft.
+
+**Technischer Hinweis:** Fortschritt basiert auf verarbeiteten Bytes vs. Gesamtgröße — springt am Ende auf 100, wenn die Kompression fertig ist (bei gut komprimierbaren Daten bleibt der Wert länger niedrig, da der Counter auf der unkomprimierten Seite zählt — das ist gewollt: er zeigt echten Arbeitsfortschritt).
+
+> **Last updated:** 2026-08-11 · Session: Backup/Download-Progress-Bars
