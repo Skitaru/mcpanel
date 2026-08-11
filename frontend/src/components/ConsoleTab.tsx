@@ -75,41 +75,6 @@ function formatUptime(seconds: number) {
   return `${s}s`;
 }
 
-/** Minimal SVG area chart (gradient fill + line) for the CPU/RAM history. */
-function AreaChart({ values, max, stroke, id }: { values: number[]; max: number; stroke: string; id: string }) {
-  if (values.length < 2) return null;
-  const w = 300;
-  const h = 40;
-  const stepX = w / (values.length - 1);
-  const pts = values.map((v, i) => {
-    const x = i * stepX;
-    const y = h - 3 - Math.min(1, Math.max(0, v / max)) * (h - 8);
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  });
-  const line = pts.join(" ");
-  const area = `M0,${h} L${pts.join(" L")} L${w},${h} Z`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-1.5 h-10 w-full" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${id})`} />
-      <polyline
-        points={line}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.5"
-        vectorEffect="non-scaling-stroke"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -148,12 +113,6 @@ export default function ConsoleTab({
   const [suggIdx, setSuggIdx] = useState(-1);
   // Console filter: free text + output level
   const [filter, setFilter] = useState<{ text: string; level: "all" | "stderr" | "system" }>({ text: "", level: "all" });
-
-  // ---- stats history for sparklines (1 sample / 5 s, 360 = last 30 min) ----
-  const HISTORY_MAX = 360;
-  const HISTORY_INTERVAL_MS = 5000;
-  const [history, setHistory] = useState<{ cpu: number; mem: number }[]>([]);
-  const lastSampleRef = useRef(0);
 
   // ---- filtered view (keeps raw lines intact for re-filtering) ----
   const visibleLines = useMemo(() => {
@@ -307,15 +266,6 @@ export default function ConsoleTab({
         memoryUsage: payload.memoryUsage,
         memoryLimit: payload.memoryLimit,
       });
-      // Throttled sample for the history sparklines
-      const now = Date.now();
-      if (now - lastSampleRef.current >= HISTORY_INTERVAL_MS) {
-        lastSampleRef.current = now;
-        setHistory((prev) => {
-          const next = [...prev, { cpu: Math.min(100, payload.cpuPercent), mem: payload.memoryUsage }];
-          return next.length > HISTORY_MAX ? next.slice(next.length - HISTORY_MAX) : next;
-        });
-      }
     });
 
     socket.on("stats:error", (payload: { serverId: string; message: string }) => {
@@ -374,8 +324,6 @@ export default function ConsoleTab({
     socket.emit("tps:unsubscribe", { serverId });
     setStats(null);
     setTps(null);
-    setHistory([]);
-    lastSampleRef.current = 0;
     reattachPendingRef.current = true;
   }, [restartTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -403,8 +351,6 @@ export default function ConsoleTab({
       socket.emit("tps:unsubscribe", { serverId });
       setStats(null);
       setTps(null);
-      setHistory([]);
-      lastSampleRef.current = 0;
     }
   }, [serverStatus, serverId, addLine, restartTick]);
 
@@ -648,7 +594,6 @@ export default function ConsoleTab({
         {/* ── Auslastung (thick bars) ── */}
         <div className="rounded-xl border border-edge bg-surface p-4">
           <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Auslastung</h4>
-          {history.length >= 2 && <div className="-mt-1 mb-2 text-right text-[9px] text-slate-700">letzte 30 Min</div>}
 
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between">
@@ -661,7 +606,6 @@ export default function ConsoleTab({
               <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${(stats?.cpuPercent ?? 0) >= 90 ? "from-pink-600 to-danger" : (stats?.cpuPercent ?? 0) >= 70 ? "from-yellow-500 to-warn" : "from-teal-700 to-online"}`}
                 style={{ width: `${Math.min(100, stats?.cpuPercent ?? 0)}%` }} />
             </div>
-            {history.length >= 2 && <AreaChart values={history.map(h => h.cpu)} max={100} stroke="#00F5D4" id="chartCpu" />}
           </div>
 
           <div className="mb-4">
@@ -675,7 +619,6 @@ export default function ConsoleTab({
               <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${stats && stats.memoryUsage / stats.memoryLimit > 0.9 ? "from-pink-600 to-danger" : stats && stats.memoryUsage / stats.memoryLimit > 0.75 ? "from-yellow-500 to-warn" : "from-purple-800 to-accent"}`}
                 style={{ width: `${stats ? Math.min(100, (stats.memoryUsage / stats.memoryLimit) * 100) : 0}%` }} />
             </div>
-            {history.length >= 2 && <AreaChart values={history.map(h => h.mem)} max={stats?.memoryLimit ?? ram * 1024 * 1024} stroke="#9D4EDD" id="chartRam" />}
             <div className="mt-1 text-right text-[10px] text-muted">von {formatRam(ram)}</div>
           </div>
 
