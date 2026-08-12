@@ -1011,3 +1011,18 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert (Live):** Name mit `\n` → 400; Port 99999 → 400; Panel 200, Builds sauber. Create-Route hatte Port-Check schon (Finding #2 war veraltet).
 
 > **Last updated:** 2026-08-12 · Session: Funktions-Audit-Fixes — Port-Edit (rconPort+properties+Toast), Name-Injection, Command-Limits, Zeitzonen-Hinweis
+
+---
+
+### 2026-08-12 — Polish-Runde: Klickschutz, Dirty-State, Feedback (alle Funktionen)
+
+**Anlass:** "Bevor neue Sachen kommen, alle Funktionen polishen" → 6 Punkte (User: alle).
+
+1. **FileManager Batch-Delete-Confirm** — Mehrfach-Löschen zeigt jetzt Inline "X wirklich löschen? Ja/Nein" (war direkt destruktiv) + Erfolgs-Toast.
+2. **PlayerCard Kick/Ban-Confirm** — Kick/Ban brauchen Bestätigung (Inline "Kick?/Ban? Ja/Nein"), OP bleibt direkt. Neuer `confirmButton()`-Helper.
+3. **Dirty-State-Warnung (Tab-Wechsel)** — FileManagerTab meldet ungespeicherte Editor-Änderungen via `onDirtyChange` (savedContentRef-Vergleich) an die Detailseite; Tab-Wechsel zeigt "Ungespeicherte Änderungen — Verwerfen & wechseln?" (pendingTab + doTab-Refactor).
+4. **Upload-Toast** — Drag&Drop + Datei-Auswahl zeigen "X Datei(en) hochgeladen" (vorher stille Aktualisierung).
+5. **Avatar-Fallback** — mc-heads.net-Avatare fallen bei Ladefehler auf Initiale zurück (avatarFailed-Set + onError).
+6. **QuickCommands Restart-Countdown** — "Restart 60s" zeigt sichtbaren Countdown mit "Abbrechen" (say "abgebrochen"), Timer-Cleanup beim Unmount, Hinweis "(Tab offen lassen)".
+
+> **Last updated:** 2026-08-12 · Session: Polish-Runde — Batch/Kick/Ban-Confirms, Dirty-State-Warnung, Upload-Toast, Avatar-Fallback, Restart-Countdown

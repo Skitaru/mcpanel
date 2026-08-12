@@ -24,6 +24,10 @@ export default function PlayerCard({ serverId, isOnline, playerCount, playerList
   const [wlLoading, setWlLoading] = useState(false);
   const [newPlayer, setNewPlayer] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  // Inline confirm for destructive player actions (kick/ban)
+  const [confirmAction, setConfirmAction] = useState<{ name: string; action: "kick" | "ban" } | null>(null);
+  // Avatar images that failed to load (mc-heads.net unreachable) → show initial
+  const [avatarFailed, setAvatarFailed] = useState<Set<string>>(new Set());
 
   const rcon = useCallback(async (command: string, label: string) => {
     setBusy(label);
@@ -83,6 +87,38 @@ export default function PlayerCard({ serverId, isOnline, playerCount, playerList
     rcon(cmd, `${action}:${name}`);
   }, [rcon]);
 
+  const confirmButton = (action: "kick" | "ban", label: string, name: string) => {
+    const confirmed = confirmAction?.name === name && confirmAction.action === action;
+    return (
+      <div className="flex shrink-0 items-center gap-1">
+        {confirmed ? (
+          <>
+            <span className={`text-[9px] font-semibold ${action === "kick" ? "text-online" : "text-danger"}`}>{label}?</span>
+            <button
+              onClick={() => { act(name, action); setConfirmAction(null); }}
+              disabled={busy !== null}
+              className={`rounded px-1.5 py-0.5 text-[9px] font-medium text-white hover:opacity-80 disabled:opacity-40 ${action === "kick" ? "bg-online/70" : "bg-danger"}`}
+              aria-label={`${label} ${name} bestätigen`}
+            >Ja</button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              className="rounded bg-edge px-1.5 py-0.5 text-[9px] text-slate-300 hover:bg-accent-deep"
+              aria-label="Abbrechen"
+            >Nein</button>
+          </>
+        ) : (
+          <button
+            onClick={() => setConfirmAction({ name, action })}
+            disabled={busy !== null}
+            className={`rounded border border-edge bg-void px-1.5 py-0.5 text-[9px] transition disabled:opacity-40 ${action === "kick" ? "text-online hover:border-online/40" : "text-danger hover:border-danger/40"}`}
+            title={label}
+            aria-label={`${label} ${name}`}
+          >{label}</button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="rounded-xl border border-edge bg-surface p-4">
       <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
@@ -93,15 +129,25 @@ export default function PlayerCard({ serverId, isOnline, playerCount, playerList
         <>
           {playerList.slice(0, 8).map((p) => (
             <div key={p.id} className="flex items-center gap-2 py-1 text-xs text-slate-300">
-              <img src={`https://mc-heads.net/avatar/${p.id}/20`} alt="" className="h-5 w-5 rounded-full border border-edge" loading="lazy" />
+              {avatarFailed.has(p.id) ? (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-edge bg-surface2 text-[10px] font-bold text-violet-300" aria-hidden>
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <img
+                  src={`https://mc-heads.net/avatar/${p.id}/20`}
+                  alt=""
+                  className="h-5 w-5 rounded-full border border-edge"
+                  loading="lazy"
+                  onError={() => setAvatarFailed((prev) => new Set(prev).add(p.id))}
+                />
+              )}
               <span className="min-w-0 flex-1 truncate">{p.name}</span>
               <div className="flex shrink-0 gap-1">
                 <button onClick={() => act(p.name, "op")} disabled={busy !== null}
                   className="rounded border border-edge bg-void px-1.5 py-0.5 text-[9px] text-warn transition hover:border-warn/40 disabled:opacity-40" title="Op" aria-label={`Op ${p.name}`}>OP</button>
-                <button onClick={() => act(p.name, "kick")} disabled={busy !== null}
-                  className="rounded border border-edge bg-void px-1.5 py-0.5 text-[9px] text-online transition hover:border-online/40 disabled:opacity-40" title="Kick" aria-label={`Kick ${p.name}`}>Kick</button>
-                <button onClick={() => act(p.name, "ban")} disabled={busy !== null}
-                  className="rounded border border-edge bg-void px-1.5 py-0.5 text-[9px] text-danger transition hover:border-danger/40 disabled:opacity-40" title="Ban" aria-label={`Ban ${p.name}`}>Ban</button>
+                {confirmButton("kick", "Kick", p.name)}
+                {confirmButton("ban", "Ban", p.name)}
               </div>
             </div>
           ))}

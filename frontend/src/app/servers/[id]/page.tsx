@@ -43,12 +43,15 @@ export default function ServerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("console");
+  // Unsaved-changes guard for the file editor (reported by FileManagerTab)
+  const [fileDirty, setFileDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null);
   // URL sync: ?tab=files|logs|backups|schedule survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
     if (t === "files" || t === "logs" || t === "backups" || t === "schedule") setActiveTab(t);
   }, []);
-  const setTab = useCallback((tab: Tab) => {
+  const doTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -57,6 +60,14 @@ export default function ServerDetailPage() {
       window.history.replaceState(null, "", url.toString());
     }
   }, []);
+  // Intercept tab switches while the file editor has unsaved changes.
+  const setTab = useCallback((tab: Tab) => {
+    if (fileDirty && tab !== activeTab) {
+      setPendingTab(tab);
+      return;
+    }
+    doTab(tab);
+  }, [fileDirty, activeTab, doTab]);
   const [acting, setActing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -367,7 +378,7 @@ export default function ServerDetailPage() {
               </div>
 
               <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>
-                <FileManagerTab serverId={serverId} />
+                <FileManagerTab serverId={serverId} onDirtyChange={setFileDirty} />
               </div>
 
               <div className={`tab-content ${activeTab === "logs" ? "" : "hidden"}`}>
@@ -421,6 +432,30 @@ export default function ServerDetailPage() {
               <button onClick={() => setDockerLogs({ loading: false, text: null })} className="rounded-md p-1 text-slate-400 transition hover:text-white">✕</button>
             </div>
             <pre className="flex-1 overflow-auto p-4 text-xs font-mono leading-relaxed text-slate-400 bg-[#000000] whitespace-pre-wrap break-all">{dockerLogs.text}</pre>
+          </div>
+        </div>
+      )}
+
+      {/* ── Unsaved file changes (tab switch guard) ── */}
+      {pendingTab && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setPendingTab(null)}>
+          <div className="surface w-full max-w-sm m-4 border border-edge p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-white mb-1.5">Ungespeicherte Änderungen</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Die geöffnete Datei enthält ungespeicherte Änderungen. Beim Tab-Wechsel gehen sie verloren.
+              <span className="text-amber-400 font-medium"> Trotzdem wechseln?</span>
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button onClick={() => setPendingTab(null)}
+                className="rounded-md bg-edge px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-accent-deep">
+                Abbrechen
+              </button>
+              <button
+                onClick={() => { if (pendingTab) doTab(pendingTab); setPendingTab(null); setFileDirty(false); }}
+                className="rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-white transition hover:bg-danger/80">
+                Verwerfen &amp; wechseln
+              </button>
+            </div>
           </div>
         </div>
       )}

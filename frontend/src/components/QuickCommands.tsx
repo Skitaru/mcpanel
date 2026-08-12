@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -35,6 +35,21 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
   const [active, setActive] = useState<CmdDef | null>(null);
   const [value, setValue] = useState("");
   const [open, setOpen] = useState(true);
+  // Visible 60s restart countdown (browser-side timer — user can cancel)
+  const [restartCountdown, setRestartCountdown] = useState<number | null>(null);
+  const restartTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (restartTimerRef.current) clearInterval(restartTimerRef.current); }, []);
+
+  // When the countdown reaches 0 → actually restart the server.
+  useEffect(() => {
+    if (restartCountdown !== 0) return;
+    if (restartTimerRef.current) clearInterval(restartTimerRef.current);
+    restartTimerRef.current = null;
+    setRestartCountdown(null);
+    fetch(`${API_BASE}/api/servers/${serverId}/restart`, { method: "POST" }).catch(() => {});
+    toast.success("Server wird neu gestartet…");
+  }, [restartCountdown, serverId]);
 
   const runRcon = useCallback(async (fullCommand: string, label: string) => {
     setBusy(label);
@@ -59,13 +74,22 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
     }
   }, [serverId]);
 
+  const cancelRestart = useCallback(() => {
+    if (restartTimerRef.current) clearInterval(restartTimerRef.current);
+    restartTimerRef.current = null;
+    setRestartCountdown(null);
+    runRcon("say ✅ Server-Restart abgebrochen.", "cancel-restart");
+  }, [runRcon]);
+
   const handleClick = useCallback((cmd: CmdDef) => {
     if (cmd.id === "restart") {
+      if (restartCountdown !== null) return; // countdown already running
       // Say a countdown, then restart after 60 s.
-      runRcon("say ⚠ Server restarting in 60 seconds!", "restart");
-      setTimeout(() => {
-        fetch(`${API_BASE}/api/servers/${serverId}/restart`, { method: "POST" }).catch(() => {});
-      }, 60_000);
+      runRcon("say ⚠ Server restartet in 60 Sekunden!", "restart");
+      setRestartCountdown(60);
+      restartTimerRef.current = setInterval(() => {
+        setRestartCountdown((prev) => (prev === null ? null : prev - 1));
+      }, 1000);
       return;
     }
     if (cmd.needsInput) {
@@ -74,7 +98,7 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
       return;
     }
     runRcon(cmd.cmd, cmd.label);
-  }, [runRcon, serverId]);
+  }, [runRcon, restartCountdown]);
 
   const handleConfirm = useCallback(() => {
     if (!active) return;
@@ -101,6 +125,20 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
           </span>
           <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? "" : "-rotate-90"}`} />
         </button>
+        {/* Restart countdown — visible even when the panel is collapsed */}
+        {restartCountdown !== null && (
+          <div className="flex items-center gap-2 border-t border-warn/20 bg-warn/10 px-3.5 py-2">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-warn" />
+            <span className="text-[11px] font-medium text-amber-300">
+              Server restartet in {restartCountdown}s …
+            </span>
+            <span className="hidden sm:inline text-[10px] text-amber-200/50">(Tab offen lassen)</span>
+            <div className="flex-1" />
+            <button onClick={cancelRestart}
+              className="rounded bg-edge px-2 py-0.5 text-[10px] font-medium text-slate-300 transition hover:bg-accent-deep"
+              aria-label="Server-Restart abbrechen">Abbrechen</button>
+          </div>
+        )}
         {open && (
           <div className="grid grid-cols-2 gap-1.5 p-3 pt-0 sm:grid-cols-3">
             {CMDS.map((c) => (

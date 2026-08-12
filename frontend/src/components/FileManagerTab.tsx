@@ -5,6 +5,7 @@ import {
   ChevronRight, Download, File, FilePlus, Folder, FolderPlus,
   Save, Loader2, Trash2, Upload, Search, X, ChevronUp, ChevronDown,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -20,9 +21,14 @@ function isBinary(filename: string) {
   return /\.(jar|png|jpg|jpeg|gif|ico|webp|dat|mca|nbt|lock|gz|zip)$/i.test(filename);
 }
 
-interface Props { serverId: string; }
+interface Props {
+  serverId: string;
+  /** Notify the parent (detail page) whether the editor holds unsaved changes —
+   *  used to warn before switching tabs. */
+  onDirtyChange?: (dirty: boolean) => void;
+}
 
-export default function FileManagerTab({ serverId }: Props) {
+export default function FileManagerTab({ serverId, onDirtyChange }: Props) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState("/");
   const [loading, setLoading] = useState(true);
@@ -53,6 +59,14 @@ export default function FileManagerTab({ serverId }: Props) {
   const [fileSearch, setFileSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchConfirm, setBatchConfirm] = useState(false);
+  // Unsaved-changes tracking (reported to the parent for tab-switch warnings)
+  const savedContentRef = useRef("");
+  const dirty = !!selectedFile && fileContent !== savedContentRef.current;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   const visibleFiles = fileSearch
     ? files.filter((f) => f.name.toLowerCase().includes(fileSearch.toLowerCase()))
@@ -80,6 +94,7 @@ export default function FileManagerTab({ serverId }: Props) {
   const batchDelete = useCallback(async () => {
     if (selected.size === 0) return;
     setBatchDeleting(true);
+    setBatchConfirm(false);
     try {
       for (const name of selected) {
         const fp = currentPath === "/" ? `/${name}` : `${currentPath}/${name}`;
@@ -87,8 +102,10 @@ export default function FileManagerTab({ serverId }: Props) {
       }
       setSelected(new Set());
       await fetchFiles();
+      toast.success(`${selected.size} Element(e) gelöscht.`);
     } catch (err) {
       console.error("Batch delete failed:", err);
+      toast.error("Löschen fehlgeschlagen.");
     } finally {
       setBatchDeleting(false);
     }
@@ -110,9 +127,11 @@ export default function FileManagerTab({ serverId }: Props) {
     try {
       const fd = new FormData(); fd.append("path", currentPath);
       for (const f of dropped) fd.append("files", f);
-      await fetch(`${API_BASE}/api/servers/${serverId}/upload`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/upload`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await fetchFiles();
-    } catch (err) { console.error("Upload failed:", err); }
+      toast.success(`${dropped.length} Datei(en) hochgeladen.`);
+    } catch (err) { console.error("Upload failed:", err); toast.error("Upload fehlgeschlagen."); }
     finally { setUploading(false); }
   }, [serverId, currentPath, fetchFiles]);
 
@@ -127,9 +146,11 @@ export default function FileManagerTab({ serverId }: Props) {
     try {
       const fd = new FormData(); fd.append("path", currentPath);
       for (const f of selected) fd.append("files", f);
-      await fetch(`${API_BASE}/api/servers/${serverId}/upload`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/upload`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await fetchFiles();
-    } catch (err) { console.error("Upload failed:", err); }
+      toast.success(`${selected.length} Datei(en) hochgeladen.`);
+    } catch (err) { console.error("Upload failed:", err); toast.error("Upload fehlgeschlagen."); }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   }, [serverId, currentPath, fetchFiles]);
 
@@ -139,9 +160,12 @@ export default function FileManagerTab({ serverId }: Props) {
     try {
       const res = await fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent(fp)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setFileContent((await res.json()).content);
+      const content: string = (await res.json()).content;
+      setFileContent(content);
+      savedContentRef.current = content;
     } catch (err: unknown) {
       setFileContent(`// Error: ${err instanceof Error ? err.message : "unknown"}`);
+      savedContentRef.current = "";
     } finally { setFileLoading(false); }
   }, [serverId, currentPath]);
 
@@ -166,6 +190,7 @@ export default function FileManagerTab({ serverId }: Props) {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSaveMessage("Saved ✓"); setTimeout(() => setSaveMessage(null), 2000);
+      savedContentRef.current = fileContent;
     } catch (err: unknown) { setSaveMessage(`Error: ${err instanceof Error ? err.message : "unknown"}`); }
     finally { setSaving(false); }
   }, [serverId, selectedFile, fileContent]);
@@ -412,12 +437,24 @@ export default function FileManagerTab({ serverId }: Props) {
           <div className="flex items-center gap-2 border-t border-edge bg-accent/10 px-3 py-1.5">
             <b className="text-[11px] text-purple-200">{selected.size} ausgewählt</b>
             <div className="flex-1" />
-            <button onClick={batchDelete} disabled={batchDeleting}
-              className="flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-danger/80 disabled:opacity-50">
-              {batchDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-              Löschen
-            </button>
-            <button onClick={() => setSelected(new Set())} disabled={batchDeleting}
+            {batchConfirm ? (
+              <div className="flex items-center gap-1.5 rounded-md border border-danger/30 bg-danger/10 px-2 py-1">
+                <span className="text-[10px] font-semibold text-red-400">{selected.size} wirklich löschen?</span>
+                <button onClick={batchDelete} disabled={batchDeleting}
+                  className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-danger/80 disabled:opacity-50">
+                  {batchDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Ja"}
+                </button>
+                <button onClick={() => setBatchConfirm(false)} disabled={batchDeleting}
+                  className="rounded bg-edge px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-accent-deep disabled:opacity-50">Nein</button>
+              </div>
+            ) : (
+              <button onClick={() => setBatchConfirm(true)}
+                className="flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-danger/80">
+                <Trash2 className="h-3 w-3" />
+                Löschen
+              </button>
+            )}
+            <button onClick={() => { setSelected(new Set()); setBatchConfirm(false); }} disabled={batchDeleting}
               className="rounded-md bg-edge px-2.5 py-1 text-[11px] text-slate-300 transition hover:bg-accent-deep disabled:opacity-50">
               Abbruch
             </button>
