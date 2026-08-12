@@ -322,11 +322,18 @@ export default function ServerDetailPage() {
                   <Settings2 className="h-4 w-4" strokeWidth={1.75} /> Edit
                 </button>
                 {deleteConfirm ? (
-                  <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
-                    <span className="text-xs font-bold text-danger">Delete?</span>
-                    <button onClick={handleDelete} disabled={deleting} className="rounded bg-danger px-2 py-0.5 text-xs font-bold text-white disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
-                    <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
-                  </div>
+                  deleting ? (
+                    <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-danger" />
+                      <span className="text-xs font-semibold text-danger">Sicherungs-Backup + Löschen…</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
+                      <span className="text-xs font-bold text-danger">Delete?</span>
+                      <button onClick={handleDelete} disabled={deleting} className="rounded bg-danger px-2 py-0.5 text-xs font-bold text-white disabled:opacity-50">{deleting ? "…" : "Yes"}</button>
+                      <button onClick={() => setDeleteConfirm(false)} disabled={deleting} className="rounded bg-edge px-2 py-0.5 text-xs text-slate-300">No</button>
+                    </div>
+                  )
                 ) : (
                   <button onClick={() => setDeleteConfirm(true)}
                     className="rounded-xl border border-edge bg-surface px-4 py-2.5 text-[13px] font-bold text-muted transition hover:border-danger/40 hover:text-danger">

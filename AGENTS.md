@@ -937,3 +937,17 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 - Servername: `group-hover:text-accent-soft`
 
 > **Last updated:** 2026-08-12 · Session: Dashboard-Hover-Effekt auf ServerCards
+
+---
+
+### 2026-08-12 — Delete-Dauer: Sicherheits-Backup + Feedback
+
+**Symptom:** "Server Delete funktioniert nicht bzw. dauert sehr lange?" → Delete funktioniert (verifiziert: Container + Data-Dir gelöscht), aber der `DELETE /:id` **awaitet ein Auto-Backup** (kind=auto) VOR dem Löschen — bei SF3 waren das **702 MB** (Mods + generierte Welt), was den Request minutenlang blockiert, ohne dass die UI Feedback zeigt (nur "…").
+
+**Fixes:**
+1. `backups.ts`: `createGzip()` → `createGzip({ level: 1 })` — schnellste Stufe; bei Minecraft-Daten (JARs, Regionen, schon-komprimiert) kaum Größenunterschied. Benchmark auf 702 MB: -6: 7s vs -1: 6s (Engpass ist tar-I/O, nicht gzip — Level 1 schadet trotzdem nicht, greift v.a. bei komprimierbaren Logs).
+2. Detail-Page (`[id]/page.tsx`): Während des Deletes zeigt der Button jetzt **"Sicherungs-Backup + Löschen…"** mit Spinner statt "…" — der User sieht, dass das Sicherheits-Backup läuft.
+
+**Hinweis:** Orphan-Backups der gelöschten Server liegen noch unter `backups/3a57591b…` (287 MB) und `backups/5a6113db…` (702 MB) — stehen zur Bereinigung bereit (früherer User-Wunsch: Orphans löschen).
+
+> **Last updated:** 2026-08-12 · Session: Delete-Feedback + gzip Level 1 für schnellere Auto-Backups

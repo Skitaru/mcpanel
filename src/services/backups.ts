@@ -91,7 +91,7 @@ async function writeBackupArchive(
   const tar = spawn("tar", ["-cf", "-", "-C", dataPath, "."], {
     stdio: ["ignore", "pipe", "ignore"],
   });
-  const gzip = createGzip();
+  const gzip = createGzip({ level: 1 }); // fastest level — MC data (jars, regions) barely compresses further
   const out = createWriteStream(backupPath);
 
   let written = 0;
