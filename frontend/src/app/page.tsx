@@ -180,7 +180,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar servers={servers} onInstallModpack={() => setModpackDialogOpen(true)} onlinePlayers={servers.filter(s => s.status === "running").reduce((a, s) => a + (playerCounts[s.id]?.online || 0), 0)} />
+      <TopBar servers={servers} onlinePlayers={servers.filter(s => s.status === "running").reduce((a, s) => a + (playerCounts[s.id]?.online || 0), 0)} />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
 
           {loading ? (

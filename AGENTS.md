@@ -1082,3 +1082,18 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** bash -n sauber, isolierter Test (run/ok/fail + Spinner + Log-Leere).
 
 > **Last updated:** 2026-08-12 · Session: Installer-Spinner mit Sekunden-Timer, TTY-sicher
+
+---
+
+### 2026-08-12 — TopBar "Modpack"-Button entfernt
+
+**Grund:** Der Modpack-Installer ist jetzt im New-Server-Wizard (CreateServerDialog Schritt-1-Template "Modpack") integriert — der separate TopBar-Button war redundant.
+
+**Änderungen:**
+- `TopBar.tsx`: `onInstallModpack`-Prop, Download-Icon-Import und Button-Block entfernt.
+- `page.tsx` (Dashboard): Prop am TopBar entfernt; `modpackDialogOpen` + `InstallModpackDialog` bleiben (vom Wizard-`onOpenModpack`-Pfad genutzt).
+- `servers/[id]/page.tsx`: toten Code entfernt (Import, State, TopBar-Prop, Dialog-Render) — der Modpack-Dialog ist auf der Detailseite nicht mehr erreichbar (nur noch übers Dashboard).
+
+**Nebenbefund:** Ein fehlgeschlagener Sammel-SCP legte wieder `components/page.tsx` auf dem Server ab → entfernt + finaler Build (transienter outfit-Font-Build-Fehler, zweiter Versuch ok). Panel 200.
+
+> **Last updated:** 2026-08-12 · Session: TopBar-Modpack-Button entfernt, Detailseite aufgeräumt

@@ -13,7 +13,6 @@ import LogsTab from "@/components/LogsTab";
 import BackupsTab from "@/components/BackupsTab";
 import ScheduleCard from "@/components/ScheduleCard";
 import EditServerDialog from "@/components/EditServerDialog";
-import InstallModpackDialog from "@/components/InstallModpackDialog";
 import TopBar from "@/components/TopBar";
 import AddressPill from "@/components/AddressPill";
 import { DetailSkeleton } from "@/components/Skeleton";
@@ -75,7 +74,6 @@ export default function ServerDetailPage() {
   const [recreateConfirm, setRecreateConfirm] = useState(false);
   const [recreating, setRecreating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [modpackDialogOpen, setModpackDialogOpen] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [backupPercent, setBackupPercent] = useState<number | null>(null);
   const [backupsRefreshTick, setBackupsRefreshTick] = useState(0);
@@ -212,7 +210,7 @@ export default function ServerDetailPage() {
 
   return (
     <div className="min-h-screen">
-      <TopBar servers={allServers} activeId={serverId} onInstallModpack={() => setModpackDialogOpen(true)} />
+      <TopBar servers={allServers} activeId={serverId} />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6">
 
@@ -397,7 +395,6 @@ export default function ServerDetailPage() {
       </main>
 
       <EditServerDialog open={editOpen} onClose={() => setEditOpen(false)} onUpdated={fetchServer} server={server} />
-      <InstallModpackDialog open={modpackDialogOpen} onClose={() => setModpackDialogOpen(false)} onCreated={fetchServer} />
 
       {/* ── Restore confirmation ── */}
       {restoreConfirm && (

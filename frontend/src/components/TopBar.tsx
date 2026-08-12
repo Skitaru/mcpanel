@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, KeyRound, Download, LayoutDashboard, ChevronDown, Users } from "lucide-react";
+import { LogOut, KeyRound, LayoutDashboard, ChevronDown, Users } from "lucide-react";
 import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { statusColor } from "@/lib/format";
 import type { ServerStatus } from "@/lib/types";
@@ -11,13 +11,12 @@ import type { ServerStatus } from "@/lib/types";
 interface Props {
   servers: ServerStatus[];
   activeId?: string;
-  onInstallModpack: () => void;
   /** Total online players across all running servers (dashboard only). */
   onlinePlayers?: number;
 }
 
 /** Slim top navigation bar — replaces the old left sidebar (Pterodactyl-style). */
-export default function TopBar({ servers, activeId, onInstallModpack, onlinePlayers }: Props) {
+export default function TopBar({ servers, activeId, onlinePlayers }: Props) {
   const [pwDialogOpen, setPwDialogOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const pathname = usePathname();
@@ -96,11 +95,6 @@ export default function TopBar({ servers, activeId, onInstallModpack, onlinePlay
 
         {/* Right actions */}
         <div className="flex items-center gap-0.5">
-          <button onClick={onInstallModpack} title="Install Modpack" aria-label="Install Modpack"
-            className="flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-3 py-1.5 text-[13px] font-medium text-slate-300 transition hover:border-accent/40 hover:text-purple-200">
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Modpack</span>
-          </button>
           <button onClick={() => setPwDialogOpen(true)} title="Change Password" aria-label="Change Password"
             className="p-2 rounded-lg text-muted transition hover:text-purple-300 hover:bg-accent/10">
             <KeyRound className="h-4 w-4" />
