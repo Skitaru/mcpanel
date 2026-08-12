@@ -994,3 +994,20 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Deploy-Hinweis:** Ein fehlgeschlagener Sammel-SCP legte Streu-Dateien ab (`src/services/{index,servers,files}.ts`) → entfernt, Server-Build sauber, Health 200, Login OK, Panel 200.
 
 > **Last updated:** 2026-08-12 · Session: Audit-Implementierung — Streaming, async scrypt, Restore-Rollback, Crash-Loop-Stop, WS-Poller-Dedupe, 30-min-Create-Fenster
+
+---
+
+### 2026-08-12 — Funktions-Audit: Port-Edit-Fix, Name-Injection, Command-Limits, Zeitzone
+
+**Anlass:** Zweiter Audit (Feature-Fokus). User wählte "Alle funktionalen Bugs fixen".
+
+**Fixes (servers.ts + config-store.ts + Frontend):**
+1. **Port-Edit-Bug behoben:** `PUT /:id` mit Port-Änderung schreibt jetzt `rconPort` (port+10) in die Config UND patcht `server.properties` (server-port/rcon.port) bzw. `velocity.toml` (bind) — die Änderung überlebt damit einen Recreate. Response-Flag `portChanged`/`recreateRequired`; EditServerDialog zeigt Toast "Port geändert — wird nach Recreate aktiv".
+2. **Name-Injection-Schutz:** Neuer `isValidServerName()` (1-60 Zeichen, keine Linebreaks, keine `"`) — angewendet in Create-Route + runCreateJob + PUT. Verhindert Properties-/Toml-Injection (z.B. `online-mode=false` per Newline im Namen).
+3. **Create-Port:** war bereits validiert (1024-65525 + Kollision 409) — nur runCreateJob-Defense ergänzt. PUT-Port-Bereich 65535 → **65525** korrigiert (RCON +10 ≤ 65535).
+4. **Command-Limits:** `POST /:id/command` — trim, max 1000 Zeichen, keine Linebreaks (400).
+5. **Scheduler-Zeitzone:** `GET /:id/schedule` liefert `timezone` (IANA-ID + Offset); ScheduleCard zeigt Hinweis "Zeiten gelten in der Server-Zeitzone Europe/London (UTC+1)".
+
+**Verifiziert (Live):** Name mit `\n` → 400; Port 99999 → 400; Panel 200, Builds sauber. Create-Route hatte Port-Check schon (Finding #2 war veraltet).
+
+> **Last updated:** 2026-08-12 · Session: Funktions-Audit-Fixes — Port-Edit (rconPort+properties+Toast), Name-Injection, Command-Limits, Zeitzonen-Hinweis

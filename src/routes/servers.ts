@@ -63,6 +63,13 @@ function parseRamToMB(ram: string | number): number {
   return mb;
 }
 
+/** Validate a server name: 1-60 chars, no line breaks, no double quotes.
+ *  Prevents property/toml injection via server.properties / velocity.toml. */
+function isValidServerName(name: string): boolean {
+  const n = name.trim();
+  return n.length > 0 && n.length <= 60 && !/[\r\n]/.test(n) && !n.includes('"');
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/servers — starts an async creation job; poll /create-progress/:id
 // ---------------------------------------------------------------------------
@@ -92,8 +99,14 @@ async function runCreateJob(body: CreateServerRequest, jobId: string): Promise<v
   let dataPath: string | null = null;
   try {
     const name = body.name.trim();
+    if (!isValidServerName(name)) {
+      throw new Error("Invalid server name (1-60 chars, no line breaks or double quotes).");
+    }
     const ram = parseRamToMB(body.ram ?? "4G");
     const port = body.port ?? 25565;
+    if (typeof port !== "number" || port < 1024 || port > 65525) {
+      throw new Error("Field 'port' must be between 1024 and 65525.");
+    }
     const voicePort = body.voicePort ?? undefined;
     const serverType: ServerType = body.serverType ?? "paper";
     const mcVersion = body.paperVersion ?? "1.21.1";
@@ -224,8 +237,8 @@ router.post("/", async (req: Request, res: Response) => {
     const body = req.body as CreateServerRequest;
 
     // ---- validation (synchronous — immediate 4xx) ----
-    if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
-      res.status(400).json({ error: "Field 'name' is required." });
+    if (!body.name || typeof body.name !== "string" || !isValidServerName(body.name)) {
+      res.status(400).json({ error: "Field 'name' must be 1-60 characters and must not contain line breaks or double quotes." });
       return;
     }
 
@@ -790,8 +803,21 @@ router.post("/:id/command", async (req: Request, res: Response) => {
       return;
     }
     const { command } = req.body ?? {};
-    if (!command || typeof command !== "string") {
+    if (typeof command !== "string") {
       res.status(400).json({ error: "Field 'command' (string) is required." });
+      return;
+    }
+    const cmd = command.trim();
+    if (!cmd) {
+      res.status(400).json({ error: "Field 'command' must not be empty." });
+      return;
+    }
+    if (cmd.length > 1000) {
+      res.status(400).json({ error: "Command too long (max 1000 characters)." });
+      return;
+    }
+    if (/[\r\n]/.test(cmd)) {
+      res.status(400).json({ error: "Command must not contain line breaks." });
       return;
     }
 
@@ -801,7 +827,7 @@ router.post("/:id/command", async (req: Request, res: Response) => {
     }
 
     const { sendRcon } = await import("../services/rcon");
-    const response = await sendRcon("127.0.0.1", server.rconPort, server.rconPassword, command);
+    const response = await sendRcon("127.0.0.1", server.rconPort, server.rconPassword, cmd);
     res.json({ response });
   } catch (err: any) {
     console.error("[api] RCON command error:", err);
@@ -878,8 +904,8 @@ router.put("/:id", async (req: Request, res: Response) => {
     const { name, ram: ramStr, port, version, javaArgs, voicePort, discordWebhook, tag } = req.body ?? {};
 
     // Validate name if provided
-    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
-      res.status(400).json({ error: "Field 'name' must be a non-empty string." });
+    if (name !== undefined && (typeof name !== "string" || !isValidServerName(name))) {
+      res.status(400).json({ error: "Field 'name' must be 1-60 characters and must not contain line breaks or double quotes." });
       return;
     }
 
@@ -904,8 +930,9 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     // Validate port if provided
     if (port !== undefined) {
-      if (typeof port !== "number" || port < 1024 || port > 65535) {
-        res.status(400).json({ error: "Field 'port' must be between 1024 and 65535." });
+      // Max 65525 — the RCON port is auto-assigned as port + 10 and must stay ≤ 65535.
+      if (typeof port !== "number" || port < 1024 || port > 65525) {
+        res.status(400).json({ error: "Field 'port' must be between 1024 and 65525." });
         return;
       }
       // Port conflict check (exclude current server)
@@ -944,7 +971,9 @@ router.put("/:id", async (req: Request, res: Response) => {
     const updated = await updateServer(server.id, {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(ram !== undefined ? { ram } : {}),
-      ...(port !== undefined ? { port } : {}),
+      // Port changes also update the RCON port (port + 10) so the stored
+      // config stays in sync even before the container is recreated.
+      ...(port !== undefined ? { port, rconPort: port + 10 } : {}),
       ...(version !== undefined ? { version: version.trim() } : {}),
       ...(javaArgs !== undefined ? { javaArgs: javaArgs?.trim() || (undefined as any) } : {}),
       ...(voicePort !== undefined ? { voicePort: voicePort ?? (undefined as any) } : {}),
@@ -966,6 +995,34 @@ router.put("/:id", async (req: Request, res: Response) => {
       }
     }
 
+    // Port changes must also be written into the server's own config files so
+    // the change survives a container recreate (server.properties / velocity.toml).
+    // The Docker port binding itself only changes after Recreate.
+    let recreateRequired = false;
+    if (port !== undefined && port !== server.port) {
+      recreateRequired = true;
+      try {
+        if (server.serverType === "velocity") {
+          const tomlPath = path.join(server.dataPath, "velocity.toml");
+          if (fs.existsSync(tomlPath)) {
+            const raw = fs.readFileSync(tomlPath, "utf-8").replace(/^bind\s*=\s*".*"/m, `bind = "0.0.0.0:${port}"`);
+            fs.writeFileSync(tomlPath, raw);
+          }
+        } else {
+          const propsPath = path.join(server.dataPath, "server.properties");
+          if (fs.existsSync(propsPath)) {
+            const raw = fs
+              .readFileSync(propsPath, "utf-8")
+              .replace(/^server-port=.*$/m, `server-port=${port}`)
+              .replace(/^rcon.port=.*$/m, `rcon.port=${port + 10}`);
+            fs.writeFileSync(propsPath, raw);
+          }
+        }
+      } catch (fileErr: any) {
+        console.error("[api] Failed to patch config file for port change:", fileErr.message);
+      }
+    }
+
     res.json({
       id: updated?.id,
       name: updated?.name,
@@ -974,6 +1031,10 @@ router.put("/:id", async (req: Request, res: Response) => {
       version: updated?.version,
       javaArgs: updated?.javaArgs ?? null,
       voicePort: updated?.voicePort ?? null,
+      // true if the port changed — the running container still binds the old
+      // port until the user recreates it.
+      portChanged: port !== undefined && port !== server.port,
+      recreateRequired,
     });
   } catch (err: any) {
     console.error("[api] PUT /api/servers/:id error:", err);
@@ -1123,11 +1184,19 @@ router.post("/:id/icon", iconUpload.single("icon"), async (req: Request, res: Re
 // GET  /api/servers/:id/schedule — read scheduled tasks
 // PUT  /api/servers/:id/schedule — write scheduled tasks
 // ---------------------------------------------------------------------------
+/** Server-local timezone info so the frontend can tell the user which clock
+ *  the scheduler runs on (scheduled HH:MM values are interpreted in this zone). */
+function getServerTimezone(): { id: string; offsetMinutes: number } {
+  let id = "UTC";
+  try { id = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { /* keep UTC */ }
+  return { id, offsetMinutes: -new Date().getTimezoneOffset() };
+}
+
 router.get("/:id/schedule", async (req: Request, res: Response) => {
   try {
     const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
-    res.json({ schedule: server.schedule ?? {} });
+    res.json({ schedule: server.schedule ?? {}, timezone: getServerTimezone() });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to read schedule.", detail: err.message });
   }

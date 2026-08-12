@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import type { ServerStatus } from "@/lib/types";
+import toast from "react-hot-toast";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -101,6 +102,13 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? `HTTP ${res.status}`);
+        }
+
+        const data = await res.json().catch(() => ({}));
+        // A port change only takes effect on the running container after a
+        // Recreate (the config + config files are updated immediately).
+        if (data.portChanged) {
+          toast("Port geändert — wird nach 'Recreate' auf dem laufenden Container aktiv.", { icon: "ℹ️" });
         }
 
         onUpdated();

@@ -18,6 +18,7 @@ interface Schedule {
 /** Auto-restart / auto-backup scheduler — its own tab on the detail page. */
 export default function ScheduleCard({ serverId }: Props) {
   const [schedule, setSchedule] = useState<Schedule>({});
+  const [timezone, setTimezone] = useState<{ id: string; offsetMinutes: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -26,6 +27,7 @@ export default function ScheduleCard({ serverId }: Props) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.schedule) setSchedule({ restart: data.schedule.restart ?? "", backup: data.schedule.backup ?? "" });
+        if (data?.timezone) setTimezone(data.timezone);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -61,6 +63,11 @@ export default function ScheduleCard({ serverId }: Props) {
 
   const hasAny = !!(schedule.restart || schedule.backup);
 
+  // Human-readable server timezone, e.g. "Europe/London (UTC+1)".
+  const tzLabel = timezone
+    ? `${timezone.id} (UTC${timezone.offsetMinutes >= 0 ? "+" : ""}${timezone.offsetMinutes / 60})`
+    : null;
+
   return (
     <div className="rounded-xl border border-edge bg-surface">
       {/* Header */}
@@ -82,6 +89,13 @@ export default function ScheduleCard({ serverId }: Props) {
           Save
         </button>
       </div>
+
+      {/* Server-timezone notice — scheduled times run on the SERVER clock, not the browser's */}
+      {tzLabel && (
+        <div className="border-b border-edge bg-void/50 px-4 py-2 text-[10px] text-muted">
+          ⏰ Zeiten gelten in der Server-Zeitzone <span className="font-mono text-slate-400">{tzLabel}</span> — nicht in deiner lokalen Zeit.
+        </div>
+      )}
 
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         {/* ── Auto-Restart ── */}
