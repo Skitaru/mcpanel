@@ -75,15 +75,23 @@ interface SocketSession {
   statsSubs: Map<string, Readable>;
   /** serverId → console streams */
   consoleSubs: Map<string, ContainerStreams>;
-  /** serverId → TPS polling interval */
-  tpsIntervals: Map<string, ReturnType<typeof setInterval>>;
-  /** serverId → player-list polling interval */
-  playersIntervals: Map<string, ReturnType<typeof setInterval>>;
-  /** serverId → last known player names (join/leave detection) */
-  playerLastNames: Map<string, string[]>;
 }
 
 const sessions = new Map<string, SocketSession>();
+
+// ---------------------------------------------------------------------------
+// Shared RCON pollers — ONE poller per server, fanning out to every socket
+// subscribed to it (so N browser tabs don't fire N RCON requests per tick).
+// ---------------------------------------------------------------------------
+
+/** serverId → set of subscribed socket ids */
+const tpsSubs = new Map<string, Set<string>>();
+const playersSubs = new Map<string, Set<string>>();
+/** serverId → the single running poller interval */
+const tpsIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const playersIntervals = new Map<string, ReturnType<typeof setInterval>>();
+/** serverId → last known player names (join/leave detection) */
+const playerLastNames = new Map<string, string[]>();
 
 // ---------------------------------------------------------------------------
 // Stats helpers
@@ -160,9 +168,6 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     const session: SocketSession = {
       statsSubs: new Map(),
       consoleSubs: new Map(),
-      tpsIntervals: new Map(),
-      playersIntervals: new Map(),
-      playerLastNames: new Map(),
     };
     sessions.set(socket.id, session);
     console.log(`[ws] Client connected: ${socket.id}`);
@@ -235,12 +240,6 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         session.statsSubs.delete(serverId);
         console.log(`[ws] Stats unsubscription: ${socket.id} → ${serverId}`);
       }
-      // Also stop TPS polling
-      const tpsInterval = session.tpsIntervals.get(serverId);
-      if (tpsInterval) {
-        clearInterval(tpsInterval);
-        session.tpsIntervals.delete(serverId);
-      }
     });
 
     // ==================================================================
@@ -249,7 +248,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
     socket.on("tps:subscribe", async (payload: { serverId: string }) => {
       const { serverId } = payload;
-      if (session.tpsIntervals.has(serverId)) return;
+      const set = tpsSubs.get(serverId) ?? new Set<string>();
+      set.add(socket.id);
+      tpsSubs.set(serverId, set);
+      if (tpsIntervals.has(serverId)) return; // one shared poller is already running
 
       const server = await getServer(serverId);
       if (!server?.containerId) {
@@ -257,6 +259,9 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         return;
       }
 
+      const emitTps = (data: unknown) => {
+        for (const sid of tpsSubs.get(serverId) ?? []) io.to(sid).emit("tps:data", data);
+      };
       const pollTps = () => {
         sendRcon("127.0.0.1", server.rconPort, server.rconPassword, "tps", 3000)
           .then((raw) => {
@@ -267,7 +272,7 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
             const clean = raw.replace(/§[0-9a-fk-or]/gi, "");
             const match = clean.match(/:\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/);
             if (match) {
-              socket.emit("tps:data", {
+              emitTps({
                 serverId,
                 tps5s: parseFloat(match[1]),
                 tps1m: parseFloat(match[2]),
@@ -285,16 +290,20 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
       pollTps(); // immediate first poll
       const interval = setInterval(pollTps, 5000);
-      session.tpsIntervals.set(serverId, interval);
+      tpsIntervals.set(serverId, interval);
       console.log(`[ws] TPS subscription: ${socket.id} → ${serverId}`);
     });
 
     socket.on("tps:unsubscribe", (payload: { serverId: string }) => {
       const { serverId } = payload;
-      const interval = session.tpsIntervals.get(serverId);
-      if (interval) {
-        clearInterval(interval);
-        session.tpsIntervals.delete(serverId);
+      const set = tpsSubs.get(serverId);
+      if (!set) return;
+      set.delete(socket.id);
+      if (set.size === 0) {
+        tpsSubs.delete(serverId);
+        const interval = tpsIntervals.get(serverId);
+        if (interval) clearInterval(interval);
+        tpsIntervals.delete(serverId);
       }
     });
 
@@ -304,7 +313,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
     socket.on("players:subscribe", async (payload: { serverId: string }) => {
       const { serverId } = payload;
-      if (session.playersIntervals.has(serverId)) return;
+      const set = playersSubs.get(serverId) ?? new Set<string>();
+      set.add(socket.id);
+      playersSubs.set(serverId, set);
+      if (playersIntervals.has(serverId)) return; // one shared poller is already running
 
       const server = await getServer(serverId);
       if (!server?.containerId) {
@@ -312,6 +324,9 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
         return;
       }
 
+      const emitPlayers = (data: unknown) => {
+        for (const sid of playersSubs.get(serverId) ?? []) io.to(sid).emit("players:data", data);
+      };
       const pollPlayers = () => {
         sendRcon("127.0.0.1", server.rconPort, server.rconPassword, "list", 3000)
           .then((raw) => {
@@ -326,14 +341,14 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
               ? [...new Set(m[3].split(",").map((s) => s.trim()).filter(Boolean))]
               : [];
 
-            const first = !session.playerLastNames.has(serverId);
-            const prev = session.playerLastNames.get(serverId) ?? [];
-            session.playerLastNames.set(serverId, names);
+            const first = !playerLastNames.has(serverId);
+            const prev = playerLastNames.get(serverId) ?? [];
+            playerLastNames.set(serverId, names);
 
             // Emit on the first poll and whenever the player set changed
             // (i.e. a player joined or left) — so the UI updates live.
             if (first || prev.join(",") !== names.join(",")) {
-              socket.emit("players:data", {
+              emitPlayers({
                 serverId,
                 online,
                 max,
@@ -348,17 +363,21 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
 
       pollPlayers(); // immediate first poll
       const interval = setInterval(pollPlayers, 5000);
-      session.playersIntervals.set(serverId, interval);
+      playersIntervals.set(serverId, interval);
       console.log(`[ws] Players subscription: ${socket.id} → ${serverId}`);
     });
 
     socket.on("players:unsubscribe", (payload: { serverId: string }) => {
       const { serverId } = payload;
-      const interval = session.playersIntervals.get(serverId);
-      if (interval) {
-        clearInterval(interval);
-        session.playersIntervals.delete(serverId);
-        session.playerLastNames.delete(serverId);
+      const set = playersSubs.get(serverId);
+      if (!set) return;
+      set.delete(socket.id);
+      if (set.size === 0) {
+        playersSubs.delete(serverId);
+        playerLastNames.delete(serverId);
+        const interval = playersIntervals.get(serverId);
+        if (interval) clearInterval(interval);
+        playersIntervals.delete(serverId);
       }
     });
 
@@ -479,8 +498,27 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
     socket.on("disconnect", () => {
       for (const stream of session.statsSubs.values()) stream.destroy();
       for (const streams of session.consoleSubs.values()) streams.close();
-      for (const interval of session.tpsIntervals.values()) clearInterval(interval);
-      for (const interval of session.playersIntervals.values()) clearInterval(interval);
+
+      // Remove this socket from the shared poller subscriptions; stop the
+      // poller once the last subscriber for a server goes away.
+      for (const [serverId, set] of tpsSubs) {
+        if (set.delete(socket.id) && set.size === 0) {
+          tpsSubs.delete(serverId);
+          const iv = tpsIntervals.get(serverId);
+          if (iv) clearInterval(iv);
+          tpsIntervals.delete(serverId);
+        }
+      }
+      for (const [serverId, set] of playersSubs) {
+        if (set.delete(socket.id) && set.size === 0) {
+          playersSubs.delete(serverId);
+          playerLastNames.delete(serverId);
+          const iv = playersIntervals.get(serverId);
+          if (iv) clearInterval(iv);
+          playersIntervals.delete(serverId);
+        }
+      }
+
       sessions.delete(socket.id);
       console.log(`[ws] Client disconnected: ${socket.id}`);
     });

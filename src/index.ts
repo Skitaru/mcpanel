@@ -77,13 +77,13 @@ app.use("/api/auth/login", rateLimit({
   legacyHeaders: false,
 }));
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) {
     res.status(400).json({ error: "Username and password required." });
     return;
   }
-  if (verifyCredentials(username, password)) {
+  if (await verifyCredentials(username, password)) {
     const token = generateToken(username);
     res.json({ token, username });
   } else {
@@ -96,13 +96,13 @@ app.get("/api/auth/me", (req, res) => {
   res.json({ authenticated: true });
 });
 
-app.post("/api/auth/change-password", (req, res) => {
+app.post("/api/auth/change-password", async (req, res) => {
   const { currentPassword, newPassword } = req.body ?? {};
   if (!currentPassword || !newPassword) {
     res.status(400).json({ error: "Current and new password required." });
     return;
   }
-  const result = changePassword(currentPassword, newPassword);
+  const result = await changePassword(currentPassword, newPassword);
   if ("error" in result) {
     res.status(400).json(result);
   } else {

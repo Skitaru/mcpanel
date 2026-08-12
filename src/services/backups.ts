@@ -146,10 +146,10 @@ export async function createBackup(server: ServerConfig, kind: BackupKind): Prom
  * Progress can be polled via {@link getBackupJob}. Job entries are cleaned up
  * 60 s after completion.
  */
-export function startBackupJob(server: ServerConfig, kind: BackupKind): { jobId: string; name: string } {
+export async function startBackupJob(server: ServerConfig, kind: BackupKind): Promise<{ jobId: string; name: string }> {
   const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const dir = serverBackupDir(server.id);
-  fs.mkdirSync(dir, { recursive: true });
+  await fs.promises.mkdir(dir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const prefix = kind === "scheduled" ? "scheduled-backup" : kind === "auto" ? "auto" : "backup";
@@ -169,7 +169,7 @@ export function startBackupJob(server: ServerConfig, kind: BackupKind): { jobId:
 
   // Fail fast on empty data dirs.
   try {
-    const entries = fs.readdirSync(server.dataPath);
+    const entries = await fs.promises.readdir(server.dataPath);
     if (entries.length === 0) throw new Error("empty");
   } catch {
     job.status = "error";
@@ -182,16 +182,16 @@ export function startBackupJob(server: ServerConfig, kind: BackupKind): { jobId:
     job.writtenBytes = writtenBytes;
     job.totalBytes = totalBytes;
   })
-    .then(() => {
+    .then(async () => {
       job.percent = 100;
       job.status = "done";
-      const st = fs.statSync(backupPath);
+      const st = await fs.promises.stat(backupPath);
       job.writtenBytes = st.size;
     })
-    .catch((err: any) => {
+    .catch(async (err: any) => {
       job.status = "error";
       job.message = err?.message ?? "Backup failed.";
-      try { fs.unlinkSync(backupPath); } catch { /* partial file */ }
+      try { await fs.promises.unlink(backupPath); } catch { /* partial file */ }
     })
     .finally(() => {
       // Clean up job entries after 60 s (like modpack install progress).
@@ -285,8 +285,11 @@ export async function restoreFromArchive(server: ServerConfig, archivePath: stri
     try { await stopContainer(server.containerId); } catch { /* already stopped */ }
   }
 
-  // ---- extract to temp dir first; only swap data if extraction succeeds ----
-  const tmpDir = path.join("/tmp/mcpanel-restore", server.id);
+  // ---- extract to a temp dir next to the data dir (same filesystem so the
+  // swap below can use atomic renames). Only swap if extraction succeeds. ----
+  const parent = path.dirname(server.dataPath);
+  const tmpDir = path.join(parent, `.restore-tmp-${server.id}`);
+  const oldDir = path.join(parent, `.restore-old-${server.id}`);
   await fs.promises.rm(tmpDir, { recursive: true, force: true });
   await fs.promises.mkdir(tmpDir, { recursive: true });
   try {
@@ -296,19 +299,37 @@ export async function restoreFromArchive(server: ServerConfig, archivePath: stri
     throw err;
   }
 
-  // ---- swap data dir ----
-  await fs.promises.mkdir(server.dataPath, { recursive: true });
-  for (const entry of await fs.promises.readdir(server.dataPath)) {
-    await fs.promises.rm(path.join(server.dataPath, entry), { recursive: true, force: true });
+  // ---- reject archives containing symlinks (defense against link abuse) ----
+  {
+    const links = await new Promise<string>((resolve, reject) => {
+      execFile("find", [tmpDir, "-type", "l", "-print"], { timeout: 30_000, maxBuffer: 2 * 1024 * 1024 }, (err, stdout) =>
+        err ? reject(err) : resolve(stdout),
+      );
+    }).catch(() => "");
+    if (links.trim()) {
+      await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      throw new Error("Archive contains symlinks and was rejected.");
+    }
   }
-  for (const entry of await fs.promises.readdir(tmpDir)) {
-    const src = path.join(tmpDir, entry);
-    const dst = path.join(server.dataPath, entry);
-    // fs.cp is EXDEV-resistant (copies across devices if needed).
-    await fs.promises.cp(src, dst, { recursive: true });
-    await fs.promises.rm(src, { recursive: true, force: true });
+
+  // ---- atomic swap with rollback: move current data dir aside, move the
+  // restored dir into place, delete the old copy only on success. ----
+  try {
+    await fs.promises.rm(oldDir, { recursive: true, force: true });
+    await fs.promises.rename(server.dataPath, oldDir).catch(async () => {
+      // dataPath didn't exist (fresh server) — create an empty placeholder.
+      await fs.promises.mkdir(server.dataPath, { recursive: true });
+    });
+    await fs.promises.rename(tmpDir, server.dataPath).catch(async (err) => {
+      // Swap failed — roll the original data dir back.
+      await fs.promises.rename(oldDir, server.dataPath).catch(() => {});
+      throw err;
+    });
+    await fs.promises.rm(oldDir, { recursive: true, force: true }).catch(() => {});
+  } catch (err) {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    throw err;
   }
-  await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 
   // ---- restart if it was running ----
   if (server.containerId && wasRunning) {

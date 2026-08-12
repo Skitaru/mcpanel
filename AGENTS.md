@@ -970,3 +970,27 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Cleanup:** Alle 4 Orphan-Backup-Ordner gelöscht (3a57591b 287MB, 5a6113db 702MB, 16565437 + db6d51ee je 5.9MB) — ~1 GB frei.
 
 > **Last updated:** 2026-08-12 · Session: Auto-Backups entfernt, Delete sofort, Orphans gelöscht
+
+---
+
+### 2026-08-12 — Audit-Implementierung: alle 10 Findings gefixt
+
+**Anlass:** Gesamt-Audit (Backend 4.7k LOC + Frontend 5.5k LOC) → 2 hoch, 4 mittel, 4 niedrig. User wählte "Alles fixen".
+
+**Hoch:**
+1. **modpack.ts Download-Streaming:** `downloadFile` puffert nicht mehr in RAM (`res.arrayBuffer()` raus) — `downloadFileStream` mit `pipeline(res.body → Transform-Counter → createWriteStream)`; Partiellen Download löscht er selbst. ZIP-Integritätscheck liest nur noch Kopf (PK-Magic) + Schwanz (EOCD, letzte 64 KB) statt der ganzen Datei.
+2. **auth.ts komplett async:** `crypto.scrypt` (promisified) statt `scryptSync`, Config-I/O via fs/promises; `verifyCredentials`/`changePassword` async (index.ts-Routen angepasst). `getJwtSecret` bleibt sync, aber einmalig gecacht (loadJwtSecretSync mit First-Run-Fallback).
+
+**Mittel:**
+3. **files.ts:** `PUT /:id/file` bekommt 10-MB-Limit (413) — konsistent zum GET.
+4. **backups.ts:** Restore mit **atomarem Rollback-Swap** (rename dataPath→.restore-old, rename tmp→dataPath, Rollback bei Fehler) — tmp/old liegen im data-Parent (gleiches FS, kein EXDEV). **Symlink-Ablehnung** per `find -type l` nach Extract. `startBackupJob` async (kein sync I/O im Request).
+5. **scheduler.ts:** Overlap-Guard (`ticking`-Flag) + **Crash-Loop-Detection** (nicht-running + restartCount ≥ 15 → Auto-Stop mit Warnung, `inspectContainer` liefert jetzt `restartCount`).
+6. **websocket.ts:** TPS-/Players-Poller dedupliziert — EIN Poller pro Server (globale `tpsSubs`/`playersSubs`-Sets), Fan-Out via `io.to(sid)`, Poller-Stopp wenn letzter Subscriber geht (subscribe/unsubscribe/disconnect).
+
+**Niedrig:**
+7. Create-Job-Fenster 10 → **30 min** (Backend `createJobs`-Cleanup + Frontend-Deadline).
+8. **AuthGuard:** globaler `unhandledrejection`-Handler (loggt + preventDefault statt uncaught errors).
+
+**Deploy-Hinweis:** Ein fehlgeschlagener Sammel-SCP legte Streu-Dateien ab (`src/services/{index,servers,files}.ts`) → entfernt, Server-Build sauber, Health 200, Login OK, Panel 200.
+
+> **Last updated:** 2026-08-12 · Session: Audit-Implementierung — Streaming, async scrypt, Restore-Rollback, Crash-Loop-Stop, WS-Poller-Dedupe, 30-min-Create-Fenster

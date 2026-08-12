@@ -308,16 +308,17 @@ export async function deleteContainer(containerId: string): Promise<void> {
 /** Return the Docker status string for a single container. */
 export async function inspectContainer(
   containerId: string,
-): Promise<{ status: string; running: boolean }> {
+): Promise<{ status: string; running: boolean; restartCount: number }> {
   try {
     const c = docker.getContainer(containerId);
     const info = await c.inspect();
     return {
       status: info.State.Status,
       running: info.State.Running,
+      restartCount: info.RestartCount ?? 0,
     };
   } catch {
-    return { status: "unknown", running: false };
+    return { status: "unknown", running: false, restartCount: 0 };
   }
 }
 

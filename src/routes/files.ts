@@ -273,6 +273,10 @@ router.put("/:id/file", async (req: Request, res: Response) => {
       res.status(400).json({ error: "Field 'content' (string) is required." });
       return;
     }
+    if (content.length > MAX_READ_SIZE) {
+      res.status(413).json({ error: "File too large (max 10 MB)." });
+      return;
+    }
 
     const resolved = await resolveSafe(req.params.id, subPath);
     if (!resolved) {

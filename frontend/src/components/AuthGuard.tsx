@@ -44,6 +44,14 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Check for existing token on mount
   useEffect(() => {
+    // Swallow unhandled promise rejections (e.g. a poll failing right before
+    // a tab switch) — log to console instead of spewing uncaught errors.
+    const onRejection = (e: PromiseRejectionEvent) => {
+      console.warn("[panel] Unhandled promise rejection:", e.reason);
+      e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+
     const stored = localStorage.getItem("obsidian-token");
     if (stored) {
       fetch(`${API_BASE}/api/auth/me`, {
@@ -62,6 +70,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     } else {
       setChecking(false);
     }
+    return () => window.removeEventListener("unhandledrejection", onRejection);
   }, []);
 
   const handleLogin = useCallback((newToken: string) => {

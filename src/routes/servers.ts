@@ -299,7 +299,7 @@ router.post("/", async (req: Request, res: Response) => {
     const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     createJobs.set(jobId, { jobId, step: "Starting…", percent: 0, status: "running" });
     // Clean up finished jobs after 10 minutes (like modpack install progress).
-    setTimeout(() => createJobs.delete(jobId), 10 * 60_000);
+    setTimeout(() => createJobs.delete(jobId), 30 * 60_000);
     runCreateJob(body, jobId);
     console.log(`[api] Create job started: ${jobId}`);
     res.status(202).json({ jobId, message: "Server creation started." });
@@ -653,7 +653,7 @@ router.post("/:id/backup", async (req: Request, res: Response) => {
       res.status(404).json({ error: "Server not found." });
       return;
     }
-    const { jobId, name } = startBackupJob(server, "manual");
+    const { jobId, name } = await startBackupJob(server, "manual");
     console.log(`[api] Backup job started: ${name} (${jobId})`);
     res.status(202).json({ message: "Backup started.", jobId, name });
   } catch (err: any) {

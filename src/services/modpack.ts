@@ -8,7 +8,10 @@
 import path from "node:path";
 import fs from "node:fs";
 import { exec, execFile } from "node:child_process";
-import { mkdir, readFile, writeFile, unlink, readdir, copyFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink, readdir, copyFile, open } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { v4 as uuid } from "uuid";
 import { ServerConfig, ServerType } from "../types";
 import { addServer, mutateServers } from "./config-store";
@@ -195,7 +198,13 @@ async function isClientOnlyMod(jarPath: string): Promise<boolean> {
   return false;
 }
 
+/** Download a file to disk — streams to disk (see {@link downloadFileStream}). */
 async function downloadFile(url: string, dest: string, expectedBytes?: number, apiKey?: string): Promise<void> {
+  await downloadFileStream(url, dest, expectedBytes, apiKey);
+}
+
+/** Stream a download to disk — never buffers the whole file in RAM. */
+async function downloadFileStream(url: string, dest: string, expectedBytes?: number, apiKey?: string): Promise<void> {
   const headers: Record<string, string> = {
     "User-Agent": "MCPanel/1.0",
     Accept: "application/octet-stream, */*;q=0.8",
@@ -216,12 +225,29 @@ async function downloadFile(url: string, dest: string, expectedBytes?: number, a
     const preview = (await res.text()).slice(0, 500);
     throw new Error(`Download returned ${ct} (expected binary): ${preview}`);
   }
+  if (!res.body) throw new Error("Download returned no body.");
 
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (expectedBytes && buf.length < expectedBytes * 0.95) {
-    throw new Error(`Download truncated: got ${buf.length} bytes, expected ~${expectedBytes}`);
+  let received = 0;
+  const out = createWriteStream(dest);
+  try {
+    await pipeline(
+      res.body as unknown as NodeJS.ReadableStream,
+      new Transform({
+        transform(chunk: Buffer, _enc, cb) {
+          received += chunk.length;
+          cb(null, chunk);
+        },
+      }),
+      out,
+    );
+  } catch (err) {
+    try { await unlink(dest); } catch { /* partial file */ }
+    throw err;
   }
-  await writeFile(dest, buf);
+  if (expectedBytes && received < expectedBytes * 0.95) {
+    await unlink(dest).catch(() => {});
+    throw new Error(`Download truncated: got ${received} bytes, expected ~${expectedBytes}`);
+  }
 }
 
 function getJavaDockerImage(mcVersion: string): string {
@@ -300,24 +326,37 @@ export async function runModpackInstall(
     console.log(`[modpack:${serverId.slice(0, 8)}] Downloading from ${downloadUrl.slice(0, 100)}… (${fileData.data.fileLength ?? "?"} bytes)`);
     await downloadFile(downloadUrl, zipPath, fileData.data.fileLength, apiKey);
 
-    // 3. Validate ZIP integrity before unzipping
+    // 3. Validate ZIP integrity before unzipping — read only the first bytes
+    //    (PK magic) and the tail (EOCD record) instead of buffering the whole file.
     {
-      const buf = await readFile(zipPath);
-      if (buf.length < 22) throw new Error(`Downloaded file too small (${buf.length} bytes)`);
-      const magic = buf[0] === 0x50 && buf[1] === 0x4b; // PK
-      if (!magic) {
-        const preview = buf.slice(0, 200).toString("utf-8").replace(/[^\x20-\x7e]/g, ".");
-        throw new Error(`Download is not a ZIP file (starts with 0x${buf[0]?.toString(16)}${buf[1]?.toString(16)}): ${preview}`);
-      }
-      // Check for EOCD (end of central directory) record
-      const eocd = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
-      let found = false;
-      for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
-        if (buf[i] === 0x50 && buf[i+1] === 0x4b && buf[i+2] === 0x05 && buf[i+3] === 0x06) {
-          found = true; break;
+      const fh = await open(zipPath, "r");
+      try {
+        const st = await fh.stat();
+        if (st.size < 22) throw new Error(`Downloaded file too small (${st.size} bytes)`);
+        const head = Buffer.alloc(4);
+        await fh.read(head, 0, 4, 0);
+        const magic = head[0] === 0x50 && head[1] === 0x4b; // PK
+        if (!magic) {
+          const preview = head.toString("utf-8").replace(/[^\x20-\x7e]/g, ".");
+          throw new Error(`Download is not a ZIP file (starts with 0x${head[0]?.toString(16)}${head[1]?.toString(16)}): ${preview}`);
         }
+        // Check for EOCD (end of central directory) record — it lives at the
+        // end of the file, so only read the last 64 KB + 22 bytes.
+        const tailLen = Math.min(st.size, 65557 + 22);
+        const tail = Buffer.alloc(tailLen);
+        await fh.read(tail, 0, tailLen, st.size - tailLen);
+        const eocd = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+        let found = false;
+        for (let i = tail.length - 22; i >= 0; i--) {
+          if (tail[i] === 0x50 && tail[i+1] === 0x4b && tail[i+2] === 0x05 && tail[i+3] === 0x06) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) throw new Error(`Downloaded ${st.size} bytes but ZIP is incomplete (missing end-of-central-directory). The download may have been interrupted by the CDN.`);
+      } finally {
+        await fh.close();
       }
-      if (!found) throw new Error(`Downloaded ${buf.length} bytes but ZIP is incomplete (missing end-of-central-directory). The download may have been interrupted by the CDN.`);
     }
 
     // 4. Extract (async via execFile) — with zip-slip protection

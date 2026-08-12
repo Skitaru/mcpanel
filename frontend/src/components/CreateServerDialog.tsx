@@ -200,7 +200,7 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
         const { jobId } = await res.json();
 
         // Poll the creation job until it finishes.
-        const deadline = Date.now() + 10 * 60 * 1000;
+        const deadline = Date.now() + 30 * 60 * 1000;
         let job: { step: string; percent: number; status: "running" | "done" | "error"; message?: string } =
           { step: "Starting…", percent: 0, status: "running" };
         while (Date.now() < deadline && job.status === "running") {

@@ -5,6 +5,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
@@ -23,24 +24,25 @@ interface PanelConfig {
   jwtSecret?: string;
 }
 
-function loadConfig(): PanelConfig {
-  if (!fs.existsSync(CONFIG_PATH)) {
+async function loadConfig(): Promise<PanelConfig> {
+  try {
+    return JSON.parse(await readFile(CONFIG_PATH, "utf8")) as PanelConfig;
+  } catch {
     // First run: create default config
     const salt = crypto.randomBytes(16).toString("hex");
-    const hash = hashPasswordScrypt(DEFAULT_PASSWORD, salt);
+    const hash = await hashPasswordScrypt(DEFAULT_PASSWORD, salt);
     const config: PanelConfig = {
       username: DEFAULT_USERNAME, salt, passwordHash: hash, hashVersion: 1,
       jwtSecret: crypto.randomBytes(32).toString("hex"),
     };
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+    await saveConfig(config);
     console.log("[auth] Created default credentials: admin / admin — CHANGE THE PASSWORD!");
     return config;
   }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
 }
 
-function saveConfig(config: PanelConfig): void {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+async function saveConfig(config: PanelConfig): Promise<void> {
+  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
 /** Constant-time hex comparison (scrypt verify). */
@@ -60,21 +62,26 @@ function hashPasswordLegacy(password: string, salt: string): string {
 
 /**
  * Hash a password with scrypt, returning `salt:hash` (both hex-encoded).
- * scrypt is memory-hard — resistant to GPU/ASIC brute-force.
+ * scrypt is memory-hard — resistant to GPU/ASIC brute-force. Async so the
+ * ~100 ms derivation never blocks the event loop.
  */
-function hashPasswordScrypt(password: string, salt: string): string {
-  // synchronously derive a 64-byte key; N=16384 (~100ms on modern CPU)
-  return crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString("hex");
+function hashPasswordScrypt(password: string, salt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (err, key) =>
+      err ? reject(err) : resolve(key.toString("hex")),
+    );
+  });
 }
 
 /** Verify a password against the stored hash, auto-upgrading legacy hashes. */
-export function verifyCredentials(username: string, password: string): boolean {
-  const config = loadConfig();
+export async function verifyCredentials(username: string, password: string): Promise<boolean> {
+  const config = await loadConfig();
   if (username !== config.username) return false;
 
   if (config.hashVersion === 1) {
     // Current scrypt format — constant-time compare
-    return safeEqualHex(hashPasswordScrypt(password, config.salt), config.passwordHash);
+    const hash = await hashPasswordScrypt(password, config.salt);
+    return safeEqualHex(hash, config.passwordHash);
   }
 
   // Legacy HMAC-SHA256 — try old hash first
@@ -82,9 +89,9 @@ export function verifyCredentials(username: string, password: string): boolean {
     // Auto-migrate to scrypt
     const newSalt = crypto.randomBytes(16).toString("hex");
     config.salt = newSalt;
-    config.passwordHash = hashPasswordScrypt(password, newSalt);
+    config.passwordHash = await hashPasswordScrypt(password, newSalt);
     config.hashVersion = 1;
-    saveConfig(config);
+    await saveConfig(config);
     console.log("[auth] Migrated credentials from HMAC-SHA256 to scrypt.");
     return true;
   }
@@ -95,25 +102,43 @@ export function verifyCredentials(username: string, password: string): boolean {
 /** JWT secret — independent random value, persisted so tokens survive restarts. */
 let _jwtSecret: string | null = null;
 
-export function getJwtSecret(): string {
-  if (!_jwtSecret) {
-    const config = loadConfig();
-    // Migrate configs created before the independent secret existed.
-    if (!config.jwtSecret) {
-      config.jwtSecret = crypto.randomBytes(32).toString("hex");
-      saveConfig(config);
-    }
-    _jwtSecret = config.jwtSecret;
+/** Load the JWT secret synchronously — runs ONCE per process and caches the
+ *  result, so the sync file read never sits in a hot request path. */
+function loadJwtSecretSync(): string {
+  if (_jwtSecret) return _jwtSecret;
+  let config: PanelConfig;
+  try {
+    config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as PanelConfig;
+  } catch {
+    // Config doesn't exist yet — create it synchronously (first-run only).
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.scryptSync(DEFAULT_PASSWORD, salt, 64, { N: 16384, r: 8, p: 1 }).toString("hex");
+    config = {
+      username: DEFAULT_USERNAME, salt, passwordHash: hash, hashVersion: 1,
+      jwtSecret: crypto.randomBytes(32).toString("hex"),
+    };
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+    console.log("[auth] Created default credentials: admin / admin — CHANGE THE PASSWORD!");
   }
+  // Migrate configs created before the independent secret existed.
+  if (!config.jwtSecret) {
+    config.jwtSecret = crypto.randomBytes(32).toString("hex");
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  }
+  _jwtSecret = config.jwtSecret;
   return _jwtSecret;
 }
 
+export function getJwtSecret(): string {
+  return loadJwtSecretSync();
+}
+
 /** Change the password. Rotates the JWT secret → invalidates all existing tokens. */
-export function changePassword(currentPassword: string, newPassword: string): { success: true } | { error: string } {
-  const config = loadConfig();
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ success: true } | { error: string }> {
+  const config = await loadConfig();
 
   // Verify current password (handles both legacy and scrypt)
-  if (!verifyCredentials(config.username, currentPassword)) {
+  if (!(await verifyCredentials(config.username, currentPassword))) {
     return { error: "Current password is incorrect." };
   }
   if (newPassword.length < 8) {
@@ -121,10 +146,10 @@ export function changePassword(currentPassword: string, newPassword: string): { 
   }
   const newSalt = crypto.randomBytes(16).toString("hex");
   config.salt = newSalt;
-  config.passwordHash = hashPasswordScrypt(newPassword, newSalt);
+  config.passwordHash = await hashPasswordScrypt(newPassword, newSalt);
   config.hashVersion = 1;
   config.jwtSecret = crypto.randomBytes(32).toString("hex"); // invalidate all sessions
-  saveConfig(config);
+  await saveConfig(config);
   _jwtSecret = null;
   return { success: true };
 }
