@@ -18,7 +18,34 @@
 
 ---
 
-## Server Layout (`/opt/mcpanel`)
+## 🧭 Session Briefing — Stand 2026-08-12
+
+**Aktueller Zustand:**
+- Panel deployed & laufend auf `188.214.30.159` (backend 3000, frontend 3001 — Services active, Health 200)
+- **Keine Server** aktuell (`servers.json = []`, alle Container + Data-Dirs gelöscht, Orphan-Backups entfernt)
+- Docker-Images auf dem Server: `eclipse-temurin:8-jre` (Debian, Java 8), `11/17/21/25-jre-alpine`. ⚠️ **Java-16-Images existieren nicht mehr auf Docker Hub** (MC 1.16.5 läuft auf Java 11)
+- Letzter Commit: `ddae59a` — Arbeitsbaum sauber
+
+**Heutige Session (2026-08-12) — Highlights:**
+- **Forge-Modpack-Fix:** Java-8-Alpine hatte keine ECDHE-Cipher (TLS `handshake_failure`) → Debian-Image + TLSv1.2; Java 16 → 11. Container-Start: `useradd -o` (UID-1000-Konflikt im Debian-Image) + `env PATH` im su
+- **Audit 1 (Sicherheit/Performance):** 10 Findings gefixt — Download-Streaming (kein RAM-Puffer), async scrypt, Restore-Rollback + Symlink-Guard, Scheduler-Overlap + Crash-Loop-Auto-Stop, WS-Poller-Dedupe (ein Poller pro Server), 30-min-Create-Fenster, unhandledrejection-Logger
+- **Audit 2 (Funktionen):** Port-Edit-Fix (rconPort + server.properties/velocity.toml + Toast "wird nach Recreate aktiv"), Name-Injection-Schutz, Command-Limits, Schedule-Zeitzonen-Hinweis, PUT-Port-Bereich 65525
+- **Polish:** Batch-Delete-/Kick-/Ban-Confirms, Dirty-State-Warnung beim Tab-Wechsel, Upload-Toasts, Avatar-Fallback, sichtbarer Restart-Countdown mit Abbrechen
+- **RCON persistent** (eine Verbindung pro Server statt pro Poll) — eliminiert den "Thread RCON Client started/stopped"-Log-Spam an der Wurzel
+- **install.sh-Audit:** .env jetzt VOR dem Frontend-Build (BACKEND_URL-Bug bei Custom-Ports), `--dir`-Bug (Services interpolierten /opt/mcpanel nicht), Ubuntu-Docker-Repo, Smoke-Test (30s /api/health), API-Key bleibt bei Reinstall, Live-Spinner mit Sekundenzähler pro Schritt
+- **Aufräumen:** Auto-Sicherheitsbackups entfernt (Delete sofort), gzip Level 1, Dashboard-Hover, TopBar-Modpack-Button raus (im New-Server-Wizard), Velocity-Felder bereinigt (maxPlayers/voicePort ausgeblendet), Create-Dialog schlägt freien Port vor (inkl. RCON+voice-Ports)
+
+**Offene Punkte / nächste Schritte:**
+- [ ] install.sh nur **statisch** validiert — kompletter Live-Test auf frischer VM/CT steht aus (User hat Test angeboten)
+- [ ] RCON-Spam-Fix (persistente Verbindung) live noch nicht verifiziert — beim nächsten Server-Start prüfen (Console ruhig, 1× started/stopped)
+- [ ] Crash-Loop-Schutz (Scheduler, ≥15 Restarts → Auto-Stop) braucht echten Crash-Test
+- [ ] Transienter `next/font outfit`-Build-Fehler auf dem Server (Google-Fonts-Download) — einfach erneut `npx next build`
+
+**Warnungen / Lehren:**
+- ⚠️ **Niemals Sammel-SCP in einen Ordner** (`scp a b c server:/ordner/`) — hat 2× Streu-Dateien verursacht (`src/services/index.ts`, `components/page.tsx`). Immer einzeln mit korrektem Zielpfad kopieren, dann `npx tsc`/`next build` auf dem Server prüfen.
+- ⚠️ Delete/Recreate/Restore machen seit heute **keine Auto-Backups** mehr (User-Wunsch) — manuelles + geplantes Backup funktionieren weiter.
+
+
 
 ```
 /opt/mcpanel/
@@ -49,7 +76,9 @@
 
 2. **Deploy workflow:**
    ```bash
-   # Copy changed files to server
+   # Copy changed files to server — ALWAYS one file per scp with the correct
+   # target path. NEVER scp multiple files into one folder (that has dropped
+   # stray files like src/services/index.ts or components/page.tsx twice).
    scp local-file.ts root@188.214.30.159:/opt/mcpanel/path/file.ts
    # Rebuild + restart on server
    ssh root@188.214.30.159 "cd /opt/mcpanel && npx tsc && systemctl restart mcpanel-backend"
@@ -1097,3 +1126,11 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Nebenbefund:** Ein fehlgeschlagener Sammel-SCP legte wieder `components/page.tsx` auf dem Server ab → entfernt + finaler Build (transienter outfit-Font-Build-Fehler, zweiter Versuch ok). Panel 200.
 
 > **Last updated:** 2026-08-12 · Session: TopBar-Modpack-Button entfernt, Detailseite aufgeräumt
+
+---
+
+### 2026-08-12 — Session-Ende: Briefing überarbeitet
+
+AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (direkt nach Project Identity): aktueller Zustand, Session-Highlights, offene Punkte (install.sh-Live-Test, RCON-Spam-Verifikation, Crash-Loop-Test), Warnungen (Sammel-SCP-Lehre, keine Auto-Backups mehr). Core Working Principles um die SCP-Warnung ergänzt. Alle Änderungen committet + gepusht, Arbeitsbaum sauber.
+
+> **Last updated:** 2026-08-12 · Session-Abschluss: Briefing + Lehren dokumentiert
