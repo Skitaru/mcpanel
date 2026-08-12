@@ -18,13 +18,20 @@ curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | s
 
 > Requires **Debian 12/13** or **Ubuntu 22.04/24.04** · Root access · Port 3001 open
 
-The installer handles Docker, Node.js 22, builds frontend + backend, creates systemd services, and enables auto-start.
+The installer handles Docker, Node.js 22, builds frontend + backend, creates systemd services, and enables auto-start. The full install log is written to `/tmp/mcpanel-install.log`.
+
+**Reinstall / update:** run the same command again — servers, worlds and backups stay untouched; existing API keys are kept.
 
 ### Custom options
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Skitaru/mcpanel/main/install.sh | sudo bash -s -- --port 3000 --fe-port 3001 --api-key YOUR_KEY
 ```
+
+- `--dir DIR` — install directory (default: `/opt/mcpanel`)
+- `--port PORT` — backend port (default: `3000`)
+- `--fe-port PORT` — frontend port (default: `3001`)
+- `--api-key KEY` — pre-set API key (kept on reinstall)
 
 ---
 

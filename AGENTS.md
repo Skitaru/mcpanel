@@ -1045,3 +1045,26 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Filter-Defense:** cleanAnsi (websocket.ts) + LogsTab-Filter auf `/(Thread RCON|RCON IO|RconClient)/` erweitert (deckt auch Forge-"Netty RCON IO"-Format ab, matcht keine Chat-Zeilen).
 
 > **Last updated:** 2026-08-12 · Session: RCON-Spam — persistente RCON-Verbindung, erweiterte Log-Filter
+
+---
+
+### 2026-08-12 — Installer-Audit: install.sh + GitHub-Oneliner professionalisiert
+
+**Audit-Findings + Fixes (install.sh komplett überarbeitet):**
+1. **🔴 BACKEND_URL-Build-Reihenfolge:** next.config.ts liest BACKEND_URL beim BUILD — .env wurde aber NACH dem Build geschrieben → bei `--port 3005` hätten die /api-Rewrites auf 3000 gezeigt (kaputtes Panel). Fix: .env vor dem Build (Schritt 6), Frontend-Build mit explizitem `BACKEND_URL=http://127.0.0.1:$PANEL_PORT`.
+2. **🔴 `--dir`-Bug:** systemd-Services waren auf /opt/mcpanel hardcoded → `--dir /srv/panel` installierte dorthin, aber die Services starteten von /opt/mcpanel. Fix: $PANEL_DIR wird in beide Service-Templates interpoliert (unquoted heredoc).
+3. **🔴 Ubuntu-Docker:** Repo-URL war hardcoded `debian` → Ubuntu-Install schlug fehl. Fix: distro-abhängig ($ID = ubuntu → ubuntu-Repo + $UBUNTU_CODENAME).
+4. **🟠 Log-Datei-Race:** `run >> log` + `tee` (truncate) mischten die Log-Datei. Fix: initial `: > log` + `tee -a`.
+5. **🟠 Reinstall-Marker:** servers.json existiert erst nach dem ersten Server → unzuverlässig. Fix: `.env`-Marker; bestehender API-Key wird bei Reinstall behalten (außer --api-key explizit).
+6. **🟠 Node-Check:** >= 18 akzeptiert, aber Next 16 braucht >= 20 → Check auf >= 20.
+7. **🟠 Smoke-Test:** statt nur `is-active` — curl /api/health mit bis zu 30 s Retry; Warnung mit journalctl-Hinweis.
+8. **🟡 read ohne TTY:** Reinstall-Bestätigung bricht ohne /dev/tty nicht mehr ab (Fallback "n").
+9. **🟡 Frontend-ExecStart:** `npx next start` → `$PANEL_DIR/frontend/node_modules/.bin/next start` (kein npx-Netzwerk-Fallback).
+10. **🟡 --local-Deploy:** rsync mit `--exclude node_modules --exclude .next` (statt cp, das gebaute Artefakte mitkopierte); rsync zur Paketliste.
+11. **🟡 Stale-Quellen:** `rm -rf $PANEL_DIR/src $PANEL_DIR/frontend/src` vor dem Deploy (gelöschte Dateien bleiben sonst als Build-Orphans).
+
+**README:** Reinstall/Update-Hinweis + Optionen-Liste + Install-Log-Pfad. Oneliner unverändert (funktioniert).
+
+**Verifiziert:** bash -n sauber, --help funktioniert ohne root, LF-Line-Endings. Kein Live-Install auf 188 (läuft bereits) — Skript nur statisch validiert.
+
+> **Last updated:** 2026-08-12 · Session: Installer-Audit — Build-Reihenfolge, --dir/Ubuntu-Bug, Log-Race, Smoke-Test, API-Key-Keep
