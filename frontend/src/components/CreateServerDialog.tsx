@@ -192,8 +192,9 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
             serverType,
             paperVersion,
             javaArgs: javaArgs.trim() || undefined,
-            maxPlayers,
-            voicePort: voicePort ?? undefined,
+            // maxPlayers/voicePort are paper/fabric-only (velocity uses fixed
+            // show-max-players and has no voice channel of its own).
+            ...(serverType !== "velocity" ? { maxPlayers, voicePort: voicePort ?? undefined } : {}),
             tag: tag.trim() || undefined,
             ...(serverType !== "velocity" ? { hardcore, difficulty } : {}),
           }),
@@ -512,47 +513,53 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
                                  disabled:opacity-50"
                     />
                   </label>
+                  {/* Max Players only applies to paper/fabric (server.properties) —
+                      Velocity uses a fixed show-max-players in velocity.toml. */}
+                  {serverType !== "velocity" && (
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-medium text-slate-300">Max Players</span>
+                      <input
+                        type="number"
+                        value={maxPlayers}
+                        onChange={(e) => setMaxPlayers(Math.max(1, Math.min(1000, parseInt(e.target.value) || 20)))}
+                        min={1}
+                        max={1000}
+                        disabled={submitting}
+                        className="w-full rounded-lg border border-edge bg-void
+                                   px-3.5 py-2.5 text-sm text-white
+                                   focus:border-accent/40 focus:outline-none
+                                   disabled:opacity-50"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Voice Port (UDP — SimpleVoiceChat, paper/fabric only) */}
+                {serverType !== "velocity" && (
                   <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium text-slate-300">Max Players</span>
+                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                      Voice Port (UDP)
+                    </span>
                     <input
                       type="number"
-                      value={maxPlayers}
-                      onChange={(e) => setMaxPlayers(Math.max(1, Math.min(1000, parseInt(e.target.value) || 20)))}
-                      min={1}
-                      max={1000}
+                      value={voicePort ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setVoicePort(v === "" ? null : parseInt(v) || null);
+                      }}
+                      placeholder="e.g. 24454 (SimpleVoiceChat)"
                       disabled={submitting}
                       className="w-full rounded-lg border border-edge bg-void
                                  px-3.5 py-2.5 text-sm text-white
+                                 placeholder:text-slate-600
                                  focus:border-accent/40 focus:outline-none
                                  disabled:opacity-50"
                     />
+                    <p className="mt-1 text-[10px] text-slate-600">
+                      Leave empty if you don't need voice chat. Requires container recreation to change later.
+                    </p>
                   </label>
-                </div>
-
-                {/* Voice Port (UDP — SimpleVoiceChat) */}
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
-                    Voice Port (UDP)
-                  </span>
-                  <input
-                    type="number"
-                    value={voicePort ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setVoicePort(v === "" ? null : parseInt(v) || null);
-                    }}
-                    placeholder="e.g. 24454 (SimpleVoiceChat)"
-                    disabled={submitting}
-                    className="w-full rounded-lg border border-edge bg-void
-                               px-3.5 py-2.5 text-sm text-white
-                               placeholder:text-slate-600
-                               focus:border-accent/40 focus:outline-none
-                               disabled:opacity-50"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-600">
-                    Leave empty if you don't need voice chat. Requires container recreation to change later.
-                  </p>
-                </label>
+                )}
 
                 {/* Difficulty + Hardcore (non-Velocity only) */}
                 {serverType !== "velocity" && (
