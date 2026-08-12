@@ -150,11 +150,18 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
         .then(r => r.json())
         .then((info: { totalMemoryMB: number }) => setMaxRamMB(info.totalMemoryMB))
         .catch(() => {});
-      // Auto-suggest next free port
+      // Auto-suggest next free port — skips ports already bound on the host:
+      // the server's own port, its RCON port (always port + 10) and its voice
+      // port (UDP), so the suggestion can never collide with another server.
       fetch(`${API_BASE}/api/servers`)
         .then(r => r.json())
-        .then((servers: { port: number }[]) => {
-          const used = new Set(servers.map(s => s.port));
+        .then((servers: { port: number; voicePort?: number | null }[]) => {
+          const used = new Set<number>();
+          for (const s of servers) {
+            used.add(s.port);
+            used.add(s.port + 10); // RCON port binding
+            if (s.voicePort) used.add(s.voicePort);
+          }
           let p = 25565;
           while (used.has(p)) p++;
           setPort(p);
