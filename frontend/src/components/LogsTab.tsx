@@ -29,7 +29,7 @@ export default function LogsTab({ serverId }: Props) {
         .replace(/\r\n/g, "\n")
         .replace(/\r/g, "")
         .split("\n")
-        .filter((line: string) => !line.includes("Thread RCON Client"))
+        .filter((line: string) => !/(Thread RCON|RCON IO|RconClient)/.test(line))
         .join("\n"));
       setError(null);
     } catch (err: unknown) {

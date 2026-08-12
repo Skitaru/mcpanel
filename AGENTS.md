@@ -1026,3 +1026,22 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 6. **QuickCommands Restart-Countdown** — "Restart 60s" zeigt sichtbaren Countdown mit "Abbrechen" (say "abgebrochen"), Timer-Cleanup beim Unmount, Hinweis "(Tab offen lassen)".
 
 > **Last updated:** 2026-08-12 · Session: Polish-Runde — Batch/Kick/Ban-Confirms, Dirty-State-Warnung, Upload-Toast, Avatar-Fallback, Restart-Countdown
+
+---
+
+### 2026-08-12 — RCON-Spam-Fix: persistente Verbindung statt Verbindung pro Poll
+
+**Symptom:** SF3-Server — RCON spammt Console + latest.log ("Thread RCON Client started/stopped" ~48 Zeilen/min).
+
+**Warum:** Minecraft loggt JEDE RCON-Verbindung. Das Panel öffnete pro `sendRcon` eine FRISCHE TCP-Verbindung; TPS- + Players-Poller (je 5 s) = 24 Verbindungen/min → konstanter Log-Spam.
+
+**Fix (rcon.ts komplett neu, ~230 LOC):**
+- **Persistente Verbindung pro (host, port)** — EIN Socket, Requests per ID korreliert (Source-RCON erlaubt mehrere in-flight Requests). "started/stopped" erscheint nur noch beim echten Verbindungsaufbau (einmal), nicht pro Poll.
+- Reconnect bei Verbindungsverlust (Server-Restart): `close`-Handler rejected in-flight + entfernt die Verbindung → nächster Request baut neu auf.
+- Auth-Handshake mit Waiter-Queue (parallele Requests während des Verbindens warten auf dieselbe Verbindung).
+- Timeout pro Request (wedged Connection wird verworfen), Idle-Cleanup nach 5 min (setInterval .unref()).
+- `sendRcon()`-Signatur unverändert → keine Caller-Änderungen (websocket, command-Route, PlayerCard-Backend).
+
+**Filter-Defense:** cleanAnsi (websocket.ts) + LogsTab-Filter auf `/(Thread RCON|RCON IO|RconClient)/` erweitert (deckt auch Forge-"Netty RCON IO"-Format ab, matcht keine Chat-Zeilen).
+
+> **Last updated:** 2026-08-12 · Session: RCON-Spam — persistente RCON-Verbindung, erweiterte Log-Filter

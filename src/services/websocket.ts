@@ -46,7 +46,7 @@ function cleanAnsi(serverId: string, raw: string): string {
     .replace(/\n> /g, "\n")
     .replace(/^> /, "")
     .replace(/\n  +/g, "\n")                               // collapse leading spaces
-    .replace(/\n?.*Thread RCON Client.*\n?/g, "\n")            // filter RCON connect/disconnect noise
+    .replace(/\n?.*(Thread RCON|RCON IO|RconClient).*\n?/g, "\n")  // filter RCON connect/disconnect noise
     .replace(/\n?(?:\[.*WARN\]:|WARN).*AsyncCatcher[\s\S]*?(?=\n\[\d|$)/g, "\n")  // filter AsyncCatcher stack traces
     .replace(/\n?.*Advanced terminal features are not available.*\n?/g, "\n") // filter TERM=dumb warning
     .replace(/\n{2,}/g, "\n");                             // collapse blank lines
