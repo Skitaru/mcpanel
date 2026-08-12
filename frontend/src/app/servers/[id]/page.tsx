@@ -325,7 +325,7 @@ export default function ServerDetailPage() {
                   deleting ? (
                     <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-danger" />
-                      <span className="text-xs font-semibold text-danger">Sicherungs-Backup + Löschen…</span>
+                      <span className="text-xs font-semibold text-danger">Löschen…</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5">

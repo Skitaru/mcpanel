@@ -951,3 +951,22 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Hinweis:** Orphan-Backups der gelöschten Server liegen noch unter `backups/3a57591b…` (287 MB) und `backups/5a6113db…` (702 MB) — stehen zur Bereinigung bereit (früherer User-Wunsch: Orphans löschen).
 
 > **Last updated:** 2026-08-12 · Session: Delete-Feedback + gzip Level 1 für schnellere Auto-Backups
+
+---
+
+### 2026-08-12 — Auto-Sicherheitsbackups entfernt + Orphan-Cleanup
+
+**Wunsch des Users:** "Keine Sicherheitsbackups mehr" beim Löschen + Orphans löschen.
+
+**Code (servers.ts):** Alle 4 `createBackup(server, "auto")` + `pruneBackups`-Blöcke entfernt:
+- Pre-recreate (POST /:id/recreate)
+- Pre-delete (DELETE /:id) — Delete ist jetzt SOFORT (kein warten auf Backup)
+- Pre-restore (POST /:id/backups/:name/restore)
+- Pre-restore aus Upload (POST /:id/restore)
+- Ungenutzte Imports `createBackup`/`pruneBackups` aus servers.ts entfernt (werden weiterhin von scheduler.ts für geplante Backups genutzt).
+
+**Frontend:** Delete-Button zeigt jetzt "Löschen…" (statt "Sicherungs-Backup + Löschen…").
+
+**Cleanup:** Alle 4 Orphan-Backup-Ordner gelöscht (3a57591b 287MB, 5a6113db 702MB, 16565437 + db6d51ee je 5.9MB) — ~1 GB frei.
+
+> **Last updated:** 2026-08-12 · Session: Auto-Backups entfernt, Delete sofort, Orphans gelöscht

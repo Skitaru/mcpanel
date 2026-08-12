@@ -25,7 +25,7 @@ import {
   isValidJavaArgs,
 } from "../services/docker";
 import { runModpackInstall, createModpackServer, searchModpacks, getModpackFiles, installProgress } from "../services/modpack";
-import { createBackup, listBackups, deleteBackup, pruneBackups, restoreFromArchive, startBackupJob, getBackupJob } from "../services/backups";
+import { listBackups, deleteBackup, restoreFromArchive, startBackupJob, getBackupJob } from "../services/backups";
 import { sendDiscordEmbed, editDiscordEmbed, buildStatusEmbed, startStatusEmbedUpdater, stopStatusEmbedUpdater, initLiveStats, clearLiveStats, setLiveStats } from "../services/discord";
 import { downloadPaperJar } from "../services/paper";
 import { downloadFabricJar } from "../services/fabric";
@@ -484,15 +484,6 @@ router.post("/:id/recreate", async (req: Request, res: Response) => {
     const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
-    // Safety snapshot before rebuilding the container.
-    try {
-      const bk = await createBackup(server, "auto");
-      console.log(`[api] Pre-recreate backup: ${bk.name}`);
-      await pruneBackups(server.id, ["auto"], 5);
-    } catch (err: any) {
-      console.error("[api] Pre-recreate backup failed (continuing):", err.message);
-    }
-
     // Remember whether it was running so we can restore the state afterwards.
     let wasRunning = false;
     if (server.containerId) {
@@ -608,14 +599,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    // 0. Safety snapshot before deleting — the data dir is gone afterwards.
-    try {
-      const bk = await createBackup(server, "auto");
-      console.log(`[api] Pre-delete backup: ${bk.name}`);
-      await pruneBackups(server.id, ["auto"], 5);
-    } catch (err: any) {
-      console.error("[api] Pre-delete backup failed (continuing):", err.message);
-    }
+    // 0. (no safety snapshot — user opted out of auto-backups)
 
     // 1. Remove Docker container (best-effort).
     if (server.containerId) {
@@ -733,15 +717,6 @@ router.post("/:id/backups/:name/restore", async (req: Request, res: Response) =>
       return;
     }
 
-    // Safety snapshot of the current state before overwriting it.
-    try {
-      const bk = await createBackup(server, "auto");
-      console.log(`[api] Pre-restore backup: ${bk.name}`);
-      await pruneBackups(server.id, ["auto"], 5);
-    } catch (err: any) {
-      console.error("[api] Pre-restore backup failed (continuing):", err.message);
-    }
-
     await restoreFromArchive(server, filePath);
     console.log(`[api] Restored server "${server.name}" from backup ${req.params.name}`);
     res.json({ message: `Server "${server.name}" restored from backup.` });
@@ -788,15 +763,6 @@ router.post("/:id/restore", restoreUpload.single("backup"), async (req: Request,
     if (!uploadPath) {
       res.status(400).json({ error: "No backup file uploaded." });
       return;
-    }
-
-    // Safety snapshot of the current state before overwriting it.
-    try {
-      const bk = await createBackup(server, "auto");
-      console.log(`[api] Pre-restore backup: ${bk.name}`);
-      await pruneBackups(server.id, ["auto"], 5);
-    } catch (err: any) {
-      console.error("[api] Pre-restore backup failed (continuing):", err.message);
     }
 
     await restoreFromArchive(server, uploadPath);
