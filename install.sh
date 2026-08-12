@@ -60,10 +60,36 @@ ok()   { echo -e "  ${G}✔${N}  $1"; }
 fail() { echo -e "  ${R}✖  $1${N}"; echo -e "  ${D}Full log: ${INSTALL_LOG}${N}"; exit 1; }
 warn() { echo -e "  ${Y}⚠${N}  $1"; }
 info() { echo -e "  ${D}→${N}  ${DIM}$1${N}"; }
+
+# Animated status line while a step runs — writes straight to the TTY so it
+# never pollutes the install log. Shows a spinner + elapsed seconds so long
+# steps (Docker pull, next build) never look frozen.
+spinner() {
+  local pid="$1" label="$2"
+  # Without a real controlling terminal (CI, piped install) there is no TTY —
+  # run silently. Subshell so the redirect error is swallowed cleanly.
+  if ! ( : >/dev/tty ) 2>/dev/null; then
+    return 0
+  fi
+  local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  local i=0 elapsed=0
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r  %s  %s   ${D}%ss${N}   " "${frames[$((i % 10))]}" "$label" "$elapsed" > /dev/tty 2>/dev/null || true
+    i=$((i + 1)); sleep 0.1
+    [ $((i % 10)) -eq 0 ] && elapsed=$((elapsed + 1))
+  done
+  # clear the status line (longer than any label we print)
+  printf "\r%*s\r" "70" "" > /dev/tty 2>/dev/null || true
+}
+
 run() {
   local label="$1"; shift
   info "$label"
-  if "$@" >> "$INSTALL_LOG" 2>&1; then ok "$label"
+  local pid
+  "$@" >> "$INSTALL_LOG" 2>&1 &
+  pid=$!
+  spinner "$pid" "$label"
+  if wait "$pid"; then ok "$label"
   else fail "$label (check $INSTALL_LOG)"; fi
 }
 

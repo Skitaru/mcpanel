@@ -1068,3 +1068,17 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 **Verifiziert:** bash -n sauber, --help funktioniert ohne root, LF-Line-Endings. Kein Live-Install auf 188 (läuft bereits) — Skript nur statisch validiert.
 
 > **Last updated:** 2026-08-12 · Session: Installer-Audit — Build-Reihenfolge, --dir/Ubuntu-Bug, Log-Race, Smoke-Test, API-Key-Keep
+
+---
+
+### 2026-08-12 — Installer: Live-Spinner mit Sekundenzähler bei jedem Schritt
+
+**Wunsch:** Lange Schritte (Docker-Install ~2-3 min, Next-Build ~2-4 min) sahen "eingefroren" aus — der User wusste nicht, ob es weitergeht.
+
+**Fix (install.sh):** Neue `spinner()`-Funktion — animierte Statuszeile (⠋⠙⠹…) + **Sekundenzähler**, die WÄHREND eines `run`-Schritts direkt auf `/dev/tty` geschrieben wird (nie in die Install-Log-Datei). `run()` startet den Befehl jetzt im Hintergrund (`cmd >> log &`), zeigt den Spinner und wartet via `wait` auf den Exit-Code.
+
+**TTY-Detection:** `if ! ( : >/dev/tty ) 2>/dev/null; then return 0; fi` — Subshell-Trick unterdrückt den Redirect-Fehler sauber (MSYS/CI/Pipe → Spinner schweigt still, kein "No such device"-Spam). Verifiziert auf MSYS (kein TTY) + per ssh.
+
+**Verifiziert:** bash -n sauber, isolierter Test (run/ok/fail + Spinner + Log-Leere).
+
+> **Last updated:** 2026-08-12 · Session: Installer-Spinner mit Sekunden-Timer, TTY-sicher
