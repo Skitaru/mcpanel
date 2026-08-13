@@ -34,7 +34,7 @@ export default function QuickCommands({ serverId }: { serverId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [active, setActive] = useState<CmdDef | null>(null);
   const [value, setValue] = useState("");
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   // Visible 60s restart countdown (browser-side timer — user can cancel)
   const [restartCountdown, setRestartCountdown] = useState<number | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);

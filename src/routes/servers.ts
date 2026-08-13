@@ -593,54 +593,62 @@ function gunzipFile(filePath: string): Promise<Buffer> {
 const gzCache = new Map<string, { key: string; content: string; at: number }>();
 const GZ_CACHE_TTL_MS = 10 * 60_000;
 
-async function getRotatedLogTail(
-  logsDir: string,
-): Promise<{ name: string; content: string } | null> {
-  let newest: { name: string; mtimeMs: number; size: number } | null = null;
+/** Decompressed tail of one gz archive, cached by name+mtime+size. */
+async function getGzTailCached(logsDir: string, name: string): Promise<string | null> {
+  const filePath = path.join(logsDir, name);
+  let st: fs.Stats;
   try {
-    const names = await fs.promises.readdir(logsDir);
-    for (const name of names) {
-      if (!name.endsWith(".log.gz")) continue;
-      const st = await fs.promises.stat(path.join(logsDir, name));
-      if (!newest || st.mtimeMs > newest.mtimeMs) {
-        newest = { name, mtimeMs: st.mtimeMs, size: st.size };
-      }
-    }
+    st = await fs.promises.stat(filePath);
   } catch {
-    return null; // logs dir missing/empty — fine
+    return null;
   }
-  if (!newest) return null;
-
-  const key = `${newest.name}:${newest.mtimeMs}:${newest.size}`;
-  const cached = gzCache.get(newest.name);
+  const key = `${name}:${st.mtimeMs}:${st.size}`;
+  const cached = gzCache.get(name);
   if (cached && cached.key === key && Date.now() - cached.at < GZ_CACHE_TTL_MS) {
-    return { name: newest.name, content: cached.content };
+    return cached.content;
   }
-
   try {
-    const buf = await gunzipFile(path.join(logsDir, newest.name));
+    const buf = await gunzipFile(filePath);
     const content = tailBuffer(buf, MAX_LOG_BYTES);
-    gzCache.set(newest.name, { key, content, at: Date.now() });
-    return { name: newest.name, content };
+    gzCache.set(name, { key, content, at: Date.now() });
+    return content;
   } catch {
     return null; // corrupted archive — skip it
   }
 }
 
-/** Read latest.log, tail-capped to MAX_LOG_BYTES (streams the tail for big files). */
-async function getLatestLogTail(logsDir: string): Promise<string> {
-  const p = path.join(logsDir, "latest.log");
+async function getRotatedLogTail(
+  logsDir: string,
+): Promise<{ name: string; content: string } | null> {
+  let newest: { name: string; mtimeMs: number } | null = null;
+  try {
+    const names = await fs.promises.readdir(logsDir);
+    for (const name of names) {
+      if (!name.endsWith(".log.gz")) continue;
+      const st = await fs.promises.stat(path.join(logsDir, name));
+      if (!newest || st.mtimeMs > newest.mtimeMs) newest = { name, mtimeMs: st.mtimeMs };
+    }
+  } catch {
+    return null; // logs dir missing/empty — fine
+  }
+  if (!newest) return null;
+  const content = await getGzTailCached(logsDir, newest.name);
+  return content ? { name: newest.name, content } : null;
+}
+
+/** Plain-text file tail, capped to MAX_LOG_BYTES (streams the tail for big files). */
+async function getPlainTail(filePath: string): Promise<string> {
   let st: fs.Stats;
   try {
-    st = await fs.promises.stat(p);
+    st = await fs.promises.stat(filePath);
   } catch {
     return "";
   }
   if (st.size <= MAX_LOG_BYTES) {
-    const buf = await fs.promises.readFile(p);
+    const buf = await fs.promises.readFile(filePath);
     return tailBuffer(buf, MAX_LOG_BYTES);
   }
-  const fh = await fs.promises.open(p, "r");
+  const fh = await fs.promises.open(filePath, "r");
   try {
     const buf = Buffer.alloc(MAX_LOG_BYTES);
     const { bytesRead } = await fh.read(buf, 0, MAX_LOG_BYTES, st.size - MAX_LOG_BYTES);
@@ -650,20 +658,50 @@ async function getLatestLogTail(logsDir: string): Promise<string> {
   }
 }
 
+// GET /api/servers/:id/log — combined view (newest rotated archive + latest.log),
+// or a single file when ?file=<name> is given (gz archives are decompressed).
 router.get("/:id/log", async (req: Request, res: Response) => {
   try {
     const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
 
     const logsDir = path.join(server.dataPath, "logs");
+
+    // ---- single-file view (Logs tab file list) ----
+    const wanted = req.query.file as string | undefined;
+    if (wanted) {
+      const safeName = path.basename(String(wanted).replace(/\\/g, "/"));
+      if (!safeName || safeName === "." || safeName === "..") {
+        res.status(400).json({ error: "Invalid file name." });
+        return;
+      }
+      const filePath = path.join(logsDir, safeName);
+      try {
+        await fs.promises.stat(filePath);
+      } catch {
+        res.status(404).json({ error: "Log file not found." });
+        return;
+      }
+      const content = safeName.endsWith(".gz")
+        ? ((await getGzTailCached(logsDir, safeName)) ?? "")
+        : await getPlainTail(filePath);
+      res.json({
+        path: `/logs/${safeName}`,
+        sources: [safeName],
+        size: Buffer.byteLength(content, "utf8"),
+        content,
+      });
+      return;
+    }
+
+    // ---- combined view (older history first, then the current log) ----
     const parts: string[] = [];
     const sources: string[] = [];
 
-    // Older history first (newest rotated archive), then the current log.
     const rotated = await getRotatedLogTail(logsDir);
     if (rotated?.content) { parts.push(rotated.content); sources.push(rotated.name); }
 
-    const latest = await getLatestLogTail(logsDir);
+    const latest = await getPlainTail(path.join(logsDir, "latest.log"));
     if (latest) { parts.push(latest); sources.push("latest.log"); }
 
     const content = parts.join("\n");

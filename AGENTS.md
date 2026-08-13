@@ -29,7 +29,10 @@
 **Heutige Session (2026-08-13) — Highlights:**
 - **"Session ID unknown" (400) erklärt:** engine.io-Race beim Seitenwechsel (alter Polling-Request mit veralteter sid) — harmlos, Client baut selbst eine frische Session auf. Kein Fix (User-Entscheid)
 - **Stale-Process-Bug gefunden + behoben:** Deploy-Race am 08-12 01:55 (Restart 1s VOR tsc-Ende) → Prozess lief 32h mit altem Code → persistenter-RCON-Fix nie aktiv → RCON-Spam flutete latest.log → Panel-Logs wirkten leer. Fix: `systemctl restart` + End-to-End-Verifikation
-- **Neuer Endpoint `GET /api/servers/:id/log`:** kombiniert neueste rotierte `.log.gz` + latest.log (Tail-Cap 1 MB/Source, gz-Cache 10 min) → 17h-History jetzt im LogsTab + Console-History sichtbar
+- **Neuer Endpoint `GET /api/servers/:id/log`:** kombiniert neueste rotierte `.log.gz` + latest.log (Tail-Cap 1 MB/Source, gz-Cache 10 min) → 17h-History jetzt im LogsTab + Console-History sichtbar. **Mit `?file=<name>`** Einzel-Datei-Ansicht (gz dekomprimiert)
+- **LogsTab als Datei-Übersicht** (wie File Manager): Liste der logs/-Dateien mit Größe → Anzeigen (Klick), Download, Löschen (Confirm; `latest.log` nicht löschbar — Backend-Guard 403)
+- **Quick Commands** standardmäßig zugeklappt
+- **RCON-Spam echte Root-Cause:** `socket.setNoDelay(true)` killt Paper-Verbindungen (2-Socket-Muster reproduziert: 7-13 Connects/90s; Rohtests: Nagle überlebt 40s+, noDelay stirbt beim 2. Poll). Fix: noDelay raus + 500ms Post-Auth-Delay (Paper schließt auch bei Commands <300ms nach Auth). **Verifiziert: 1 Verbindung / 90s**
 
 **Offene Punkte / nächste Schritte:**
 - [ ] install.sh nur **statisch** validiert — kompletter Live-Test auf frischer VM/CT steht aus (User hat Test angeboten)
@@ -39,6 +42,7 @@
 **Warnungen / Lehren:**
 - ⚠️ **Niemals Sammel-SCP in einen Ordner** (`scp a b c server:/ordner/`) — hat mehrfach Streu-Dateien verursacht. Immer einzeln mit korrektem Zielpfad, dann `npx tsc`/`next build` auf dem Server prüfen.
 - ⚠️ **Deploy-Race:** `systemctl restart` NIE ohne abgeschlossenen Build ausführen — IMMER `npx tsc && systemctl restart mcpanel-backend` in EINER Kette (der 01:55-Deploy startete den Prozess 1s vor tsc-Ende → Server lief 32h mit altem Code, RCON-Fix inaktiv).
+- ⚠️ **RCON-Client: NIEMALS `setNoDelay(true)`** — Paper schließt solche Verbindungen innerhalb von Sekunden (empirisch verifiziert; Kommentar steht im Code).
 - ⚠️ Delete/Recreate/Restore machen **keine Auto-Backups** mehr (User-Wunsch) — manuelles + geplantes Backup funktionieren weiter.
 
 
@@ -1151,3 +1155,25 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 **Verifiziert (Live):** Endpoint liefert `sources: [2026-08-12-1.log.gz, latest.log]` mit dem 17h-Startup ("[bootstrap] Running Java 25…"), Backend tsc 0 Fehler, Frontend `next build` OK, Panel 200, API-Proxy 200, RCON ruhig (keine offenen Verbindungen ohne Panel).
 
 > **Last updated:** 2026-08-13 · Session: Session-ID-400 erklärt, Deploy-Race gefunden (Stale-Process), RCON-Fix live verifiziert, rotierte Logs via `/:id/log`
+
+---
+
+### 2026-08-13 (Teil 2) — QuickCommands zugeklappt, LogsTab Datei-Übersicht, RCON-NoDelay-Root-Cause
+
+**Features (User-Wünsche):**
+- **QuickCommands default zugeklappt:** `useState(false)` (Restart-Countdown bleibt auch zugeklappt sichtbar)
+- **LogsTab → Datei-Übersicht** (wie File Manager): Liste der `logs/`-Dateien (latest.log + Archive) mit Größe/Badges (active/archive), Klick = Anzeigen (gz wird dekomprimiert), Download (roh, via `/file?raw=true`), Löschen mit Inline-Confirm. `latest.log` ist **nicht löschbar** (Backend-Guard 403 in files.ts — Server hält die Datei offen). Auto-Selektiert latest.log (Live-Poll 5s), Archive laden einmalig. Suche/Copy/Auto-Scroll bleiben.
+- **Backend `GET /:id/log` erweitert:** `?file=<name>` = Einzel-Datei-Ansicht (gz per zlib dekomprimiert, Tail-Cap 1 MB, gz-Cache 10 min pro Datei). Combined-Ansicht (neueste gz + latest.log) bleibt für Console-History.
+
+**RCON-Spam-Erkenntnis (wichtig!):** Nach dem Neustart (Teil 1) spammte latest.log trotzdem weiter. Reproduziert mit dem echten 2-Socket-Muster (Dashboard-Stats-Socket + Detail-Console-Socket): **started-delta 7-13 in 90s**. Debug-Logs (temporär instrumentiert): CLOSE ohne REQ/HANDSHAKE-TIMEOUT/SOCKET-ERROR + `END` (Server-FIN) in derselben Sekunde wie CONNECT+AUTH → **der Server schließt aktiv**. Rohtest-Isolation gegen den RCON-Port ergab:
+1. `setNoDelay(true)` ist der Hauptkiller: Rohtests MIT noDelay + Commands sterben beim 1.-2. Poll-Tick (t+5s/t+10s), OHNE noDelay (Nagle) überlebt die Verbindung 40s+ (raw1).
+2. Zusätzlich schließt Paper Verbindungen, wenn Commands < ~300ms nach Auth eintreffen (raw3: 200ms → zu, 300ms+ → ok) — Brute-Force-Guard-Fenster.
+
+**Fixes (rcon.ts):**
+- `socket.setNoDelay(true)` **entfernt** (Kommentar im Code: NIEMALS wieder aktivieren) → Nagle koalesziert die RCON-Pakete
+- `POST_AUTH_DELAY_MS = 500`: erste Commands werden 500ms nach Auth zurückgehalten (schützt das Auth-Fenster; `connecting` bleibt währenddessen true, konkurrierende Caller warten)
+- Bonus-Guard: der `close`-Handler löscht die Verbindung nur noch aus der Map, wenn es noch DIESE ist (`connections.get(key) === conn`) — ein stale Close-Ereignis eines alten Sockets kann keine neuere Verbindung mehr verdrängen
+
+**Verifiziert (Live, 2-Socket-Muster):** started-delta **1** über 90s (vorher 7-13). latest.log: einzelne "started"-Zeile ohne Paar. Alle Endpoints (`/log?file=`, combined, files-list, delete-guard 403) getestet. Backend tsc 0 Fehler, Frontend next build OK, Panel 200, Proxy 200.
+
+> **Last updated:** 2026-08-13 · Session Teil 2: LogsTab Datei-Übersicht, QuickCommands zugeklappt, RCON-Root-Cause (setNoDelay) gefunden + gefixt

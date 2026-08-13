@@ -361,6 +361,16 @@ router.delete("/:id/file", async (req: Request, res: Response) => {
       return;
     }
 
+    // Refuse to delete the active Minecraft log file — the server keeps it
+    // open and writes to it continuously; removing it would silently lose
+    // the current session's log.
+    if (subPath.replace(/\\/g, "/").replace(/^\/+/, "") === "logs/latest.log") {
+      res
+        .status(403)
+        .json({ error: "Cannot delete the active log file (logs/latest.log)." });
+      return;
+    }
+
     const resolved = await resolveSafe(req.params.id, subPath);
     if (!resolved) {
       res

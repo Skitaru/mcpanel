@@ -7,12 +7,19 @@
 //
 // Requests are correlated by request id (the Source RCON protocol supports
 // multiple in-flight requests over a single connection).
+//
+// NOTE (Paper/Vanilla quirk): the server closes the RCON connection when the
+// first command arrives within ~200-300 ms of the auth response (brute-force
+// guard). We therefore hold the first command batch back for POST_AUTH_DELAY_MS
+// after auth — verified: commands at >= 300 ms keep the connection alive.
 
 import net from "node:net";
 
 const DEFAULT_TIMEOUT_MS = 5000;
 /** Close idle connections after 5 minutes without traffic. */
 const IDLE_CLEANUP_MS = 5 * 60_000;
+/** Delay before the first commands after auth (see file header). */
+const POST_AUTH_DELAY_MS = 500;
 
 interface PendingRequest {
   resolve: (value: string) => void;
@@ -125,7 +132,11 @@ function ensureReady(conn: RconConnection, timeoutMs: number): Promise<void> {
     conn.buffer = Buffer.alloc(0);
 
     const socket = new net.Socket();
-    socket.setNoDelay(true);
+    // NOTE: do NOT setNoDelay(true) here. With Nagle disabled, the client emits
+    // each RCON packet as its own TCP segment and Paper closes the connection
+    // within ~5-10 s (verified empirically: raw tests with noDelay die at the
+    // 2nd poll tick, Nagle-coalesced traffic survives indefinitely). RCON polls
+    // run every 5 s, so the ~40 ms Nagle latency is irrelevant.
 
     const handshakeTimer = setTimeout(() => {
       socket.destroy();
@@ -148,12 +159,18 @@ function ensureReady(conn: RconConnection, timeoutMs: number): Promise<void> {
       conn.pending.set(authId, {
         resolve: () => {
           clearTimeout(handshakeTimer);
-          conn.authed = true;
-          conn.connecting = false;
           conn.lastUsed = Date.now();
-          for (const w of conn.waiters) w();
-          conn.waiters = [];
-          resolve();
+          // Keep `connecting = true` so concurrent callers queue up, and only
+          // release them after the post-auth delay (see file header). This
+          // makes sure the first commands never hit the server's post-auth
+          // guard window.
+          setTimeout(() => {
+            conn.connecting = false;
+            conn.authed = true;
+            for (const w of conn.waiters) w();
+            conn.waiters = [];
+            resolve();
+          }, POST_AUTH_DELAY_MS);
         },
         reject: (err) => {
           clearTimeout(handshakeTimer);
@@ -184,7 +201,11 @@ function ensureReady(conn: RconConnection, timeoutMs: number): Promise<void> {
       conn.connecting = false;
       conn.socket = null;
       conn.authed = false;
-      connections.delete(conn.key);
+      // Only remove the entry if it is still THIS connection — a stale close
+      // event from an old socket must never delete a newer replacement.
+      if (connections.get(conn.key) === conn) {
+        connections.delete(conn.key);
+      }
     });
 
     socket.connect(conn.port, conn.host);
