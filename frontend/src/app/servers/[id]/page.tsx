@@ -375,7 +375,7 @@ export default function ServerDetailPage() {
 
               {/* ── Viewport (ConsoleTab renders its own 2-column layout) ── */}
               <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
-                <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} diskUsage={diskUsage[server.id]} />
+                <ConsoleTab serverId={serverId} serverName={server.name} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} diskUsage={diskUsage[server.id]} />
               </div>
 
               <div className={`tab-content ${activeTab === "status" ? "" : "hidden"}`}>
