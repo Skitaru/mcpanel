@@ -271,7 +271,7 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl overflow-hidden rounded-xl
+        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl
                    border border-edge bg-surface shadow-2xl"
       >
         {/* Header */}
@@ -358,7 +358,7 @@ export default function CreateServerDialog({ open, onClose, onCreated, onOpenMod
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* ── Left Column: Basic Information ── */}
             <div>
               <div className="flex items-center gap-2 mb-4">

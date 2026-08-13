@@ -150,7 +150,7 @@ export default function EditServerDialog({ open, onClose, onUpdated, server }: P
                  bg-black/70 p-4 backdrop-blur-sm"
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-xl
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl
                    border border-edge bg-surface shadow-2xl"
       >
         {/* Header */}

@@ -483,8 +483,10 @@ export default function ConsoleTab({
           </div>
         )}
 
-        {/* Console panel — fills the remaining height under Quick Commands */}
-        <div className="flex h-[420px] min-h-0 flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
+        {/* Console panel — fills the remaining height under Quick Commands.
+            Mobile: fixed height (flex-1 would override h-[420px] via flex-basis:0
+            and let the panel grow with the log content = "endless console"). */}
+        <div className="flex h-[420px] max-h-[75vh] min-h-0 lg:h-auto lg:max-h-none lg:flex-1 min-w-0 flex-col overflow-hidden rounded-xl border border-edge bg-surface">
         {/* Console header + filter */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-edge bg-surface px-4 py-2">
           <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${isOnline ? "text-online" : "text-muted"}`}>

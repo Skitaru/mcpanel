@@ -1177,3 +1177,20 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 **Verifiziert (Live, 2-Socket-Muster):** started-delta **1** über 90s (vorher 7-13). latest.log: einzelne "started"-Zeile ohne Paar. Alle Endpoints (`/log?file=`, combined, files-list, delete-guard 403) getestet. Backend tsc 0 Fehler, Frontend next build OK, Panel 200, Proxy 200.
 
 > **Last updated:** 2026-08-13 · Session Teil 2: LogsTab Datei-Übersicht, QuickCommands zugeklappt, RCON-Root-Cause (setNoDelay) gefunden + gefixt
+
+---
+
+### 2026-08-13 (Teil 3) — Mobile-Responsive-Audit + Fixes
+
+**Anlass:** User-Report am Handy: (1) "Create Server"-Button im Create-Dialog fehlt/wird überdeckt, (2) Console wird endlos lang.
+
+**Root Causes:**
+1. **Dialog-Overlay-Bug (Create/Edit/ChangePassword):** Dialog-Container hatte `overflow-hidden` OHNE `max-h` → auf kleinen Viewports wurde der untere Teil (Submit-Button) abgeschnitten, Scrollen unmöglich (overflow-hidden). Fix: `max-h-[90vh] overflow-y-auto` (ganzer Dialog scrollt) — dasselbe Muster, das InstallModpackDialog + Docker-Logs-Dialog schon korrekt hatten.
+2. **Console "endlos lang":** `flex-1` (= `flex: 1 1 0%`) auf der Console-Card überschrieb die `h-[420px]` (flex-basis:0% ignoriert height) → der Container wuchs mit dem Log-Inhalt (2000 Zeilen) → ewig lange Console, Output scrollte nie. Fix: `flex-1` → `lg:flex-1` (Mobile: feste 420px + `max-h-[75vh]`; Desktop: unverändert sidebarH-gesteuert).
+3. **CreateServerDialog Schritt 2:** `grid grid-cols-2` quetschte die Formularfelder auf Mobile → `grid-cols-1 sm:grid-cols-2`.
+
+**Audit-Ergebnis (restliche Komponenten — OK):** TopBar (sticky, truncate, hidden sm:inline), ServerCard (flex-wrap, truncate), Dashboard (grid-cols-2 → lg:grid-cols-4, Toolbar flex-wrap), Detailseite (Breadcrumb/Chips/Buttons flex-wrap, Tabs overflow-x-auto), FileManagerTab (vh-begrenzt), LogsTab (calc(100vh-24rem)), BackupsTab/ScheduleCard/PlayerCard (flex-wrap), InstallModpackDialog (max-h-90vh + scrollbarer Body ✓), Docker-Logs-Dialog (max-h-70vh ✓), globals.css (font-size 100% auf Mobile, overflow:hidden nur .btn-group).
+
+**Deploy:** 4 Dateien einzeln scp'd, `next build` OK, Frontend-Restart, Panel 200, Proxy 200. Kein Backend-Change.
+
+> **Last updated:** 2026-08-13 · Session Teil 3: Mobile-Audit — Dialog-Overlay-Fixes (max-h+scroll), Console-Endlos-Bug (flex-basis), Grid-Responsive

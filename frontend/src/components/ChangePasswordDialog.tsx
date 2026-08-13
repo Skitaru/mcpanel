@@ -87,7 +87,7 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm overflow-hidden rounded-xl
+        className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-xl
                    border border-edge bg-surface shadow-2xl"
       >
         {/* Header */}
