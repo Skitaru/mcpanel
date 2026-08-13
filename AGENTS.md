@@ -18,31 +18,39 @@
 
 ---
 
-## 🧭 Session Briefing — Stand 2026-08-13
+## 🧭 Session Briefing — Stand 2026-08-13 (Ende)
 
 **Aktueller Zustand:**
-- Panel deployed & laufend auf `188.214.30.159` (backend 3000, frontend 3001 — Services active, Health 200). **Backend + Frontend auf aktuellem Stand** (Neustarts 2026-08-13 09:51/09:57 — zuvor lief der Backend-Prozess seit 01:55 mit PRE-Fix-Code, siehe Session-Log)
-- **1 Server aktiv:** "Test" (Paper 26.2, Java 25, 6 GB RAM, Port 25565) läuft seit 2026-08-12 ~16:08 BST (~18h). Container `mc-paper-e1bc359c…` — RCON persistent-Fix live (1 Verbindung, Idle-Cleanup 5 min)
-- Docker-Images auf dem Server: `eclipse-temurin:8-jre` (Debian, Java 8), `11/17/21/25-jre-alpine`. ⚠️ **Java-16-Images existieren nicht mehr auf Docker Hub** (MC 1.16.5 läuft auf Java 11)
-- Letzter Commit: siehe git log — Arbeitsbaum sauber
+- Panel deployed & laufend auf `188.214.30.159` (backend 3000, frontend 3001 — Services active, Health 200). Backend + Frontend auf aktuellem Stand (letzter Deploy: Status-Tab-Erweiterung, Commit `c72cc77`)
+- **1 Server aktiv:** "Test" (Paper 26.2, Java 25, 6 GB RAM, Port 25565) läuft seit 2026-08-12 ~16:08 BST. Container `mc-paper-e1bc359c…` — RCON persistent (1 Verbindung, Idle-Cleanup 5 min)
+- Docker-Images: `eclipse-temurin:8-jre` (Debian, Java 8), `11/17/21/25-jre-alpine`. ⚠️ **Java-16-Images existieren nicht mehr auf Docker Hub** (MC 1.16.5 → Java 11)
+- Letzter Commit: `c72cc77` — Arbeitsbaum sauber, alles gepusht
 
-**Heutige Session (2026-08-13) — Highlights:**
-- **"Session ID unknown" (400) erklärt:** engine.io-Race beim Seitenwechsel (alter Polling-Request mit veralteter sid) — harmlos, Client baut selbst eine frische Session auf. Kein Fix (User-Entscheid)
-- **Stale-Process-Bug gefunden + behoben:** Deploy-Race am 08-12 01:55 (Restart 1s VOR tsc-Ende) → Prozess lief 32h mit altem Code → persistenter-RCON-Fix nie aktiv → RCON-Spam flutete latest.log → Panel-Logs wirkten leer. Fix: `systemctl restart` + End-to-End-Verifikation
-- **Neuer Endpoint `GET /api/servers/:id/log`:** kombiniert neueste rotierte `.log.gz` + latest.log (Tail-Cap 1 MB/Source, gz-Cache 10 min) → 17h-History jetzt im LogsTab + Console-History sichtbar. **Mit `?file=<name>`** Einzel-Datei-Ansicht (gz dekomprimiert)
-- **LogsTab als Datei-Übersicht** (wie File Manager): Liste der logs/-Dateien mit Größe → Anzeigen (Klick), Download, Löschen (Confirm; `latest.log` nicht löschbar — Backend-Guard 403)
+**Session 2026-08-13 — Highlights:**
+- **"Session ID unknown" (400):** engine.io-Race beim Seitenwechsel — harmlos, kein Fix (User-Entscheid)
+- **Stale-Process-Bug + RCON-Root-Cause:** Deploy-Race (Restart 1s vor tsc) → 32h alter Prozess → RCON-Spam; **`setNoDelay(true)` killt Paper-Verbindungen** → noDelay raus + 500ms Post-Auth-Delay → 1 Verbindung/90s verifiziert
+- **Logs:** `GET /:id/log` (rotierte gz + latest.log, `?file=`-Einzelansicht); LogsTab als Datei-Übersicht (View/Download/Delete, latest.log-Delete-Guard 403)
 - **Quick Commands** standardmäßig zugeklappt
-- **RCON-Spam echte Root-Cause:** `socket.setNoDelay(true)` killt Paper-Verbindungen (2-Socket-Muster reproduziert: 7-13 Connects/90s; Rohtests: Nagle überlebt 40s+, noDelay stirbt beim 2. Poll). Fix: noDelay raus + 500ms Post-Auth-Delay (Paper schließt auch bei Commands <300ms nach Auth). **Verifiziert: 1 Verbindung / 90s**
+- **Mobile-Audit:** Dialoge `max-h-[90vh] overflow-y-auto` (Create/Edit/ChangePassword), Console `lg:flex-1` statt `flex-1` (Endlos-Bug), Create-Grid `grid-cols-1 sm:grid-cols-2`
+- **Funktionstest komplett bestanden** (Auth, File Manager, Logs, RCON, Backup-Job, Create/Recreate/Delete, **Modpack-E2E**: Fabulously Optimized → 22 Mods → Welt → RCON → Delete)
+- **Status-Tab:** Zeitfenster (5m–24h Ressourcen, 30m–30d Player), CPU/RAM/Disk/TPS mit Peak, Player-History mit Peak/Avg/Player-Hours, disk via 60s-Poll in History
 
 **Offene Punkte / nächste Schritte:**
+- [ ] **Feature #2 SFTP** (geplant): Panel als eigener SFTP-Server (Port 2222, gleiche Panel-Logins, pro Server ein Data-Dir) — mittlerer/großer Aufwand
+- [ ] **Feature #3 Benutzergruppen/Multi-User** + **#4 Subuser** (großes Auth-Rework; Subuser hängt an #3)
+- [ ] **Persistente History** (User-Option): Status-Puffer sind RAM-basiert (verfallen bei Backend-Neustart) — für 30d-Player-Statistik evtl. Datei/SQLite-Speicherung
 - [ ] install.sh nur **statisch** validiert — kompletter Live-Test auf frischer VM/CT steht aus (User hat Test angeboten)
 - [ ] Crash-Loop-Schutz (Scheduler, ≥15 Restarts → Auto-Stop) braucht echten Crash-Test
-- [ ] Transienter `next/font outfit`-Build-Fehler auf dem Server (Google-Fonts-Download) — einfach erneut `npx next build`
+- [ ] Transienter `next/font outfit`-Build-Fehler — einfach erneut `npx next build`
+
+**Hinweise:**
+- **CF-API-Key des Users** ist für Modpack-Install-Tests nötig (liegt im Browser-localStorage `obsidian_cf_key`; bei API-Tests vom User anfordern — **NIEMALS in Repo/AGENTS.md speichern**, ist public!)
+- Status-History wird nur gefüllt, während das Panel offen ist (WS-Stream) — nach Backend-Neustart beginnt sie neu
 
 **Warnungen / Lehren:**
 - ⚠️ **Niemals Sammel-SCP in einen Ordner** (`scp a b c server:/ordner/`) — hat mehrfach Streu-Dateien verursacht. Immer einzeln mit korrektem Zielpfad, dann `npx tsc`/`next build` auf dem Server prüfen.
-- ⚠️ **Deploy-Race:** `systemctl restart` NIE ohne abgeschlossenen Build ausführen — IMMER `npx tsc && systemctl restart mcpanel-backend` in EINER Kette (der 01:55-Deploy startete den Prozess 1s vor tsc-Ende → Server lief 32h mit altem Code, RCON-Fix inaktiv).
-- ⚠️ **RCON-Client: NIEMALS `setNoDelay(true)`** — Paper schließt solche Verbindungen innerhalb von Sekunden (empirisch verifiziert; Kommentar steht im Code).
+- ⚠️ **Deploy-Race:** `systemctl restart` NIE ohne abgeschlossenen Build — IMMER `npx tsc && systemctl restart mcpanel-backend` in EINER Kette.
+- ⚠️ **RCON-Client: NIEMALS `setNoDelay(true)`** — Paper schließt solche Verbindungen innerhalb von Sekunden (Kommentar im Code).
 - ⚠️ Delete/Recreate/Restore machen **keine Auto-Backups** mehr (User-Wunsch) — manuelles + geplantes Backup funktionieren weiter.
 
 
@@ -1241,3 +1249,11 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 **Deploy + verifiziert:** websocket.ts/servers.ts/StatusTab.tsx einzeln gescp't, Backend tsc+Restart, Frontend next build+Restart, Panel 200. Endpoints getestet: history 5m/24h (7 Samples, peak ok), player-history (1 Sample bei 60s-Auflösung nach 18s — korrekt), disk-Backfill (242MB) ✓.
 
 > **Last updated:** 2026-08-13 · Session Teil 5: Status-Tab erweitert — Zeitfenster, Peak, Player-History (30d) mit Aggregaten
+
+---
+
+### 2026-08-13 — Session-Ende: Briefing + Dateien für nächste Session vorbereitet
+
+AGENTS.md-Briefing auf den vollständigen Session-Stand aktualisiert (Teil 1–5): aktueller Zustand, alle Highlights, offene Punkte (SFTP #2, Multi-User/Gruppen #3, Subuser #4, persistente History, install.sh-Live-Test, Crash-Loop-Test), Hinweise (CF-Key nur beim User/localStorage — **nicht im Repo**), Warnungen (Sammel-SCP, Deploy-Race, setNoDelay). Letzter Commit `c72cc77`, Arbeitsbaum sauber, alles gepusht.
+
+> **Last updated:** 2026-08-13 · Session-Abschluss: Briefing + Dateien für nächste Session vorbereitet
