@@ -32,7 +32,9 @@ import { downloadPaperJar } from "../services/paper";
 import { downloadFabricJar } from "../services/fabric";
 import { downloadVelocityJar } from "../services/velocity";
 import { pingMinecraftServer } from "../services/minecraft-ping";
-import { getHistory, clearHistory } from "../services/websocket";
+import {
+  getHistory, clearHistory, recordSample, getPlayerHistory, clearPlayerHistory,
+} from "../services/websocket";
 
 const router = Router();
 
@@ -788,8 +790,9 @@ router.delete("/:id", async (req: Request, res: Response) => {
     // 3. Remove from config store.
     await removeServer(server.id);
 
-    // Drop the Status-tab history buffer.
+    // Drop the Status-tab history buffers.
     clearHistory(server.id);
+    clearPlayerHistory(server.id);
 
     console.log(`[api] Deleted server "${server.name}" (${server.id.slice(0, 8)})`);
     res.json({ message: `Server "${server.name}" deleted.` });
@@ -1040,6 +1043,8 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
       });
     });
     const bytes = parseInt(output.trim().split(/\s+/)[0], 10) || 0;
+    // Feed the Status-tab disk history (detail page + status tab poll every 60 s).
+    recordSample(server.id, { disk: bytes });
     res.json({ bytes, path: dataPath });
   } catch (err: any) {
     if (err.killed || err.code === "ETIMEDOUT") {
@@ -1051,17 +1056,105 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// History helpers (Status tab): window parsing, downsampling, aggregates.
+// ---------------------------------------------------------------------------
+
+/** "5m" | "15m" | "30m" | "4h" | "12h" | "24h" | "48h" | "7d" | "14d" | "30d" → ms */
+function parseWindow(value: string | undefined, fallbackMs: number): number {
+  const m = /^(\d+)([mhd])$/.exec((value ?? "").trim().toLowerCase());
+  if (!m) return fallbackMs;
+  const n = parseInt(m[1], 10);
+  const unit = m[2] === "m" ? 60_000 : m[2] === "h" ? 3_600_000 : 86_400_000;
+  return n * unit;
+}
+
+/** Average over non-null values, or null if there are none. */
+function avg(vals: (number | null)[]): number | null {
+  const nums = vals.filter((v): v is number => v != null);
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+/** Downsample an array to at most `maxPoints` (take the last item per bucket). */
+function downsample<T>(samples: T[], maxPoints: number): T[] {
+  if (samples.length <= maxPoints) return samples;
+  const size = Math.ceil(samples.length / maxPoints);
+  const out: T[] = [];
+  for (let i = 0; i < samples.length; i += size) {
+    out.push(samples[Math.min(i + size - 1, samples.length - 1)]);
+  }
+  return out;
+}
+
+interface HistSampleLike { t: number; cpu: number | null; mem: number | null; memLimit: number | null; tps: number | null; disk: number | null; }
+
+/** Filter + downsample + per-metric peak for the resource history. */
+function buildResourcePayload(samples: HistSampleLike[], windowMs: number) {
+  const cutoff = Date.now() - windowMs;
+  const inWindow = samples.filter((s) => s.t >= cutoff);
+  const peak = { cpu: 0, mem: 0, disk: 0 };
+  for (const s of inWindow) {
+    if (s.cpu != null && s.cpu > peak.cpu) peak.cpu = s.cpu;
+    if (s.mem != null && s.mem > peak.mem) peak.mem = s.mem;
+    if (s.disk != null && s.disk > peak.disk) peak.disk = s.disk;
+  }
+  return { windowMs, peak, samples: downsample(inWindow, 720) };
+}
+
+interface PlayerSampleLike { t: number; online: number; }
+
+/** Filter + aggregate (peak / weighted avg / player-hours) + downsample. */
+function buildPlayerPayload(samples: PlayerSampleLike[], windowMs: number) {
+  const cutoff = Date.now() - windowMs;
+  const inWindow = samples.filter((s) => s.t >= cutoff);
+  let peak = 0;
+  let weighted = 0; // Σ online × dt
+  let totalMs = 0;
+  for (let i = 0; i < inWindow.length; i++) {
+    const s = inWindow[i];
+    if (s.online > peak) peak = s.online;
+    const end = i + 1 < inWindow.length ? inWindow[i + 1].t : s.t + 60_000;
+    const dt = Math.max(0, end - s.t);
+    weighted += s.online * dt;
+    totalMs += dt;
+  }
+  const avgPlayers = totalMs > 0 ? weighted / totalMs : 0;
+  const playerHours = totalMs > 0 ? weighted / 3_600_000 : 0;
+  return { windowMs, peak, avgPlayers, playerHours, samples: downsample(inWindow, 720) };
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/servers/:id/history — resource history for the Status tab
-// (ring buffer fed by the live WebSocket stats/tps stream, ~5 s samples).
+// (ring buffer fed by the live WebSocket stats/tps stream + disk polls).
+// Optional ?window=5m|15m|30m|4h|12h|24h (default 30m).
 // ---------------------------------------------------------------------------
 router.get("/:id/history", async (req: Request, res: Response) => {
   try {
     const server = await getServer(req.params.id);
     if (!server) { res.status(404).json({ error: "Server not found." }); return; }
-    res.json({ serverId: server.id, samples: getHistory(server.id) });
+    const windowMs = parseWindow(req.query.window as string | undefined, 30 * 60_000);
+    const payload = buildResourcePayload(getHistory(server.id), windowMs);
+    res.json({ serverId: server.id, ...payload });
   } catch (err: any) {
     console.error("[api] GET /api/servers/:id/history error:", err);
     res.status(500).json({ error: "Failed to read history." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/:id/player-history — player count over time for the Status
+// tab. Optional ?window=30m|4h|12h|24h|48h|7d|14d|30d (default 24h).
+// ---------------------------------------------------------------------------
+router.get("/:id/player-history", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    const windowMs = parseWindow(req.query.window as string | undefined, 24 * 3_600_000);
+    const payload = buildPlayerPayload(getPlayerHistory(server.id), windowMs);
+    res.json({ serverId: server.id, ...payload });
+  } catch (err: any) {
+    console.error("[api] GET /api/servers/:id/player-history error:", err);
+    res.status(500).json({ error: "Failed to read player history." });
   }
 });
 

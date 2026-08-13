@@ -81,8 +81,9 @@ const sessions = new Map<string, SocketSession>();
 
 // ---------------------------------------------------------------------------
 // Resource history (Status tab) — ring buffer fed by the live stats/tps stream.
-// One sample per ~5 s per server, capped at 30 minutes (360 samples), so the
-// Status tab can draw CPU/RAM/TPS graphs without its own poller.
+// One sample per ~5 s per server, capped at 24 h (17280 samples). Disk is
+// back-filled by the REST /:id/disk poll (60 s) — so CPU/RAM/DISK/TPS graphs
+// with selectable windows (5m … 24h) can be drawn without extra pollers.
 // ---------------------------------------------------------------------------
 
 interface HistorySample {
@@ -91,13 +92,14 @@ interface HistorySample {
   mem: number | null; // bytes
   memLimit: number | null;
   tps: number | null;
+  disk: number | null; // bytes (back-filled from /:id/disk polls)
 }
 
-const MAX_HISTORY_SAMPLES = 360; // 30 min @ 5 s
+const MAX_HISTORY_SAMPLES = 17280; // 24 h @ 5 s
 const history = new Map<string, HistorySample[]>();
 
-/** Merge a stats/tps update into the ring buffer (5 s per sample). */
-function recordSample(serverId: string, data: Partial<HistorySample>): void {
+/** Merge a stats/tps/disk update into the ring buffer (5 s per sample). */
+export function recordSample(serverId: string, data: Partial<HistorySample>): void {
   const now = Date.now();
   const arr = history.get(serverId) ?? [];
   const last = arr[arr.length - 1];
@@ -108,6 +110,7 @@ function recordSample(serverId: string, data: Partial<HistorySample>): void {
     if (data.mem != null) last.mem = data.mem;
     if (data.memLimit != null) last.memLimit = data.memLimit;
     if (data.tps != null) last.tps = data.tps;
+    if (data.disk != null) last.disk = data.disk;
   } else {
     arr.push({
       t: now,
@@ -115,6 +118,7 @@ function recordSample(serverId: string, data: Partial<HistorySample>): void {
       mem: data.mem ?? null,
       memLimit: data.memLimit ?? null,
       tps: data.tps ?? null,
+      disk: data.disk ?? null,
     });
     if (arr.length > MAX_HISTORY_SAMPLES) arr.shift();
   }
@@ -129,6 +133,43 @@ export function getHistory(serverId: string): HistorySample[] {
 /** Drop the buffer when a server is deleted. */
 export function clearHistory(serverId: string): void {
   history.delete(serverId);
+}
+
+// ---------------------------------------------------------------------------
+// Player-count history (Status tab) — one sample per minute per server,
+// capped at 30 days (43200 samples). Fed by the WS players poller (always,
+// not only on join/leave diffs) so long-window stats (peak/avg/player-hours)
+// can be computed.
+// ---------------------------------------------------------------------------
+
+interface PlayerSample {
+  t: number;
+  online: number;
+}
+
+const MAX_PLAYER_SAMPLES = 43200; // 30 d @ 60 s
+const playerHistory = new Map<string, PlayerSample[]>();
+
+/** Record the current online count (60 s per sample). */
+export function recordPlayerSample(serverId: string, online: number): void {
+  const now = Date.now();
+  const arr = playerHistory.get(serverId) ?? [];
+  const last = arr[arr.length - 1];
+  if (last && now - last.t < 60_000) {
+    last.online = online;
+  } else {
+    arr.push({ t: now, online });
+    if (arr.length > MAX_PLAYER_SAMPLES) arr.shift();
+  }
+  playerHistory.set(serverId, arr);
+}
+
+export function getPlayerHistory(serverId: string): PlayerSample[] {
+  return playerHistory.get(serverId) ?? [];
+}
+
+export function clearPlayerHistory(serverId: string): void {
+  playerHistory.delete(serverId);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +441,10 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
             const names = m[3]
               ? [...new Set(m[3].split(",").map((s) => s.trim()).filter(Boolean))]
               : [];
+
+            // Always record the count for the Status-tab player history
+            // (even when nothing changed — the graph needs a continuous line).
+            recordPlayerSample(serverId, online);
 
             const first = !playerLastNames.has(serverId);
             const prev = playerLastNames.get(serverId) ?? [];

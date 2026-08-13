@@ -1218,3 +1218,26 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 **Feature-Planung (User priorisiert):** 1. Status-Tab ✅ (umgesetzt) · 2. SFTP (mittlerer/großer Aufwand, Panel als SFTP-Server Port 2222) · 3. Benutzergruppen/Multi-User (großes Auth-Rework) · 4. Subuser (hängt an 3) — offen für spätere Runden.
 
 > **Last updated:** 2026-08-13 · Session Teil 4: Funktionstest A–F bestanden, Status-Tab mit Graphen implementiert
+
+---
+
+### 2026-08-13 (Teil 5) — Status-Tab: Zeitfenster + Peak + Player-Statistik
+
+**User-Anforderung:** Status-Tab mit Zeitfenstern (5m/15m/30m/4h/12h/24h), CPU/RAM/DISK mit Peak-Anzeige, Player-Count-History (30m/4h/12h/24h/48h/7d/14d/30d) mit Peak + Avg Players + Player-Hours — alles als Graph.
+
+**Backend (websocket.ts + servers.ts):**
+- Resource-History: 360 → **17280 Samples** (24h @ 5s) + neues `disk`-Feld (wird aus den `/disk`-Polls der Detailseite/StatusTab back-gefüllt, kein Extra-Poller)
+- **Player-History:** neuer Puffer (60s-Samples, 43200 = 30d); `recordPlayerSample` wird bei JEDEM Players-Poll geschrieben (nicht nur bei Join/Leave-Diff — der Graph braucht eine durchgehende Linie)
+- `GET /:id/history?window=5m|15m|30m|4h|12h|24h` → filtert + downsampled (max 720 Punkte) + `peak {cpu,mem,disk}` aus dem vollen Fenster
+- `GET /:id/player-history?window=30m|4h|12h|24h|48h|7d|14d|30d` → downsampled + `peak` + `avgPlayers` (gewichtet nach Sample-Dauer) + `playerHours` (Σ online×dt/3600s)
+- `clearPlayerHistory` beim Delete; `recordSample` exportiert
+
+**Frontend (StatusTab.tsx neu):**
+- Ressourcen-Card mit Fenster-Chips; 4 Graphen (CPU/RAM/Disk/TPS) je mit aktuellem Wert + **Peak-Zeile**; Disk aktuell via 60s-/disk-Poll
+- Player-Count-Card mit Fenster-Chips + Stat-Tiles (Peak / Avg Players / Player-Hours) + Verlaufsgraph
+- `hold()`-Helper (null→letzter Wert) für lückenhafte Disk/TPS-Linien; WindowChips + Stat als kleine Subkomponenten
+- Hinweis im Footer: Puffer sind RAM-basiert (verfallen bei Backend-Neustart)
+
+**Deploy + verifiziert:** websocket.ts/servers.ts/StatusTab.tsx einzeln gescp't, Backend tsc+Restart, Frontend next build+Restart, Panel 200. Endpoints getestet: history 5m/24h (7 Samples, peak ok), player-history (1 Sample bei 60s-Auflösung nach 18s — korrekt), disk-Backfill (242MB) ✓.
+
+> **Last updated:** 2026-08-13 · Session Teil 5: Status-Tab erweitert — Zeitfenster, Peak, Player-History (30d) mit Aggregaten
