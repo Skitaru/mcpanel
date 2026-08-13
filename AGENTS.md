@@ -18,32 +18,28 @@
 
 ---
 
-## 🧭 Session Briefing — Stand 2026-08-12
+## 🧭 Session Briefing — Stand 2026-08-13
 
 **Aktueller Zustand:**
-- Panel deployed & laufend auf `188.214.30.159` (backend 3000, frontend 3001 — Services active, Health 200)
-- **Keine Server** aktuell (`servers.json = []`, alle Container + Data-Dirs gelöscht, Orphan-Backups entfernt)
+- Panel deployed & laufend auf `188.214.30.159` (backend 3000, frontend 3001 — Services active, Health 200). **Backend + Frontend auf aktuellem Stand** (Neustarts 2026-08-13 09:51/09:57 — zuvor lief der Backend-Prozess seit 01:55 mit PRE-Fix-Code, siehe Session-Log)
+- **1 Server aktiv:** "Test" (Paper 26.2, Java 25, 6 GB RAM, Port 25565) läuft seit 2026-08-12 ~16:08 BST (~18h). Container `mc-paper-e1bc359c…` — RCON persistent-Fix live (1 Verbindung, Idle-Cleanup 5 min)
 - Docker-Images auf dem Server: `eclipse-temurin:8-jre` (Debian, Java 8), `11/17/21/25-jre-alpine`. ⚠️ **Java-16-Images existieren nicht mehr auf Docker Hub** (MC 1.16.5 läuft auf Java 11)
-- Letzter Commit: `ddae59a` — Arbeitsbaum sauber
+- Letzter Commit: siehe git log — Arbeitsbaum sauber
 
-**Heutige Session (2026-08-12) — Highlights:**
-- **Forge-Modpack-Fix:** Java-8-Alpine hatte keine ECDHE-Cipher (TLS `handshake_failure`) → Debian-Image + TLSv1.2; Java 16 → 11. Container-Start: `useradd -o` (UID-1000-Konflikt im Debian-Image) + `env PATH` im su
-- **Audit 1 (Sicherheit/Performance):** 10 Findings gefixt — Download-Streaming (kein RAM-Puffer), async scrypt, Restore-Rollback + Symlink-Guard, Scheduler-Overlap + Crash-Loop-Auto-Stop, WS-Poller-Dedupe (ein Poller pro Server), 30-min-Create-Fenster, unhandledrejection-Logger
-- **Audit 2 (Funktionen):** Port-Edit-Fix (rconPort + server.properties/velocity.toml + Toast "wird nach Recreate aktiv"), Name-Injection-Schutz, Command-Limits, Schedule-Zeitzonen-Hinweis, PUT-Port-Bereich 65525
-- **Polish:** Batch-Delete-/Kick-/Ban-Confirms, Dirty-State-Warnung beim Tab-Wechsel, Upload-Toasts, Avatar-Fallback, sichtbarer Restart-Countdown mit Abbrechen
-- **RCON persistent** (eine Verbindung pro Server statt pro Poll) — eliminiert den "Thread RCON Client started/stopped"-Log-Spam an der Wurzel
-- **install.sh-Audit:** .env jetzt VOR dem Frontend-Build (BACKEND_URL-Bug bei Custom-Ports), `--dir`-Bug (Services interpolierten /opt/mcpanel nicht), Ubuntu-Docker-Repo, Smoke-Test (30s /api/health), API-Key bleibt bei Reinstall, Live-Spinner mit Sekundenzähler pro Schritt
-- **Aufräumen:** Auto-Sicherheitsbackups entfernt (Delete sofort), gzip Level 1, Dashboard-Hover, TopBar-Modpack-Button raus (im New-Server-Wizard), Velocity-Felder bereinigt (maxPlayers/voicePort ausgeblendet), Create-Dialog schlägt freien Port vor (inkl. RCON+voice-Ports)
+**Heutige Session (2026-08-13) — Highlights:**
+- **"Session ID unknown" (400) erklärt:** engine.io-Race beim Seitenwechsel (alter Polling-Request mit veralteter sid) — harmlos, Client baut selbst eine frische Session auf. Kein Fix (User-Entscheid)
+- **Stale-Process-Bug gefunden + behoben:** Deploy-Race am 08-12 01:55 (Restart 1s VOR tsc-Ende) → Prozess lief 32h mit altem Code → persistenter-RCON-Fix nie aktiv → RCON-Spam flutete latest.log → Panel-Logs wirkten leer. Fix: `systemctl restart` + End-to-End-Verifikation
+- **Neuer Endpoint `GET /api/servers/:id/log`:** kombiniert neueste rotierte `.log.gz` + latest.log (Tail-Cap 1 MB/Source, gz-Cache 10 min) → 17h-History jetzt im LogsTab + Console-History sichtbar
 
 **Offene Punkte / nächste Schritte:**
 - [ ] install.sh nur **statisch** validiert — kompletter Live-Test auf frischer VM/CT steht aus (User hat Test angeboten)
-- [ ] RCON-Spam-Fix (persistente Verbindung) live noch nicht verifiziert — beim nächsten Server-Start prüfen (Console ruhig, 1× started/stopped)
 - [ ] Crash-Loop-Schutz (Scheduler, ≥15 Restarts → Auto-Stop) braucht echten Crash-Test
 - [ ] Transienter `next/font outfit`-Build-Fehler auf dem Server (Google-Fonts-Download) — einfach erneut `npx next build`
 
 **Warnungen / Lehren:**
-- ⚠️ **Niemals Sammel-SCP in einen Ordner** (`scp a b c server:/ordner/`) — hat 2× Streu-Dateien verursacht (`src/services/index.ts`, `components/page.tsx`). Immer einzeln mit korrektem Zielpfad kopieren, dann `npx tsc`/`next build` auf dem Server prüfen.
-- ⚠️ Delete/Recreate/Restore machen seit heute **keine Auto-Backups** mehr (User-Wunsch) — manuelles + geplantes Backup funktionieren weiter.
+- ⚠️ **Niemals Sammel-SCP in einen Ordner** (`scp a b c server:/ordner/`) — hat mehrfach Streu-Dateien verursacht. Immer einzeln mit korrektem Zielpfad, dann `npx tsc`/`next build` auf dem Server prüfen.
+- ⚠️ **Deploy-Race:** `systemctl restart` NIE ohne abgeschlossenen Build ausführen — IMMER `npx tsc && systemctl restart mcpanel-backend` in EINER Kette (der 01:55-Deploy startete den Prozess 1s vor tsc-Ende → Server lief 32h mit altem Code, RCON-Fix inaktiv).
+- ⚠️ Delete/Recreate/Restore machen **keine Auto-Backups** mehr (User-Wunsch) — manuelles + geplantes Backup funktionieren weiter.
 
 
 
@@ -1134,3 +1130,24 @@ Alle 9 Features aus dem abgenommenen Mockup (`screenshots/mockup-features.html`)
 AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (direkt nach Project Identity): aktueller Zustand, Session-Highlights, offene Punkte (install.sh-Live-Test, RCON-Spam-Verifikation, Crash-Loop-Test), Warnungen (Sammel-SCP-Lehre, keine Auto-Backups mehr). Core Working Principles um die SCP-Warnung ergänzt. Alle Änderungen committet + gepusht, Arbeitsbaum sauber.
 
 > **Last updated:** 2026-08-12 · Session-Abschluss: Briefing + Lehren dokumentiert
+
+---
+
+### 2026-08-13 — "Session ID unknown" erklärt, Stale-Process-Fix, rotierte Logs im Panel
+
+**"Session ID unknown" (400) — Diagnose:** engine.io-Race beim Seitenwechsel. Dashboard + Detailseite bauen je eine eigene Socket.IO-Verbindung (Polling-only, da Next.js-Rewrites keine WS-Upgrades proxien); beim Navigieren reißt der alte Socket ab, während ein Long-Poll-Request mit veralteter `sid` noch in der Luft ist → 400 `{"code":1,"message":"Session ID unknown"}`. Der Client baut selbst eine frische Session auf ("Connected to server console" erscheint trotzdem). Harmlos, Einmal-Rauschen pro Navigation. **Kein Fix** (User-Entscheid; Backend-Uptime + WS-Log bestätigten: kein Crash/Restart).
+
+**"Leere Logs trotz 17h Uptime" — Root-Cause-Kette:**
+1. **Deploy-Race am 08-12 01:55:** `systemctl restart mcpanel-backend` feuerte **1s VOR tsc-Fertigstellung** (Prozess-Start 01:55:50, `dist/services/rcon.js` mtime 01:55:51.013) → der Prozess lud den **PRE-Fix-Code** (persistenter-RCON-Fix, Commit `6f3bebf`, war als Datei da, aber nie im RAM). Backend lief 32h mit altem Code.
+2. Folge: Jeder TPS-/Players-Poll (alle 5s, sobald Panel offen) öffnete eine **frische RCON-Verbindung** → `latest.log` bestand NUR aus "Thread RCON Client started/shutting down"-Spam (50+ Verbindungen in 7 min, Zähler #10→#50).
+3. Der Panel-Filter (cleanAnsi + LogsTab) entfernt genau diese Zeilen → **Console + LogsTab wirkten komplett leer**.
+4. Zusätzlich: Paper 26.2 loggt fast nichts (75 Zeilen in 17,5h — Startup + RCON-Rauschen, keine Autosave-Logs, keine Spieler) und der echte Startup (15:08 UTC) lag in der rotierten `logs/2026-08-12-1.log.gz`, die LogsTab nicht las.
+
+**Fixes:**
+- `systemctl restart mcpanel-backend` → lädt den aktuellen Code. **Verifiziert (End-to-End):** WS-Simulation (15s TPS+Players-Subscriptions via socket.io-client) → `started-delta: 1` (vorher ~6+), Verbindung fd=24 durchgehend stabil; Idle-Cleanup schließt nach 5 min (Log: started 08:52:19 → shutting down 08:56:57). Health 200.
+- **Neu `GET /api/servers/:id/log`** (servers.ts): kombiniert neueste rotierte `*.log.gz` (per zlib dekomprimiert, Tail-Cap 1 MB, **gz-Cache 10 min** — der 5s-LogsTab-Poll re-dekomprimiert kein statisches Archiv) + latest.log (Tail-Read 1 MB) → `{sources, content}`.
+- **Frontend:** LogsTab + ConsoleTab-History laden jetzt `/log` (statt `/file?path=/logs/latest.log`); LogsTab-Label `logs/ (latest.log + .gz)`, Empty-State bei leerem Content.
+
+**Verifiziert (Live):** Endpoint liefert `sources: [2026-08-12-1.log.gz, latest.log]` mit dem 17h-Startup ("[bootstrap] Running Java 25…"), Backend tsc 0 Fehler, Frontend `next build` OK, Panel 200, API-Proxy 200, RCON ruhig (keine offenen Verbindungen ohne Panel).
+
+> **Last updated:** 2026-08-13 · Session: Session-ID-400 erklärt, Deploy-Race gefunden (Stale-Process), RCON-Fix live verifiziert, rotierte Logs via `/:id/log`

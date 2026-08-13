@@ -19,10 +19,11 @@ export default function LogsTab({ serverId }: Props) {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/logs/latest.log")}`);
+      const res = await fetch(`${API_BASE}/api/servers/${serverId}/log`);
       if (res.status === 404) { await res.text(); setError("not_started"); setLogContent(null); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (!data.content) { setError("not_started"); setLogContent(null); return; }
       // eslint-disable-next-line no-control-regex
       setLogContent(data.content
         .replace(/\x1b/g, "")
@@ -61,7 +62,7 @@ export default function LogsTab({ serverId }: Props) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-surface px-3 py-2">
         <ScrollText className="h-4 w-4 text-slate-500 shrink-0" />
-        <span className="text-xs text-slate-500">logs/latest.log</span>
+        <span className="text-xs text-slate-500">logs/ (latest.log + .gz)</span>
         <div className="relative flex-1 min-w-[120px]">
           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-600" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"

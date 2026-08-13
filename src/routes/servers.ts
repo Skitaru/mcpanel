@@ -4,6 +4,7 @@ import { Router, Request, Response } from "express";
 import { v4 as uuid } from "uuid";
 import path from "node:path";
 import fs from "node:fs";
+import zlib from "node:zlib";
 import multer from "multer";
 import { CreateServerRequest, ServerConfig, ServerStatus, ServerType } from "../types";
 import {
@@ -553,6 +554,123 @@ router.get("/:id/logs", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[api] GET /api/servers/:id/logs error:", err);
     res.status(500).json({ error: "Failed to read container logs.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/:id/log — log FILES (newest rotated archive + latest.log)
+// ---------------------------------------------------------------------------
+// latest.log only spans the current rotation period; the history (e.g. the
+// startup after a restart) lives in the rotated `logs/*.log.gz` archives.
+// This endpoint combines the newest archive (older) with latest.log (current)
+// so the whole recent story is visible in one view.
+
+const MAX_LOG_BYTES = 1_048_576; // 1 MB tail cap per source
+
+/** Keep only the last `maxBytes` of decompressed text, cut at a line boundary. */
+function tailBuffer(buf: Buffer, maxBytes: number): string {
+  if (buf.length <= maxBytes) return buf.toString("utf8");
+  let text = buf.subarray(buf.length - maxBytes).toString("utf8");
+  const nl = text.indexOf("\n");
+  if (nl > 0) text = text.slice(nl + 1);
+  return text;
+}
+
+/** Decompress a .log.gz archive completely (bounded by caller usage). */
+function gunzipFile(filePath: string): Promise<Buffer> {
+  return fs.promises.readFile(filePath).then((buf) =>
+    new Promise<Buffer>((resolve, reject) => {
+      zlib.gunzip(buf, (err, out) => (err ? reject(err) : resolve(out)));
+    }),
+  );
+}
+
+/**
+ * Find the newest `*.log.gz` in a server's logs dir and return its decompressed
+ * tail. Cached per file (keyed by name+mtime+size) so the 5 s LogsTab poll
+ * doesn't re-decompress a static archive on every tick.
+ */
+const gzCache = new Map<string, { key: string; content: string; at: number }>();
+const GZ_CACHE_TTL_MS = 10 * 60_000;
+
+async function getRotatedLogTail(
+  logsDir: string,
+): Promise<{ name: string; content: string } | null> {
+  let newest: { name: string; mtimeMs: number; size: number } | null = null;
+  try {
+    const names = await fs.promises.readdir(logsDir);
+    for (const name of names) {
+      if (!name.endsWith(".log.gz")) continue;
+      const st = await fs.promises.stat(path.join(logsDir, name));
+      if (!newest || st.mtimeMs > newest.mtimeMs) {
+        newest = { name, mtimeMs: st.mtimeMs, size: st.size };
+      }
+    }
+  } catch {
+    return null; // logs dir missing/empty — fine
+  }
+  if (!newest) return null;
+
+  const key = `${newest.name}:${newest.mtimeMs}:${newest.size}`;
+  const cached = gzCache.get(newest.name);
+  if (cached && cached.key === key && Date.now() - cached.at < GZ_CACHE_TTL_MS) {
+    return { name: newest.name, content: cached.content };
+  }
+
+  try {
+    const buf = await gunzipFile(path.join(logsDir, newest.name));
+    const content = tailBuffer(buf, MAX_LOG_BYTES);
+    gzCache.set(newest.name, { key, content, at: Date.now() });
+    return { name: newest.name, content };
+  } catch {
+    return null; // corrupted archive — skip it
+  }
+}
+
+/** Read latest.log, tail-capped to MAX_LOG_BYTES (streams the tail for big files). */
+async function getLatestLogTail(logsDir: string): Promise<string> {
+  const p = path.join(logsDir, "latest.log");
+  let st: fs.Stats;
+  try {
+    st = await fs.promises.stat(p);
+  } catch {
+    return "";
+  }
+  if (st.size <= MAX_LOG_BYTES) {
+    const buf = await fs.promises.readFile(p);
+    return tailBuffer(buf, MAX_LOG_BYTES);
+  }
+  const fh = await fs.promises.open(p, "r");
+  try {
+    const buf = Buffer.alloc(MAX_LOG_BYTES);
+    const { bytesRead } = await fh.read(buf, 0, MAX_LOG_BYTES, st.size - MAX_LOG_BYTES);
+    return tailBuffer(buf.subarray(0, bytesRead), MAX_LOG_BYTES);
+  } finally {
+    await fh.close();
+  }
+}
+
+router.get("/:id/log", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+
+    const logsDir = path.join(server.dataPath, "logs");
+    const parts: string[] = [];
+    const sources: string[] = [];
+
+    // Older history first (newest rotated archive), then the current log.
+    const rotated = await getRotatedLogTail(logsDir);
+    if (rotated?.content) { parts.push(rotated.content); sources.push(rotated.name); }
+
+    const latest = await getLatestLogTail(logsDir);
+    if (latest) { parts.push(latest); sources.push("latest.log"); }
+
+    const content = parts.join("\n");
+    res.json({ path: "/logs", sources, size: Buffer.byteLength(content, "utf8"), content });
+  } catch (err: any) {
+    console.error("[api] GET /api/servers/:id/log error:", err);
+    res.status(500).json({ error: "Failed to read log files." });
   }
 });
 

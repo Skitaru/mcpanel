@@ -308,14 +308,13 @@ export default function ConsoleTab({
       console.warn(`[panel] players error: ${payload.message}`);
     });
 
-    // ---- load log history ----
+    // ---- load log history ---- (rotated archives + latest.log)
     (async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/servers/${serverId}/file?path=${encodeURIComponent("/logs/latest.log")}&raw=true`,
-        );
-        if (res.ok && res.status !== 204 && !cancelled) {
-          const text = await res.text();
+        const res = await fetch(`${API_BASE}/api/servers/${serverId}/log`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          const text = data.content ?? "";
           if (text) {
             // eslint-disable-next-line no-control-regex
             const cleaned = text.replace(/\x1b/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "");
