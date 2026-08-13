@@ -133,6 +133,17 @@ export function getJwtSecret(): string {
   return loadJwtSecretSync();
 }
 
+/** The configured panel username (e.g. "admin"). Used by the SFTP server to
+ *  split per-server logins ("admin.<server>"). */
+export async function getConfigUsername(): Promise<string | null> {
+  try {
+    const config = await loadConfig();
+    return config.username;
+  } catch {
+    return null;
+  }
+}
+
 /** Change the password. Rotates the JWT secret → invalidates all existing tokens. */
 export async function changePassword(currentPassword: string, newPassword: string): Promise<{ success: true } | { error: string }> {
   const config = await loadConfig();

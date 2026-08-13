@@ -10,10 +10,12 @@ import {
   verifyCredentials,
   generateToken,
   changePassword,
+  getJwtSecret,
 } from "./services/auth";
 import { startScheduler } from "./services/scheduler";
-import { startSftpServer, getSftpPort } from "./services/sftp";
+import { startSftpServer, getSftpPort, sftpUsernameFor } from "./services/sftp";
 import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
 
 const PORT = process.env.PANEL_PORT ? parseInt(process.env.PANEL_PORT, 10) : 3000;
 
@@ -182,9 +184,24 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-// ---- SFTP info (port for the frontend access card) ----
-app.get("/api/sftp/info", (_req, res) => {
-  res.json({ enabled: true, port: getSftpPort() });
+// ---- SFTP info (port + base username for the frontend access card) ----
+app.get("/api/sftp/info", (req, res) => {
+  // authMiddleware already validated the JWT — decode it for the username.
+  let username = "admin";
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    try {
+      const payload = jwt.verify(auth.slice(7), getJwtSecret()) as { username?: string };
+      if (payload.username) username = payload.username;
+    } catch { /* fall back to default */ }
+  }
+  res.json({
+    enabled: true,
+    port: getSftpPort(),
+    username,
+    // helper the frontend can use to build per-server logins
+    usernameFor: (serverName: string) => sftpUsernameFor(username, serverName),
+  });
 });
 
 // ---- system info (max RAM, etc.) ----

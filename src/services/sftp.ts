@@ -15,7 +15,7 @@ import fsp, { type FileHandle } from "node:fs/promises";
 import type { Dir, Stats } from "node:fs";
 import path from "node:path";
 import { Server } from "ssh2";
-import { verifyCredentials } from "./auth";
+import { verifyCredentials, getConfigUsername } from "./auth";
 import { loadServers } from "./config-store";
 
 // ---- SFTP-Status-Codes (SSH_FX_*) ----
@@ -58,9 +58,10 @@ interface ServerEntry {
 }
 
 type Resolved =
-  | { type: "root" }
-  | { type: "server"; entry: ServerEntry }
-  | { type: "real"; entry: ServerEntry; abs: string }
+  | { type: "root" }                                  // all-Modus: "/" (Serverliste)
+  | { type: "server"; entry: ServerEntry }            // all-Modus: "/<name>"
+  | { type: "serverroot"; entry: ServerEntry }        // server-Modus: "/" = dataPath
+  | { type: "real"; entry: ServerEntry; abs: string } // tiefer Pfad
   | { type: "none" };
 
 type Handle =
@@ -120,15 +121,31 @@ function recordSuccess(ip: string): void {
 // Virtual filesystem
 // ---------------------------------------------------------------------------
 
-/** Split + normalize a client-supplied virtual path into clean segments. */
+/** Split + normalize a client-supplied virtual path into clean segments.
+ *  "." / "./" / ".." / "/" all resolve to the root (no segments). */
 function splitVirtual(vpath: string): string[] {
-  return path.posix.normalize(vpath.replace(/\\/g, "/")).split("/").filter(Boolean);
+  // normalize: "." stays ".", "./" stays "./", "/a/./b" → "/a/b",
+  // "/a/../b" → "/b", "../x" stays "../x" (traversal above root clamps to root)
+  const norm = path.posix.normalize(vpath.replace(/\\/g, "/"));
+  const segs = norm.split("/").filter((s) => s !== "" && s !== ".");
+  if (segs.length === 0 || segs[0] === "..") return [];
+  return segs;
 }
 
+/** A login can either see all servers (virtual root) or be pinned to one. */
+type SftpScope =
+  | { type: "all"; entries: Map<string, ServerEntry> }
+  | { type: "server"; entry: ServerEntry };
+
 /** Resolve virtual segments to a real location. */
-function resolveVirtual(segs: string[], entries: Map<string, ServerEntry>): Resolved {
+function resolveVirtual(segs: string[], scope: SftpScope): Resolved {
+  if (scope.type === "server") {
+    // Root IS the server's data dir — everything below maps into it.
+    if (segs.length === 0) return { type: "serverroot", entry: scope.entry };
+    return { type: "real", entry: scope.entry, abs: path.join(scope.entry.dataPath, ...segs) };
+  }
   if (segs.length === 0) return { type: "root" };
-  const entry = entries.get(segs[0]);
+  const entry = scope.entries.get(segs[0]);
   if (!entry) return { type: "none" };
   if (segs.length === 1) return { type: "server", entry };
   return { type: "real", entry, abs: path.join(entry.dataPath, ...segs.slice(1)) };
@@ -238,10 +255,39 @@ function getEntries(): Map<string, ServerEntry> {
 }
 
 // ---------------------------------------------------------------------------
+// Per-server login ("admin.<server>") — root is pinned to one server folder
+// ---------------------------------------------------------------------------
+
+/** SFTP username suffix for a server folder. The frontend sends the server
+ *  name with spaces replaced by "_"; the backend matches both forms. */
+export function sftpUsernameFor(base: string, serverName: string): string {
+  return `${base}.${serverName.replace(/\s+/g, "_")}`;
+}
+
+/** Find a server entry by its login suffix (exact or "_"-for-space form). */
+function findEntryBySuffix(suffix: string, entries: Map<string, ServerEntry>): ServerEntry | undefined {
+  const exact = entries.get(suffix);
+  if (exact) return exact;
+  const spaced = suffix.replace(/_/g, " ");
+  for (const e of entries.values()) if (e.name === spaced) return e;
+  return undefined;
+}
+
+/** Build the scope for an SFTP session: pinned to one server or all servers. */
+function buildScope(suffix: string | null, entries: Map<string, ServerEntry>): SftpScope {
+  if (suffix) {
+    const entry = findEntryBySuffix(suffix, entries);
+    if (entry) return { type: "server", entry };
+    console.warn(`[sftp] Unknown server suffix in login: "${suffix}" — falling back to all servers`);
+  }
+  return { type: "all", entries };
+}
+
+// ---------------------------------------------------------------------------
 // SFTP session handler
 // ---------------------------------------------------------------------------
 
-function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
+function handleSftp(sftp: SftpStream, scope: SftpScope): void {
   const handles = new Map<number, Handle>();
   let handleCount = 0;
 
@@ -267,7 +313,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- OPEN (file) ----
   sftp.on("OPEN", (reqid: number, filename: string, flags: number) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -355,10 +401,10 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- OPENDIR ----
   sftp.on("OPENDIR", (reqid: number, dirname: string) => {
     const segs = splitVirtual(dirname);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type === "root") return sftp.handle(reqid, newHandle({ kind: "rootdir", exhausted: false }));
-    if (res.type !== "real" && res.type !== "server") return sftp.status(reqid, STATUS.NO_SUCH_FILE);
-    const abs = res.type === "server" ? res.entry.dataPath : res.abs;
+    if (res.type === "none") return sftp.status(reqid, STATUS.NO_SUCH_FILE);
+    const abs = res.type === "server" || res.type === "serverroot" ? res.entry.dataPath : res.abs;
     assertInside(res.entry.realRoot, abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
       try {
@@ -378,7 +424,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
       // The client re-requests READDIR until EOF — serve entries once, then EOF.
       if (h.exhausted) return sftp.status(reqid, STATUS.EOF);
       h.exhausted = true;
-      const names = [...entries.values()].map((e) => ({
+      const names = (scope.type === "all" ? [...scope.entries.values()] : [scope.entry]).map((e) => ({
         filename: e.name,
         longname: longname({ mode: DIR_MODE, size: 0, mtime: 0 }, e.name),
         attrs: { mode: DIR_MODE, uid: 0, gid: 0, size: 0, atime: 0, mtime: 0 },
@@ -408,9 +454,10 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- STAT / LSTAT ----
   const statHandler = (symlink: boolean) => (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
-    if (res.type === "root") return sftp.attrs(reqid, { mode: DIR_MODE, uid: 0, gid: 0, size: 0, atime: 0, mtime: 0 });
-    if (res.type === "server") return sftp.attrs(reqid, { mode: DIR_MODE, uid: 0, gid: 0, size: 0, atime: 0, mtime: 0 });
+    const res = resolveVirtual(segs, scope);
+    if (res.type === "root" || res.type === "server" || res.type === "serverroot") {
+      return sftp.attrs(reqid, { mode: DIR_MODE, uid: 0, gid: 0, size: 0, atime: 0, mtime: 0 });
+    }
     if (res.type !== "real") return sftp.status(reqid, STATUS.NO_SUCH_FILE);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -428,7 +475,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- SETSTAT ----
   sftp.on("SETSTAT", (reqid: number, filename: string, attrs: any) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -450,7 +497,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- REMOVE ----
   sftp.on("REMOVE", (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -466,7 +513,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- MKDIR ----
   sftp.on("MKDIR", (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -482,7 +529,7 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- RMDIR ----
   sftp.on("RMDIR", (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(res.entry.realRoot, res.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
@@ -497,8 +544,8 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
 
   // ---- RENAME ----
   sftp.on("RENAME", (reqid: number, oldPath: string, newPath: string) => {
-    const from = resolveVirtual(splitVirtual(oldPath), entries);
-    const to = resolveVirtual(splitVirtual(newPath), entries);
+    const from = resolveVirtual(splitVirtual(oldPath), scope);
+    const to = resolveVirtual(splitVirtual(newPath), scope);
     if (from.type !== "real" || to.type !== "real") {
       return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     }
@@ -519,18 +566,19 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
   // ---- REALPATH ----
   sftp.on("REALPATH", (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type === "none") return sftp.status(reqid, STATUS.NO_SUCH_FILE);
-    const virt = res.type === "root" ? "/" : res.type === "server"
-      ? `/${res.entry.name}`
-      : `/${res.entry.name}/${segs.slice(1).join("/")}`;
+    const virt = res.type === "root" || res.type === "serverroot" ? "/"
+      : res.type === "server"
+        ? `/${res.entry.name}`
+        : `/${res.entry.name}/${segs.slice(1).join("/")}`;
     sftp.name(reqid, [{ filename: virt, longname: "", attrs: {} }]);
   });
 
   // ---- READLINK ----
   sftp.on("READLINK", (reqid: number, filename: string) => {
     const segs = splitVirtual(filename);
-    const res = resolveVirtual(segs, entries);
+    const res = resolveVirtual(segs, scope);
     if (res.type !== "real") return sftp.status(reqid, STATUS.NO_SUCH_FILE);
     fsp.readlink(res.abs).then(
       (target) => sftp.name(reqid, [{ filename: target, longname: "", attrs: {} }]),
@@ -540,12 +588,12 @@ function handleSftp(sftp: SftpStream, entries: Map<string, ServerEntry>): void {
 
   // ---- SYMLINK (target first per SFTP spec, ssh2 emits linkPath, targetPath) ----
   sftp.on("SYMLINK", (reqid: number, linkPath: string, targetPath: string) => {
-    const linkRes = resolveVirtual(splitVirtual(linkPath), entries);
+    const linkRes = resolveVirtual(splitVirtual(linkPath), scope);
     if (linkRes.type !== "real") return sftp.status(reqid, STATUS.PERMISSION_DENIED);
     assertInside(linkRes.entry.realRoot, linkRes.abs).then(async (ok) => {
       if (!ok) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
       const targetAbs = targetPath.startsWith("/")
-        ? (() => { const r = resolveVirtual(splitVirtual(targetPath), entries); return r.type === "real" ? r.abs : null; })()
+        ? (() => { const r = resolveVirtual(splitVirtual(targetPath), scope); return r.type === "real" ? r.abs : null; })()
         : path.join(path.dirname(linkRes.abs), targetPath);
       if (!targetAbs) return sftp.status(reqid, STATUS.PERMISSION_DENIED);
       try {
@@ -580,14 +628,31 @@ export function startSftpServer(): void {
       if (isBlocked(ip)) {
         return ctx.reject(["password"]);
       }
-      verifyCredentials(ctx.username, ctx.password).then((ok) => {
-        if (ok) {
-          recordSuccess(ip);
-          ctx.accept();
+      // Per-server logins use "<base>.<server>" (e.g. "admin.Test"). Split the
+      // base username off so the panel password still validates, then pin the
+      // SFTP root to that one server.
+      getConfigUsername().then((base) => {
+        if (!base) return ctx.reject(["password"]);
+        let authUser = ctx.username;
+        let serverSuffix: string | null = null;
+        if (ctx.username === base) {
+          authUser = base;
+        } else if (ctx.username.startsWith(`${base}.`)) {
+          authUser = base;
+          serverSuffix = ctx.username.slice(base.length + 1);
         } else {
-          recordFail(ip);
-          ctx.reject(["password"]);
+          return ctx.reject(["password"]);
         }
+        verifyCredentials(authUser, ctx.password).then((ok) => {
+          if (ok) {
+            recordSuccess(ip);
+            (client as any)._sftpServerSuffix = serverSuffix;
+            ctx.accept();
+          } else {
+            recordFail(ip);
+            ctx.reject(["password"]);
+          }
+        }).catch(() => ctx.reject(["password"]));
       }).catch(() => ctx.reject(["password"]));
     });
 
@@ -602,7 +667,8 @@ export function startSftpServer(): void {
           // Register handlers SYNCHRONOUSLY — ssh2 answers any request that
           // arrives without a listener with OP_UNSUPPORTED. The entries map
           // comes from the (pre-filled) cache, so early requests work too.
-          handleSftp(sftp, getEntries());
+          const suffix = (client as any)._sftpServerSuffix ?? null;
+          handleSftp(sftp, buildScope(suffix, getEntries()));
           refreshEntries().catch((err) => console.error("[sftp] Failed to build server entries:", err));
         });
       });
