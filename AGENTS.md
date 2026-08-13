@@ -1205,7 +1205,8 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 - Logs: combined + Einzel-Datei (gz dekomprimiert) ✓; Schedule GET/PUT ✓; Properties GET/PUT (Format: `{properties:{...}}`) ✓
 - RCON-Command ✓; Backup-Job mit Live-Progress (9→100%) + Download 227 MB + gzip valid + Delete ✓
 - Create-Job (202→done) → Start (RCON/TPS 20 antwortet) → Recreate → Delete (Container weg) ✓ — Hinweis: frischer Server mit 1G RAM braucht >2 min bis Ping antwortet (Welt-Gen) — kein Panel-Bug
-- CF-Proxy: 400 ohne Key, sauberer Fehler bei ungültigem Key ✓ — **kompletter Modpack-Install-Test steht aus (wartet auf CF-API-Key vom User!)**
+- CF-Proxy: 400 ohne Key, sauberer Fehler bei ungültigem Key ✓
+- **Modpack-Install-Test KOMPLETT BESTANDEN** (Fabulously Optimized 14.0.0-beta.4 für MC 26.2, Fabric): CF-Search ✓ → CF-Files (30 Versionen) ✓ → POST /modpack (sofortige serverId) ✓ → async Install ✓ → Server "running" ✓ → 22 Mods + fabric-server-launch.jar + overrides/config ✓ → Welt geladen in 32,7s, RCON aktiv ✓ → Delete + Cleanup ✓. Hinweis: "tps"→Unknown-command bei Fabric/Vanilla ist normal (Paper-only-Befehl, Poller failt silent).
 
 **Neues Feature: Status-Tab mit Ressourcen-Graphen (User-Entscheid aus Feature-Planung):**
 - **Backend:** History-Ringpuffer in websocket.ts (360 Samples × 5s = 30 min) — wird direkt aus dem Live-Stats/TPS-Stream gefüllt (kein eigener Poller; merge-t TPS in offene 5s-Samples). Neue Route `GET /api/servers/:id/history`. `clearHistory` beim Server-Delete.
