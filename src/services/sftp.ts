@@ -140,8 +140,11 @@ type SftpScope =
 /** Resolve virtual segments to a real location. */
 function resolveVirtual(segs: string[], scope: SftpScope): Resolved {
   if (scope.type === "server") {
-    // Root IS the server's data dir — everything below maps into it.
+    // Root IS the server's data dir — everything below maps into it. Also
+    // accept "/<serverName>" as an alias for the root, so clients with a
+    // saved start path ("/Test") keep working after the per-server login.
     if (segs.length === 0) return { type: "serverroot", entry: scope.entry };
+    if (segs.length === 1 && segs[0] === scope.entry.name) return { type: "serverroot", entry: scope.entry };
     return { type: "real", entry: scope.entry, abs: path.join(scope.entry.dataPath, ...segs) };
   }
   if (segs.length === 0) return { type: "root" };
