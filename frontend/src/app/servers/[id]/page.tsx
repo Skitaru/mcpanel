@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
-  Terminal, FolderOpen, ScrollText, Settings2, Archive, CalendarClock,
+  Terminal, FolderOpen, ScrollText, Settings2, Archive, CalendarClock, Activity,
   Loader2, AlertTriangle, Trash2, Play, Square, Upload, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import ConsoleTab from "@/components/ConsoleTab";
+import StatusTab from "@/components/StatusTab";
 import FileManagerTab from "@/components/FileManagerTab";
 import LogsTab from "@/components/LogsTab";
 import BackupsTab from "@/components/BackupsTab";
@@ -22,10 +23,11 @@ import type { ServerStatus } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-type Tab = "console" | "files" | "logs" | "backups" | "schedule";
+type Tab = "console" | "status" | "files" | "logs" | "backups" | "schedule";
 
 const SUB_NAV_ITEMS: { id: Tab; label: string; icon: typeof Terminal }[] = [
   { id: "console", label: "Console", icon: Terminal },
+  { id: "status", label: "Status", icon: Activity },
   { id: "files", label: "File Manager", icon: FolderOpen },
   { id: "logs", label: "Server Logs", icon: ScrollText },
   { id: "backups", label: "Backups", icon: Archive },
@@ -48,7 +50,7 @@ export default function ServerDetailPage() {
   // URL sync: ?tab=files|logs|backups|schedule survives refresh & deep-linking (after mount to avoid SSR hydration mismatch)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "files" || t === "logs" || t === "backups" || t === "schedule") setActiveTab(t);
+    if (t === "status" || t === "files" || t === "logs" || t === "backups" || t === "schedule") setActiveTab(t);
   }, []);
   const doTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
@@ -199,10 +201,11 @@ export default function ServerDetailPage() {
       const el = e.target as HTMLElement;
       if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable) return;
       if (e.key === "1") setTab("console");
-      else if (e.key === "2") setTab("files");
-      else if (e.key === "3") setTab("logs");
-      else if (e.key === "4") setTab("backups");
-      else if (e.key === "5") setTab("schedule");
+      else if (e.key === "2") setTab("status");
+      else if (e.key === "3") setTab("files");
+      else if (e.key === "4") setTab("logs");
+      else if (e.key === "5") setTab("backups");
+      else if (e.key === "6") setTab("schedule");
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -373,6 +376,10 @@ export default function ServerDetailPage() {
               {/* ── Viewport (ConsoleTab renders its own 2-column layout) ── */}
               <div className={`tab-content ${activeTab === "console" ? "" : "hidden"}`}>
                 <ConsoleTab serverId={serverId} serverStatus={server.status} port={server.port} ram={server.ram} serverType={server.serverType} version={server.version} startedAt={server.startedAt} restartTick={restartTick} diskUsage={diskUsage[server.id]} />
+              </div>
+
+              <div className={`tab-content ${activeTab === "status" ? "" : "hidden"}`}>
+                <StatusTab serverId={serverId} ram={server.ram} />
               </div>
 
               <div className={`tab-content ${activeTab === "files" ? "" : "hidden"}`}>

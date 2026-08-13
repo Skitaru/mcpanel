@@ -80,6 +80,58 @@ interface SocketSession {
 const sessions = new Map<string, SocketSession>();
 
 // ---------------------------------------------------------------------------
+// Resource history (Status tab) — ring buffer fed by the live stats/tps stream.
+// One sample per ~5 s per server, capped at 30 minutes (360 samples), so the
+// Status tab can draw CPU/RAM/TPS graphs without its own poller.
+// ---------------------------------------------------------------------------
+
+interface HistorySample {
+  t: number;          // ms timestamp
+  cpu: number | null; // percent
+  mem: number | null; // bytes
+  memLimit: number | null;
+  tps: number | null;
+}
+
+const MAX_HISTORY_SAMPLES = 360; // 30 min @ 5 s
+const history = new Map<string, HistorySample[]>();
+
+/** Merge a stats/tps update into the ring buffer (5 s per sample). */
+function recordSample(serverId: string, data: Partial<HistorySample>): void {
+  const now = Date.now();
+  const arr = history.get(serverId) ?? [];
+  const last = arr[arr.length - 1];
+  if (last && now - last.t < 5000) {
+    // Update the current sample with the freshest values (stats arrive faster
+    // than tps, so the tps field is back-filled into the open sample).
+    if (data.cpu != null) last.cpu = data.cpu;
+    if (data.mem != null) last.mem = data.mem;
+    if (data.memLimit != null) last.memLimit = data.memLimit;
+    if (data.tps != null) last.tps = data.tps;
+  } else {
+    arr.push({
+      t: now,
+      cpu: data.cpu ?? null,
+      mem: data.mem ?? null,
+      memLimit: data.memLimit ?? null,
+      tps: data.tps ?? null,
+    });
+    if (arr.length > MAX_HISTORY_SAMPLES) arr.shift();
+  }
+  history.set(serverId, arr);
+}
+
+/** Snapshot for GET /:id/history. */
+export function getHistory(serverId: string): HistorySample[] {
+  return history.get(serverId) ?? [];
+}
+
+/** Drop the buffer when a server is deleted. */
+export function clearHistory(serverId: string): void {
+  history.delete(serverId);
+}
+
+// ---------------------------------------------------------------------------
 // Shared RCON pollers — ONE poller per server, fanning out to every socket
 // subscribed to it (so N browser tabs don't fire N RCON requests per tick).
 // ---------------------------------------------------------------------------
@@ -209,6 +261,12 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
             memoryLimit: stats.memoryLimit,
             timestamp: Date.now(),
           });
+          // Feed the Status-tab history (independent of the emitting socket).
+          recordSample(serverId, {
+            cpu: stats.cpuPercent,
+            mem: stats.memoryUsage,
+            memLimit: stats.memoryLimit,
+          });
           // Update shared live-stats store for Discord embed
           updateLiveStats(serverId, { cpuPercent: stats.cpuPercent, memoryUsage: stats.memoryUsage, memoryLimit: stats.memoryLimit });
         });
@@ -279,6 +337,8 @@ export function setupWebSocket(httpServer: HttpServer): SocketIOServer {
                 tps5m: parseFloat(match[3]),
                 timestamp: Date.now(),
               });
+              // Feed the Status-tab history (tps back-filled into open sample).
+              recordSample(serverId, { tps: parseFloat(match[1]) });
               // Update shared live-stats for Discord embed
               updateLiveStats(serverId, { tps5s: parseFloat(match[1]) });
             }

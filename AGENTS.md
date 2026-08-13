@@ -1194,3 +1194,26 @@ AGENTS.md um einen **"Session Briefing — Stand 2026-08-12"**-Block erweitert (
 **Deploy:** 4 Dateien einzeln scp'd, `next build` OK, Frontend-Restart, Panel 200, Proxy 200. Kein Backend-Change.
 
 > **Last updated:** 2026-08-13 · Session Teil 3: Mobile-Audit — Dialog-Overlay-Fixes (max-h+scroll), Console-Endlos-Bug (flex-basis), Grid-Responsive
+
+---
+
+### 2026-08-13 (Teil 4) — Funktionstest A–F + Status-Tab mit Ressourcen-Graphen
+
+**Funktionstest (Live, Test-Server Paper 26.2) — ALLE BESTANDEN:**
+- Auth (Login JWT / falsches Passwort 401 / API-Key / health ohne Token 200), Server-Status, Disk, Players, System-Stats
+- File Manager: List/Read/Write/Create/Upload/Delete ✓, Traversal-Guard 404 ✓, latest.log-Delete-Guard 403 ✓
+- Logs: combined + Einzel-Datei (gz dekomprimiert) ✓; Schedule GET/PUT ✓; Properties GET/PUT (Format: `{properties:{...}}`) ✓
+- RCON-Command ✓; Backup-Job mit Live-Progress (9→100%) + Download 227 MB + gzip valid + Delete ✓
+- Create-Job (202→done) → Start (RCON/TPS 20 antwortet) → Recreate → Delete (Container weg) ✓ — Hinweis: frischer Server mit 1G RAM braucht >2 min bis Ping antwortet (Welt-Gen) — kein Panel-Bug
+- CF-Proxy: 400 ohne Key, sauberer Fehler bei ungültigem Key ✓ — **kompletter Modpack-Install-Test steht aus (wartet auf CF-API-Key vom User!)**
+
+**Neues Feature: Status-Tab mit Ressourcen-Graphen (User-Entscheid aus Feature-Planung):**
+- **Backend:** History-Ringpuffer in websocket.ts (360 Samples × 5s = 30 min) — wird direkt aus dem Live-Stats/TPS-Stream gefüllt (kein eigener Poller; merge-t TPS in offene 5s-Samples). Neue Route `GET /api/servers/:id/history`. `clearHistory` beim Server-Delete.
+- **Frontend:** Neue `StatusTab.tsx` — 3 SVG-Area-Charts (CPU cyan, RAM violett, TPS grün/gelb/rot je nach Wert) + große aktuelle Werte, 5s-Poll, Live-Badge, Empty-State. Dependency-frei (eigene SparkArea mit Gradient).
+- **Detailseite:** Neuer Tab "Status" (Icon Activity) nach Console, Shortcuts 1-6 (2=Status), URL-Sync `?tab=status`.
+
+**Deploy:** websocket.ts + servers.ts + StatusTab.tsx + [id]/page.tsx einzeln gescp't, Backend tsc+Restart (Health 200), Frontend next build+Restart (Panel 200). History-Pipeline verifiziert (5 Samples in 18s, TPS-Backfill ✓).
+
+**Feature-Planung (User priorisiert):** 1. Status-Tab ✅ (umgesetzt) · 2. SFTP (mittlerer/großer Aufwand, Panel als SFTP-Server Port 2222) · 3. Benutzergruppen/Multi-User (großes Auth-Rework) · 4. Subuser (hängt an 3) — offen für spätere Runden.
+
+> **Last updated:** 2026-08-13 · Session Teil 4: Funktionstest A–F bestanden, Status-Tab mit Graphen implementiert

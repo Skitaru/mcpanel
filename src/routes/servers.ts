@@ -32,6 +32,7 @@ import { downloadPaperJar } from "../services/paper";
 import { downloadFabricJar } from "../services/fabric";
 import { downloadVelocityJar } from "../services/velocity";
 import { pingMinecraftServer } from "../services/minecraft-ping";
+import { getHistory, clearHistory } from "../services/websocket";
 
 const router = Router();
 
@@ -787,6 +788,9 @@ router.delete("/:id", async (req: Request, res: Response) => {
     // 3. Remove from config store.
     await removeServer(server.id);
 
+    // Drop the Status-tab history buffer.
+    clearHistory(server.id);
+
     console.log(`[api] Deleted server "${server.name}" (${server.id.slice(0, 8)})`);
     res.json({ message: `Server "${server.name}" deleted.` });
   } catch (err: any) {
@@ -1043,6 +1047,21 @@ router.get("/:id/disk", async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: "Failed to get disk usage.", detail: err.message });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/servers/:id/history — resource history for the Status tab
+// (ring buffer fed by the live WebSocket stats/tps stream, ~5 s samples).
+// ---------------------------------------------------------------------------
+router.get("/:id/history", async (req: Request, res: Response) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) { res.status(404).json({ error: "Server not found." }); return; }
+    res.json({ serverId: server.id, samples: getHistory(server.id) });
+  } catch (err: any) {
+    console.error("[api] GET /api/servers/:id/history error:", err);
+    res.status(500).json({ error: "Failed to read history." });
   }
 });
 
