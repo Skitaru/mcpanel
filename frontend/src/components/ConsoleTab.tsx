@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
-  TerminalSquare, Users, Search, X, Check, Copy, FolderOpen,
+  TerminalSquare, Users, Search, X,
 } from "lucide-react";
 import AddressPill from "@/components/AddressPill";
 import QuickCommands from "@/components/QuickCommands";
@@ -45,7 +45,6 @@ interface StatsPayload {
 
 interface Props {
   serverId: string;
-  serverName: string;
   serverStatus: "running" | "exited" | "created" | "paused" | "unknown";
   port: number;
   ram: number; // MB
@@ -83,7 +82,7 @@ function formatUptime(seconds: number) {
 // ---------------------------------------------------------------------------
 
 export default function ConsoleTab({
-  serverId, serverName, serverStatus, port, ram, serverType, version, startedAt, restartTick, diskUsage,
+  serverId, serverStatus, port, ram, serverType, version, startedAt, restartTick, diskUsage,
 }: Props) {
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,33 +118,6 @@ export default function ConsoleTab({
   // so both columns end flush (whatever the Quick Commands state).
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarH, setSidebarH] = useState<number | undefined>(undefined);
-
-  // ---- SFTP access info (port from backend, host = current location) ----
-  const [sftpPort, setSftpPort] = useState<number | null>(null);
-  const [sftpCopied, setSftpCopied] = useState(false);
-  useEffect(() => {
-    fetch(`${API_BASE}/api/sftp/info`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.port) setSftpPort(d.port); })
-      .catch(() => {});
-  }, []);
-
-  const sftpAddr = sftpPort
-    ? `sftp://${typeof window !== "undefined" ? window.location.hostname : "—"}:${sftpPort}/${serverName}`
-    : null;
-  const copySftp = useCallback(() => {
-    if (!sftpAddr) return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(sftpAddr);
-    } else {
-      const ta = document.createElement("textarea");
-      ta.value = sftpAddr; ta.style.position = "fixed"; ta.style.opacity = "0";
-      document.body.appendChild(ta); ta.select();
-      document.execCommand("copy"); document.body.removeChild(ta);
-    }
-    setSftpCopied(true);
-    setTimeout(() => setSftpCopied(false), 1500);
-  }, [sftpAddr]);
 
   useEffect(() => {
     const el = sidebarRef.current;
@@ -733,20 +705,6 @@ export default function ConsoleTab({
               hoverReveal
             />
           </div>
-          {sftpAddr && (
-            <div className="mt-2 flex items-center gap-1.5 min-w-0" title={sftpAddr}>
-              <FolderOpen className="h-3 w-3 shrink-0 text-accent/70" />
-              <span className="font-mono text-[11px] text-slate-400 truncate">sftp://…/{serverName}</span>
-              <button
-                onClick={copySftp}
-                aria-label="Copy SFTP address"
-                title="Copy SFTP address"
-                className="rounded p-0.5 text-slate-600 transition hover:text-slate-400 shrink-0"
-              >
-                {sftpCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-              </button>
-            </div>
-          )}
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-xs text-muted">Uptime</span>
             <span className="text-sm font-bold tabular-nums text-white">{formatUptime(upSeconds)}</span>
